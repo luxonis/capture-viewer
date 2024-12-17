@@ -212,8 +212,12 @@ if __name__ == "__main__":
     update_button.pack(side="right")
 
     # Sliders for setting range
+    display_images(root, canvas, view_info, current_view)
+    image, range_min, range_max = colorize_depth(current_view["depth"], "depth", False, None, None)
     min_slider = Scale(root, from_=0, to=slider_upper_range, orient=VERTICAL, label="Min Value")  # Adjust range and labels as needed
     max_slider = Scale(root, from_=0, to=slider_upper_range, orient=VERTICAL, label="Max Value")  # Adjust range and labels as needed
+    min_slider.set(range_min)
+    max_slider.set(range_max)
     min_slider.pack(side=RIGHT, fill="y")
     max_slider.pack(side=RIGHT, fill="y")
     # Function to update slider ranges and constraints
@@ -229,6 +233,7 @@ if __name__ == "__main__":
     min_slider.config(command=update_sliders)
     max_slider.config(command=update_sliders)
 
-    display_images(root, canvas, view_info, current_view)
+    view_info["max_slider"] = max_slider.get()
+    view_info["min_slider"] = min_slider.get()
 
     root.mainloop()
