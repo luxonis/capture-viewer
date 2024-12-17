@@ -305,7 +305,7 @@ class ReplayVisualizer:
 
         config_json = {}
         sucess = open_replay_settings_screen(config_json, original_config=self.view_info['metadata']['settings'])  # Call open_popup and capture the returned JSON
-        print("Selected config_json:", config_json)
+        print("\nSelected config_json:", config_json)
         # config_json = str(config_json)
         if not sucess:
             self.settings_received = False

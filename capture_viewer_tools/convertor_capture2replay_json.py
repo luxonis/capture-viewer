@@ -32,6 +32,12 @@ decimation_set_dict = {
     'PIXEL_SKIPPING': 'StereoDepthConfig.PostProcessing.DecimationFilter.DecimationMode.PIXEL_SKIPPING'
 }
 
+CT_kernel_dict = {
+    "KERNEL_5x5": "StereoDepthConfig.CensusTransform.KernelSize.KERNEL_5x5",
+    "KERNEL_7x7": "StereoDepthConfig.CensusTransform.KernelSize.KERNEL_7x7",
+    "KERNEL_7x9": "StereoDepthConfig.CensusTransform.KernelSize.KERNEL_7x9"
+}
+
 
 # Generic conversion function
 def handle_dict(value, key_dict, reverse=False):
@@ -178,7 +184,8 @@ def config2settings(config, capture_data):
         },
         "FPS": capture_data["FPS"],
         "num_captures": capture_data["num_captures"],
-        "replay_generated": True
+        "replay_generated": True,
+        "custom_advanced_settings": True if 'cfg.censusTransform.kernelSize' in config else False
     }
 
     return settings

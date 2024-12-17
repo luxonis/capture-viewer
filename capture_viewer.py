@@ -45,6 +45,7 @@ def run_capture_script(session, selected_streams):
     try:
         subprocess.Popen(command)
         print(f"Ran capture script for session: {session_path} with streams: {selected_streams}")
+        print("\n")
     except subprocess.CalledProcessError as e:
         print(f"Error running capture script for session: {session_path}")
         print(e)

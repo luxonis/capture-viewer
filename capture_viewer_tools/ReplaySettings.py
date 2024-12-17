@@ -3,7 +3,8 @@ from tkinter import ttk
 import sys
 import os
 
-from capture_viewer_tools.convertor_capture2replay_json import settings2config, handle_dict, decimation_set_dict
+from capture_viewer_tools.convertor_capture2replay_json import settings2config, handle_dict, decimation_set_dict, \
+    CT_kernel_dict
 from capture_viewer_tools.popup_info import show_popup
 
 # Define a dictionary of default settings
@@ -26,10 +27,10 @@ default_config = {
     'cfg.postProcessing.speckleFilter.enable': False,
     'cfg.postProcessing.speckleFilter.speckleRange': 100,
     'cfg.postProcessing.spatialFilter.enable': False,
-    'cfg.postProcessing.spatialFilter.holeFillingRadius': 2,
+    'cfg.postProcessing.spatialFilter.holeFillingRadius': 1,
     'cfg.postProcessing.spatialFilter.numIterations': 1,
-    'cfg.postProcessing.spatialFilter.alpha': 5,
-    'cfg.postProcessing.spatialFilter.delta': 5,
+    'cfg.postProcessing.spatialFilter.alpha': 0.5,
+    'cfg.postProcessing.spatialFilter.delta': 3,
     'cfg.postProcessing.thresholdFilter.enable': False,
     'cfg.postProcessing.thresholdFilter.minRange': 0,
     'cfg.postProcessing.thresholdFilter.maxRange': 65535,
@@ -78,9 +79,12 @@ def get_filter_order_back(order_string):
 
 def open_replay_settings_screen(config, original_config=None):
 
-    def update_label(var, label):
+    def update_label(var, label, form="int"):
         """Update the label when slider is moved."""
-        label.config(text=str(var.get()))
+        if form == "int":
+            label.config(text=str(int(var.get())))
+        elif form == "float":
+            label.config(text=str(round(float(var.get()), 1)))
     def on_generate():
         if filtering_order_enable.get(): # needs to be the first item for the config to not be initialised in case of wrong filtering order
             if not check_valid_filtering_order([decimation_order.get(), median_order.get(), speckle_order.get(), spatial_order.get(), temporal_order.get()]):
@@ -100,6 +104,8 @@ def open_replay_settings_screen(config, original_config=None):
 
         if subpixelBox_val.get():
             config['stereo.setSubpixelFractionalBits'] = fractional_bits_combo.get()
+
+
 
         # FILTERS
         # Note: temporal filter disabled due to the nature of data (not continuous recording)
@@ -140,13 +146,29 @@ def open_replay_settings_screen(config, original_config=None):
             config['cfg.postProcessing.decimationFilter.decimationFactor'] = decimation_factor_val.get()
             config['cfg.postProcessing.decimationFilter.decimationMode'] = handle_dict(decimation_mode_val.get(), decimation_set_dict)  # leave this is correct
 
+
+        # ADVANCED SETTINGS
+        if advanced_settings_enable.get():
+            config["cfg.censusTransform.kernelSize"] = handle_dict(CT_kernel_val.get(), CT_kernel_dict)
+            config["cfg.censusTransform.enableMeanMode"] = mean_mode_enable.get()
+            config["cfg.censusTransform.threshold"] = CT_threshold_val.get()
+
+            config["cfg.costAggregation.divisionFactor"] = division_factor_val.get()
+            config["cfg.costAggregation.horizontalPenaltyCostP1"] = horizontal_penalty_p1_val.get()
+            config["cfg.costAggregation.horizontalPenaltyCostP2"] = horizontal_penalty_p2_val.get()
+            config["cfg.costAggregation.verticalPenaltyCostP1"] = vertical_penalty_p1_val.get()
+            config["cfg.costAggregation.verticalPenaltyCostP2"] = vertical_penalty_p2_val.get()
+
+            config["cfg.costMatching.confidenceThreshold"] = confidence_threshold_val.get()
+            config["cfg.costMatching.linearEquationParameters.alpha"] = CM_alpha_val.get()
+            config["cfg.costMatching.linearEquationParameters.beta"] = CM_beta_val.get()
+            config["cfg.costMatching.linearEquationParameters.threshold"] = matching_threshold_val.get()
+
         popup_window.destroy()
         popup_window1.destroy()
         return config
 
     if original_config is not None:
-        print("ORIGINAL CONFIG")
-        print(settings2config(original_config))
         current_config = settings2config(original_config)
     else:
         current_config = default_config
@@ -201,7 +223,6 @@ def open_replay_settings_screen(config, original_config=None):
     fractional_bits = tk.IntVar(value=current_config['stereo.setSubpixelFractionalBits'])
 
     # FILTERS -----------------------------------------------------------------------------------
-    print("CURRENT CONFIG", current_config)
     filtering_order_enable = tk.BooleanVar(value=(True if 'cfg.postProcessing.filteringOrder' in current_config else False))
     if 'cfg.postProcessing.filteringOrder' in current_config:
         initial_filter_order = get_filter_order_back(current_config['cfg.postProcessing.filteringOrder'])
@@ -237,7 +258,7 @@ def open_replay_settings_screen(config, original_config=None):
                                                                     default_config['cfg.postProcessing.spatialFilter.holeFillingRadius']))
     num_iterations_slider = tk.IntVar(value=current_config.get('cfg.postProcessing.spatialFilter.numIterations',
                                                                default_config['cfg.postProcessing.spatialFilter.numIterations']))
-    alpha_slider = tk.IntVar(value=current_config.get('cfg.postProcessing.spatialFilter.alpha',
+    alpha_slider = tk.DoubleVar(value=current_config.get('cfg.postProcessing.spatialFilter.alpha',
                                                       default_config['cfg.postProcessing.spatialFilter.alpha']))
     delta_slider = tk.IntVar(value=current_config.get('cfg.postProcessing.spatialFilter.delta',
                                                       default_config['cfg.postProcessing.spatialFilter.delta']))
@@ -266,7 +287,6 @@ def open_replay_settings_screen(config, original_config=None):
     #                                                                       (True, False))
     # cfg['cfg.censusTransform.threshold'] = trial.suggest_int('cfg.censusTransform.threshold', 0, 255)
     #
-    # # TODO what are good bounds for costAggregation.divisionFactor?
     # cfg['cfg.costAggregation.divisionFactor'] = trial.suggest_int('cfg.costAggregation.divisionFactor', 1, 100)
     # cfg['cfg.costAggregation.horizontalPenaltyCostP1'] = trial.suggest_int(
     #     'cfg.costAggregation.horizontalPenaltyCostP1', 0, 500, step=10)
@@ -525,16 +545,17 @@ def open_replay_settings_screen(config, original_config=None):
     ttk.Label(spatial_frame, text="Alpha").grid(row=2, column=0, padx=10, pady=10, sticky="w")
     alpha_label = ttk.Label(spatial_frame, text=str(alpha_slider.get()))
     alpha_label.grid(row=2, column=2, padx=10, pady=10, sticky="w")
-    ttk.Scale(spatial_frame, from_=1, to=10, variable=alpha_slider, orient="horizontal",
-              command=lambda x: update_label(alpha_slider, alpha_label)).grid(row=2, column=1, padx=10, pady=10,
+    ttk.Scale(spatial_frame, from_=0, to=1, variable=alpha_slider, orient="horizontal",
+              command=lambda x: update_label(alpha_slider, alpha_label, form="float")).grid(row=2, column=1, padx=10, pady=10,
                                                                               sticky="e")
 
     ttk.Label(spatial_frame, text="Delta").grid(row=2, column=3, padx=10, pady=10, sticky="w")
     delta_label = ttk.Label(spatial_frame, text=str(delta_slider.get()))
-    delta_label.grid(row=2, column=5, padx=10, pady=10, sticky="w")
-    ttk.Scale(spatial_frame, from_=1, to=10, variable=delta_slider, orient="horizontal",
-              command=lambda x: update_label(delta_slider, delta_label)).grid(row=2, column=4, padx=10, pady=10,
-                                                                              sticky="e")
+    delta_spinbox = ttk.Spinbox(spatial_frame, from_=0, to=255, textvariable=delta_slider,
+                                command=lambda: update_label(delta_slider, delta_label))
+    delta_spinbox.grid(row=2, column=4, padx=10, pady=10, sticky="e")
+    ttk.Label(spatial_frame, text="(0, 255)").grid(row=2, column=5, padx=10, pady=10, sticky="w")
+
     current_row += 1
 
     # Threshold Filter Frame
@@ -546,20 +567,21 @@ def open_replay_settings_screen(config, original_config=None):
     threshold_filter_checkbox = ttk.Checkbutton(threshold_frame, variable=threshold_filter_enable)
     threshold_filter_checkbox.grid(row=0, column=1, padx=10, pady=10, sticky="e")
 
-    # Threshold Filter (Min and Max on one row)
+    # Threshold Filter Min and Max with Spinboxes
     ttk.Label(threshold_frame, text="Min").grid(row=1, column=0, padx=10, pady=10, sticky="w")
-    min_range_label = ttk.Label(threshold_frame, text=str(min_range_val.get()))
-    min_range_label.grid(row=1, column=2, padx=10, pady=10, sticky="w")
-    ttk.Scale(threshold_frame, from_=0, to=int(max_range_val.get()), variable=min_range_val, orient="horizontal",
-              command=lambda x: update_label(min_range_val, min_range_label)).grid(row=1, column=1, padx=10, pady=10,
-                                                                                   sticky="e")
+    min_range_spinbox = ttk.Spinbox(threshold_frame, from_=0, to=int(max_range_val.get()), textvariable=min_range_val,
+                                    width=10)
+    min_range_spinbox.grid(row=1, column=1, padx=10, pady=10, sticky="e")
+    ttk.Label(threshold_frame, text="(0, " + str(max_range_val.get()) + ")").grid(row=1, column=2, padx=10, pady=10,
+                                                                                  sticky="w")
 
     ttk.Label(threshold_frame, text="Max").grid(row=1, column=3, padx=10, pady=10, sticky="w")
-    max_range_label = ttk.Label(threshold_frame, text=str(max_range_val.get()))
-    max_range_label.grid(row=1, column=5, padx=10, pady=10, sticky="w")
-    ttk.Scale(threshold_frame, from_=int(min_range_val.get()), to=65535, variable=max_range_val, orient="horizontal",
-              command=lambda x: update_label(max_range_val, max_range_label)).grid(row=1, column=4, padx=10, pady=10,
-                                                                                   sticky="e")
+    max_range_spinbox = ttk.Spinbox(threshold_frame, from_=int(min_range_val.get()), to=65535,
+                                    textvariable=max_range_val, width=10)
+    max_range_spinbox.grid(row=1, column=4, padx=10, pady=10, sticky="e")
+    ttk.Label(threshold_frame, text="(" + str(min_range_val.get()) + ", 65535)").grid(row=1, column=5, padx=10, pady=10,
+                                                                                      sticky="w")
+
     current_row += 1
 
     # Decimation Filter Group (in a LabelFrame with a black border)
@@ -590,37 +612,127 @@ def open_replay_settings_screen(config, original_config=None):
 
 
 
+    # ADVANCED SETTINGS ----------------------------------------------------------------------------------------------
+    # todo - add default depthai values
+    advanced_settings_enable = tk.BooleanVar(value=False)
+    mean_mode_enable = tk.BooleanVar(value=False)
+    CT_kernel_val = tk.StringVar(value='KERNEL_5x5')
+    CT_threshold_val = tk.IntVar(value=0)
+    division_factor_val = tk.IntVar(value=1)
+    horizontal_penalty_p1_val = tk.IntVar(value=0)
+    horizontal_penalty_p2_val = tk.IntVar(value=0)
+    vertical_penalty_p1_val = tk.IntVar(value=0)
+    vertical_penalty_p2_val = tk.IntVar(value=0)
+    confidence_threshold_val = tk.IntVar(value=0)
+    CM_alpha_val = tk.IntVar(value=0)
+    CM_beta_val = tk.IntVar(value=0)
+    matching_threshold_val = tk.IntVar(value=0)
 
+    advanced_stereo_setting_frame = ttk.LabelFrame(popup_window, text="Advanced Settings", padding=(10, 10))
+    advanced_stereo_setting_frame.grid(row=current_row, column=0, columnspan=6, padx=10, pady=10, sticky="ew")
 
-    # # ADVANCED SETTINGS ----------------------------------------------------------------------------------------------
-    # enable_advanced_settings = tk.BooleanVar(value=False)
-    # # decimation_factor_val = tk.IntVar(value=current_config.get('cfg.postProcessing.decimationFilter.decimationFactor', default_config['cfg.postProcessing.decimationFilter.decimationFactor']))
-    # CT_kernel_val = tk.StringVar(value='dai.StereoDepthConfig.CensusTransform.KernelSize.KERNEL_5x5')
-    #
-    # advanced_stereo_setting_frame = ttk.LabelFrame(popup_window, text="Advanced Settings", padding=(10, 10))
-    # advanced_stereo_setting_frame.grid(row=current_row, column=0, columnspan=6, padx=10, pady=10, sticky="ew")
-    #
-    # ttk.Label(advanced_stereo_setting_frame, text="Enable Advanced Settings").grid(row=0, column=0, padx=10, pady=10, sticky="w")
-    # advanced_settings_checkbox = ttk.Checkbutton(advanced_stereo_setting_frame, variable=enable_advanced_settings)
-    # advanced_settings_checkbox.grid(row=0, column=1, padx=10, pady=10, sticky="e")
-    #
-    # # Decimation Filter (Factor and Mode on one row)
-    # # ttk.Label(advanced_stereo_setting_frame, text="Factor").grid(row=1, column=0, padx=10, pady=10, sticky="w")
-    # # decimation_factor_label = ttk.Label(advanced_stereo_setting_frame)
-    # # decimation_factor_label.grid(row=1, column=2, padx=10, pady=10, sticky="w")
-    # # decimation_factor_dropdown = ttk.Combobox(advanced_stereo_setting_frame, values=[1, 2, 3, 4], textvariable=decimation_factor_val,
-    # #                                           state="readonly")
-    # # decimation_factor_dropdown.grid(row=1, column=1, padx=10, pady=10, sticky="e")
-    #
-    # ttk.Label(advanced_stereo_setting_frame, text="censusTransform.kernelSize").grid(row=1, column=0, padx=10, pady=10, sticky="w")
-    # CT_kernel_dropdown = ttk.Combobox(advanced_stereo_setting_frame, textvariable=CT_kernel_val, values=[
-    #     'dai.StereoDepthConfig.CensusTransform.KernelSize.KERNEL_5x5',
-    #     'dai.StereoDepthConfig.CensusTransform.KernelSize.KERNEL_7x7',
-    #     'dai.StereoDepthConfig.CensusTransform.KernelSize.KERNEL_7x9'
-    # ], state="readonly")
-    # CT_kernel_dropdown.grid(row=1, column=1, padx=10, pady=10, sticky="e")
-    #
-    # current_row += 1
+    ttk.Label(advanced_stereo_setting_frame, text="Enable Advanced Settings").grid(row=0, column=0, padx=10, pady=10, sticky="w")
+    advanced_settings_checkbox = ttk.Checkbutton(advanced_stereo_setting_frame, variable=advanced_settings_enable)
+    advanced_settings_checkbox.grid(row=0, column=1, padx=10, pady=10, sticky="e")
+
+    ttk.Label(advanced_stereo_setting_frame, text="censusTransform.kernelSize").grid(row=1, column=0, padx=10, pady=10, sticky="w")
+    CT_kernel_dropdown = ttk.Combobox(advanced_stereo_setting_frame, textvariable=CT_kernel_val, values=[
+        'KERNEL_5x5',
+        'KERNEL_7x7',
+        'KERNEL_7x9'
+    ], state="readonly")
+    CT_kernel_dropdown.grid(row=1, column=1, padx=10, pady=10, sticky="e")
+
+    ttk.Label(advanced_stereo_setting_frame, text="censusTransform.enableMeanMode").grid(row=2, column=0, padx=10, pady=10,
+                                                                                   sticky="w")
+    mean_mode_checkbox = ttk.Checkbutton(advanced_stereo_setting_frame, variable=mean_mode_enable)
+    mean_mode_checkbox.grid(row=2, column=1, padx=10, pady=10, sticky="e")
+
+    ttk.Label(advanced_stereo_setting_frame, text="censusTransform.threshold").grid(row=3, column=0, padx=10, pady=10,
+                                                                                    sticky="w")
+    threshold_spinbox = ttk.Spinbox(advanced_stereo_setting_frame, from_=0, to=255,
+                                    textvariable=CT_threshold_val, width=10  # You can adjust the width as needed
+    )
+    threshold_spinbox.grid(row=3, column=1, padx=10, pady=10, sticky="e")
+    ttk.Label(advanced_stereo_setting_frame, text="(0, 255)").grid(row=3, column=2, padx=10, pady=10, sticky="w")
+
+    ttk.Label(advanced_stereo_setting_frame, text="costAggregation.divisionFactor").grid(row=4, column=0, padx=10,
+                                                                                         pady=10, sticky="w")
+    division_factor_spinbox = ttk.Spinbox(advanced_stereo_setting_frame, from_=1, to=100,
+                                          textvariable=division_factor_val, width=10)
+    division_factor_spinbox.grid(row=4, column=1, padx=10, pady=10, sticky="e")
+    ttk.Label(advanced_stereo_setting_frame, text="(1, 100)").grid(row=4, column=2, padx=10, pady=10, sticky="w")
+
+    ttk.Label(advanced_stereo_setting_frame, text="costAggregation.horizontalPenaltyCostP1").grid(row=5, column=0,
+                                                                                                  padx=10, pady=10,
+                                                                                                  sticky="w")
+    horizontal_penalty_p1_spinbox = ttk.Spinbox(advanced_stereo_setting_frame, from_=0, to=500,
+                                                textvariable=horizontal_penalty_p1_val, increment=10, width=10)
+    horizontal_penalty_p1_spinbox.grid(row=5, column=1, padx=10, pady=10, sticky="e")
+    ttk.Label(advanced_stereo_setting_frame, text="(0, 500)").grid(row=5, column=2, padx=10, pady=10, sticky="w")
+
+    ttk.Label(advanced_stereo_setting_frame, text="costAggregation.horizontalPenaltyCostP2").grid(row=6, column=0,
+                                                                                                  padx=10, pady=10,
+                                                                                                  sticky="w")
+    horizontal_penalty_p2_spinbox = ttk.Spinbox(advanced_stereo_setting_frame, from_=0, to=1000,
+                                                textvariable=horizontal_penalty_p2_val, increment=10, width=10)
+    horizontal_penalty_p2_spinbox.grid(row=6, column=1, padx=10, pady=10, sticky="e")
+    ttk.Label(advanced_stereo_setting_frame, text="(0, 1000)").grid(row=6, column=2, padx=10, pady=10, sticky="w")
+
+    ttk.Label(advanced_stereo_setting_frame, text="costAggregation.verticalPenaltyCostP1").grid(row=7, column=0,
+                                                                                                padx=10, pady=10,
+                                                                                                sticky="w")
+    vertical_penalty_p1_spinbox = ttk.Spinbox(advanced_stereo_setting_frame, from_=0, to=500,
+                                              textvariable=vertical_penalty_p1_val, increment=10, width=10)
+    vertical_penalty_p1_spinbox.grid(row=7, column=1, padx=10, pady=10, sticky="e")
+    ttk.Label(advanced_stereo_setting_frame, text="(0, 500)").grid(row=7, column=2, padx=10, pady=10, sticky="w")
+
+    ttk.Label(advanced_stereo_setting_frame, text="costAggregation.verticalPenaltyCostP2").grid(row=8, column=0,
+                                                                                                padx=10, pady=10,
+                                                                                                sticky="w")
+    vertical_penalty_p2_spinbox = ttk.Spinbox(advanced_stereo_setting_frame, from_=0, to=1000,
+                                              textvariable=vertical_penalty_p2_val, increment=10, width=10)
+    vertical_penalty_p2_spinbox.grid(row=8, column=1, padx=10, pady=10, sticky="e")
+    ttk.Label(advanced_stereo_setting_frame, text="(0, 1000)").grid(row=8, column=2, padx=10, pady=10, sticky="w")
+
+    ttk.Label(advanced_stereo_setting_frame, text="costMatching.confidenceThreshold").grid(row=9, column=0, padx=10,
+                                                                                           pady=10, sticky="w")
+    confidence_threshold_spinbox = ttk.Spinbox(advanced_stereo_setting_frame, from_=0, to=255,
+                                               textvariable=confidence_threshold_val, width=10)
+    confidence_threshold_spinbox.grid(row=9, column=1, padx=10, pady=10, sticky="e")
+    ttk.Label(advanced_stereo_setting_frame, text="(0, 255)").grid(row=9, column=2, padx=10, pady=10, sticky="w")
+
+    # Alpha Slider
+    ttk.Label(advanced_stereo_setting_frame, text="costMatching.linearEquationParameters.alpha").grid(row=10, column=0,
+                                                                                                      padx=10, pady=10,
+                                                                                                      sticky="w")
+    CM_alpha_slider = ttk.Scale(advanced_stereo_setting_frame, from_=0, to=10, variable=CM_alpha_val, orient="horizontal",
+                             command=lambda x: update_label(CM_alpha_slider, CM_alpha_label))
+    CM_alpha_slider.grid(row=10, column=1, padx=10, pady=10, sticky="ew")
+    CM_alpha_label = ttk.Label(advanced_stereo_setting_frame, text=str(int(CM_alpha_val.get())))
+    CM_alpha_label.grid(row=10, column=2, padx=10, pady=10, sticky="w")
+
+    # Beta Slider
+    ttk.Label(advanced_stereo_setting_frame, text="costMatching.linearEquationParameters.beta").grid(row=11, column=0,
+                                                                                                     padx=10, pady=10,
+                                                                                                     sticky="w")
+    CM_beta_slider = ttk.Scale(advanced_stereo_setting_frame, from_=0, to=10, variable=CM_beta_val, orient="horizontal",
+                            command=lambda x: update_label(CM_beta_slider, CM_beta_label))
+    CM_beta_slider.grid(row=11, column=1, padx=10, pady=10, sticky="ew")
+    CM_beta_label = ttk.Label(advanced_stereo_setting_frame, text=str(int(CM_beta_val.get())))
+    CM_beta_label.grid(row=11, column=2, padx=10, pady=10, sticky="w")
+
+    ttk.Label(advanced_stereo_setting_frame, text="costMatching.linearEquationParameters.threshold").grid(row=12,
+                                                                                                          column=0,
+                                                                                                          padx=10,
+                                                                                                          pady=10,
+                                                                                                          sticky="w")
+    matching_threshold_spinbox = ttk.Spinbox(advanced_stereo_setting_frame, from_=0, to=255,
+                                             textvariable=matching_threshold_val, width=10)
+    matching_threshold_spinbox.grid(row=12, column=1, padx=10, pady=10, sticky="e")
+    ttk.Label(advanced_stereo_setting_frame, text="(0, 255)").grid(row=12, column=2, padx=10, pady=10, sticky="w")
+
+    current_row += 1
 
     # cfg['cfg.censusTransform.kernelSize'] = trial.suggest_categorical(
     #     'cfg.censusTransform.kernelSize',
@@ -628,7 +740,7 @@ def open_replay_settings_screen(config, original_config=None):
     #      'dai.StereoDepthConfig.CensusTransform.KernelSize.KERNEL_7x7',
     #      'dai.StereoDepthConfig.CensusTransform.KernelSize.KERNEL_7x9'))
 
-    # # cfg['cfg.censusTransform.kernelMask'] = np.uint64(0X2AA00AA805540155)
+    # # cfg['cfg.censusTransform.kernelMask'] = np.uint64(0X2AA00AA805540155) # skip
     # cfg['cfg.censusTransform.enableMeanMode'] = trial.suggest_categorical('cfg.censusTransform.enableMeanMode',
     #                                                                       (True, False))
     # cfg['cfg.censusTransform.threshold'] = trial.suggest_int('cfg.censusTransform.threshold', 0, 255)
