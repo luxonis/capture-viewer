@@ -23,9 +23,9 @@ class ReplayVisualizer:
     def __init__(self, root, view_info, current_view):
         self.window = tk.Toplevel(root)
         self.window.title("Depth Visualization")
-        self.window.geometry("1800x1200")
+        self.window.geometry("2200x1200")
 
-        max_image_width = 500
+        max_image_width = 640
         max_image_height = 400
         self.scaled_original_size = calculate_scaled_dimensions(view_info['depth_size'], max_image_width, max_image_height)
         # self.scaled_original_size = view_info['depth_size']
@@ -246,8 +246,8 @@ class ReplayVisualizer:
         pcd = o3d.geometry.PointCloud()
         pcd.points = o3d.utility.Vector3dVector(pcl)
 
-
-        if color is not None:
+        print(config)
+        if color is not None and config['stereo.setDepthAlign'] == "dai.CameraBoardSocket.CAM_A":
             # Resize `isp_frame` to match the number of points
             isp_height, isp_width, _ = color.shape
             # Calculate the target dimensions
