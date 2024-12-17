@@ -61,6 +61,14 @@ class ReplayVisualizer:
             visualize_pointcloud_path = os.path.join(script_directory, 'visualize_pointcloud.py')
             subprocess.Popen(['python', visualize_pointcloud_path, self.pcl_path, str(self.config_json)])  # o3d.visualization.draw_geometries([pointcloud])
             time.sleep(1)
+
+        capture_depth_text_label = tk.Label(self.window, text="Capture Depth", font=("Arial", 12, "bold"))
+        capture_depth_text_label.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="nsew")
+        generated_depth_text_label = tk.Label(self.window, text="Generated Depth", font=("Arial", 12, "bold"))
+        generated_depth_text_label.grid(row=0, column=1, padx=10, pady=(10, 0), sticky="nsew")
+        difference_depth_text_label = tk.Label(self.window, text="Difference", font=("Arial", 12, "bold"))
+        difference_depth_text_label.grid(row=0, column=3, padx=10, pady=(10, 0), sticky="nsew")
+
         original_img_label = tk.Label(self.window)
         original_img_label.grid(row=1, column=0, padx=10, pady=10)
         generated_img_label = tk.Label(self.window)

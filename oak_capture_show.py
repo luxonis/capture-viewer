@@ -5,6 +5,10 @@ from capture_viewer_tools.capture_tools import extract_calibration_values
 from capture_viewer_tools.button_functions import *
 from capture_viewer_tools.popup_info import show_popup
 
+# change window size here
+canvas_width = 1920  # 1920
+canvas_height = 1000
+
 def load_data(folder, types):
     data = {}
     height, width = 0, 0
@@ -104,9 +108,6 @@ if __name__ == "__main__":
     else:
         datas = None, None, None, None, None, None, None, None
 
-    canvas_width = 1620  # 1920
-    canvas_height = 880
-
     if 'disparity' in selected_types or 'neural_disparity' in selected_types:
         slider_upper_range = 95
     else: slider_upper_range = 7000
@@ -149,20 +150,37 @@ if __name__ == "__main__":
 
     # ------------------- TINKER PART --------------------------
     root = Tk()
-    root.title(f"Depthai Capture Viewer: {capture_folder}")
+    root.title(f"Capture Viewer: {capture_folder}")
     canvas = Canvas(root, width=canvas_width, height=canvas_height, bg="black")
     canvas.pack()
 
-    prev_button = Button(root, text="<-", bg="yellow", activebackground="orange",
+    prev_button = Button(root, text="<-", bg="orange", activebackground="yellow",
                          command=lambda: on_prev(root, canvas, view_info, current_view))
-    next_button = Button(root, text="->", bg="yellow", activebackground="orange",
+    next_button = Button(root, text="->", bg="orange", activebackground="yellow",
                          command=lambda: on_next(root, canvas, view_info, current_view))
     next_button.pack(side="right")
     prev_button.pack(side="right")
 
+    def select_alignment():
+        current_view["alignSocket"] = align_socket.get()
+
     pointcloud_button = Button(root, text="OpenCV \nPointCloud", command=lambda: on_pointcloud_rgb(root, view_info, current_view,
                                                                                           downsample=False))
     pointcloud_button.pack(side="right")
+
+    align_button = Button(root, text="OpenCV\nAlignment\nset",
+                           command=select_alignment)
+    align_button.pack(side="right")
+
+
+    align_socket = StringVar(value="COLOR")
+    radiobutton_color = Radiobutton(root, text="COLOR", variable=align_socket, value="COLOR")
+    radiobutton_color.pack(side="right")
+    # radiobutton_right = Radiobutton(root, text="RIGHT", variable=align_socket, value="RIGHT")
+    # radiobutton_right.pack(side="right")  # right is not working
+    radiobutton_left = Radiobutton(root, text="LEFT", variable=align_socket, value="LEFT")
+    radiobutton_left.pack(side="right")
+
 
     # alignment_button = Button(root, text="Alignment", command=lambda: on_alignment(root, view_info, current_view))
     # alignment_button.pack(side="right")
@@ -175,19 +193,23 @@ if __name__ == "__main__":
     #                           command=lambda: on_alignment_ref(root, view_info, current_view))
     # alignment_button.pack(side="right")
 
-    info_button = Button(root, text="INFO",
-                              command=lambda: show_popup(str(view_info["metadata"])))
-    info_button.pack(side="right")
 
     canvas.tooltip = Label(root, text="", background="white", relief="solid", borderwidth=1, padx=2, pady=2)
     canvas.tooltip.place_forget()
 
     canvas.bind("<Motion>", lambda event: on_mouse_move(event, canvas))
 
-    replay_button = Button(root, text="REPLAY",  bg="RoyalBlue3", activebackground="RoyalBlue1",
+    replay_button = Button(root, text="REPLAY",  bg="#4169E1", activebackground="#63A8FF",
                               command=lambda: on_replay(root, view_info, current_view))
     replay_button.pack(side="left")
 
+    info_button = Button(root, text="INFO", bg="#32CD32", activebackground="#90EE90",
+                              command=lambda: show_popup(str(view_info["metadata"])))
+    info_button.pack(side="left")
+
+    update_button = Button(root, text="Colorize\nDepth", command=lambda: display_images(root, canvas, view_info, current_view,
+                                                                              min_slider.get(), max_slider.get()))
+    update_button.pack(side="right")
 
     # Sliders for setting range
     min_slider = Scale(root, from_=0, to=slider_upper_range, orient=VERTICAL, label="Min Value")  # Adjust range and labels as needed
@@ -206,25 +228,6 @@ if __name__ == "__main__":
     # Link sliders to update their behavior when changed
     min_slider.config(command=update_sliders)
     max_slider.config(command=update_sliders)
-
-    update_button = Button(root, text="Color", command=lambda: display_images(root, canvas, view_info, current_view,
-                                                                              min_slider.get(), max_slider.get()))
-    update_button.pack(side="right")
-
-    def select_alignment():
-        current_view["alignSocket"] = align_socket.get()
-
-    align_socket = StringVar(value="COLOR")
-    radiobutton_color = Radiobutton(root, text="COLOR", variable=align_socket, value="COLOR")
-    radiobutton_color.pack(side="left")
-    # radiobutton_right = Radiobutton(root, text="RIGHT", variable=align_socket, value="RIGHT")
-    # radiobutton_right.pack(side="left")  # right is not working
-    radiobutton_left = Radiobutton(root, text="LEFT", variable=align_socket, value="LEFT")
-    radiobutton_left.pack(side="left")
-
-    replay_button = Button(root, text="align", bg="RoyalBlue3", activebackground="RoyalBlue1",
-                           command=select_alignment)
-    replay_button.pack(side="left")
 
     display_images(root, canvas, view_info, current_view)
 

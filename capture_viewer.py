@@ -3,7 +3,7 @@ import argparse
 import json
 import tkinter as tk
 import subprocess
-import sys
+import time
 
 
 # Function to load session metadata from each session folder
@@ -44,8 +44,8 @@ def run_capture_script(session, selected_streams):
     # Run the command as a subprocess
     try:
         subprocess.Popen(command)
-        print(f"Ran capture script for session: {session_path} with streams: {selected_streams}")
-        print("\n")
+        time.sleep(4)
+        print(f"Opened capture script for session: {session_path} with streams: {selected_streams}")
     except subprocess.CalledProcessError as e:
         print(f"Error running capture script for session: {session_path}")
         print(e)

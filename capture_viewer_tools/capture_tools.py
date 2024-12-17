@@ -229,10 +229,11 @@ def create_placeholder_frame(size, text):
     return placeholder_image
 
 def device_connected():
+    print("connecting to device...")
     try:
         device = dai.Device()
-        print(device.getDeviceName())
+        print(f"Device connected: {device.getDeviceName()}")
         return True
     except RuntimeError:
-        print("No device connected. Connect a camera.")
+        print("No device connected. Connect a camera to use REPLAY features.")
         return False

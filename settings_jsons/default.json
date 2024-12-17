@@ -14,7 +14,7 @@
     "subpixelValue": 3,
     "highAccuracy": false,
     "highDensity": true,
-    "filters_on": true,
+    "filters_on": false,
     "filters": {
         "threshold_filter": false,
         "lower_threshold_filter": 1000,
@@ -29,5 +29,5 @@
         "median_size": "MEDIAN_OFF"
     },
     "FPS": 30,
-    "num_captures": 60
+    "num_captures": 20
 }
