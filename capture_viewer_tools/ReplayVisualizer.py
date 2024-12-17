@@ -124,18 +124,18 @@ class ReplayVisualizer:
             colorized_generated_depth = create_placeholder_frame(self.scaled_original_size, label)
             colorized_difference = None
         else:
-            colorized_generated_depth = colorize_depth(self.generated_depth, type="depth", label=0)
+            colorized_generated_depth, range_min, range_max = colorize_depth(self.generated_depth, type="depth", label=0, min_val=self.view_info["min_slider"], max_val=self.view_info["max_slider"])
             if self.generated_depth.shape != self.depth.shape:  # decimation filter downsamples, this upsamples
                 if self.depth.shape != self.generated_depth.shape:
                     height, width = self.depth.shape
                     self.generated_depth = cv2.resize(self.generated_depth, (width, height),
                                                       interpolation=cv2.INTER_NEAREST)
             depth_difference = np.abs(self.depth - self.generated_depth)
-            colorized_difference = colorize_depth(depth_difference, type="difference", label=0)
+            colorized_difference, range_min, range_max = colorize_depth(depth_difference, type="difference", label=0, min_val=self.view_info["min_slider"], max_val=self.view_info["max_slider"])
 
         # Update images
         # update original depth
-        colorized_depth = colorize_depth(self.depth, type="depth", label=0)
+        colorized_depth, range_min, range_max = colorize_depth(self.depth, type="depth", label=0, min_val=self.view_info["min_slider"], max_val=self.view_info["max_slider"])
         resized_depth = cv2.resize(colorized_depth, self.scaled_original_size,
                                              interpolation=cv2.INTER_AREA)
         im_original = ImageTk.PhotoImage(image=Image.fromarray(resized_depth))
