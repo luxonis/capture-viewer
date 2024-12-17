@@ -56,7 +56,7 @@ def extract_calibration_values_old(json_data, width=None, height=None):
 
     return M1, D1, M2, D2, T, R, TARGET_MATRIX, lensPosition
 
-def extract_calibration_values(calib, width, height, rgb_width, rgb_height, align="right"):
+def extract_calibration_values(calib: dai.CalibrationHandler, width, height, rgb_width, rgb_height, align="right"):
     RGB_SOCKET = dai.CameraBoardSocket.CAM_A
     LEFT_SOCKET = dai.CameraBoardSocket.CAM_B
     RIGHT_SOCKET = dai.CameraBoardSocket.CAM_C
@@ -82,7 +82,7 @@ def extract_calibration_values(calib, width, height, rgb_width, rgb_height, alig
 
     return M1, D1, M2, D2, T, R, TARGET_MATRIX, lensPosition
 
-def get_calibration_between_sockets(calib, SOCKET1, SOCKET2, size1, size2):
+def get_calibration_between_sockets(calib: dai.CalibrationHandler, SOCKET1, SOCKET2, size1, size2):
     """
     SOCKET1 is usually LEFT_SOCKET or RIGHT_SOCKET
     SOCKET2 is usually RGB_SOCKET
@@ -157,7 +157,7 @@ def colorize_depth(image, type, label=True, min_val=None, max_val=None, color_no
         colored_image = cv2.applyColorMap(scaled_disparity, cv2.COLORMAP_JET )
     elif type == 'difference':
         if np.all(image == 0):
-            return image
+            return image, max_val, min_val
         else:
             range_min, range_max = np.percentile(image[image > 0], [0, 100 - color_noise_percent_removal])
             if min_val is not None and max_val is not None:
@@ -196,7 +196,7 @@ def colorize_depth(image, type, label=True, min_val=None, max_val=None, color_no
     if label:
         cv2.putText(colored_image, type, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 1, cv2.LINE_AA)
 
-    return colored_image
+    return colored_image, range_min, range_max
 
 def calculate_scaled_dimensions(original_dimensions, max_width, max_height):
     original_width, original_height = original_dimensions

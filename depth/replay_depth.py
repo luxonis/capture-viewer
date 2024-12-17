@@ -433,7 +433,7 @@ def replay(frames, *, calib=None, stereo_config:str='', fps:int=30, outputs:Set[
             print(f"Timeout error. signal: {signame} ({signum}), frame: {frame}")
             raise TimeoutError()
 
-        signal.signal(signal.SIGALRM, handler)
+        #signal.signal(signal.SIGALRM, handler)
 
         for frame in frames:
             if len(frame) == 2:
@@ -444,7 +444,7 @@ def replay(frames, *, calib=None, stereo_config:str='', fps:int=30, outputs:Set[
             else:
                 raise ValueError(f'Unexpected length of frame {len(frame)}. Expected 2 or 3.')
             _send_images(device, {"left": left_frame, "right": right_frame, 'rgb': rgb_frame})
-            signal.alarm(timeout_s)
+            #signal.alarm(timeout_s)
             data = {name: queue.get() for name, queue in queues.items()}
-            signal.alarm(0)
+            #signal.alarm(0)
             yield {name: _convert(name, datum) for name, datum in data.items()}

@@ -47,7 +47,7 @@ def show_blended(rgb_image, depth_aligned2rgb):
     new_height = int(rgb_image.shape[0] * scale_factor)
 
     # colorise depth
-    alignedDepth_colored = colorize_depth(depth_aligned2rgb, "depth", label=False, color_noise_percent_removal=0.5)
+    alignedDepth_colored, range_min, range_max = colorize_depth(depth_aligned2rgb, "depth", label=False, color_noise_percent_removal=0.5)
 
     # Resize images
     frameBGR_resized = cv2.resize(rgb_image, (new_width, new_height))
@@ -282,7 +282,7 @@ def display_images(root, canvas, view_info, current_view, min_val=None, max_val=
             if len(image.shape) == 2:  # if grayscale, convert to BGR
                 image = np.stack((image,)*3, axis=-1)
             if key == 'depth' or key == 'disparity' or key == 'tof' or key == 'neural_disparity' or key == 'disparity_rescaled':
-                image = colorize_depth(image, key, False, min_val, max_val)
+                image, range_min, range_max = colorize_depth(image, key, False, min_val, max_val)
                 # image, type, label = True, min_val = None, max_val = None, color_noise_percent_removal = 1
 
             resized_image = resize_image(image, image_size)
