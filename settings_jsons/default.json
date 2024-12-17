@@ -1,17 +1,4 @@
-# capture-viewer
-Internal use python app to view and analyse data from OAK captures
-
-Requirements: Python=3.11
-
-```
-python capture_viewer.py /home/katka/PycharmProjects/capture-viewer/DATA
-```
-
-
-# Capture
-## Settings options
-TODO list options for each parameter
-```{
+{
     "ir": true,
     "ir_value": 1,
     "flood_light": false,
@@ -27,20 +14,20 @@ TODO list options for each parameter
     "subpixelValue": 3,
     "highAccuracy": false,
     "highDensity": true,
-    "filters_on": false,
+    "filters_on": true,
     "filters": {
-        "threshold_filter": true,
+        "threshold_filter": false,
         "lower_threshold_filter": 1000,
         "upper_threshold_filter": 5000,
         "decimation_filter": true,
         "decimation_factor": 2,
-        "spacial_filter": true,
-        "temporal_filter": true,
-        "speckle_filter": true,
+        "spacial_filter": false,
+        "temporal_filter": false,
+        "speckle_filter": false,
         "speckle_range": 50,
         "median_filter": false,
-        "median_size": "MEDIAN_3x3"
+        "median_size": "MEDIAN_OFF"
     },
     "FPS": 30,
     "num_captures": 60
-}```
+}
