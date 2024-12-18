@@ -139,6 +139,8 @@ def generate_color_scale_with_annotations_v2(range_min, range_max, image_height)
     return scale_image
 
 def colorize_depth(image, type, label=True, min_val=None, max_val=None, color_noise_percent_removal=1):
+    range_min = None
+    range_max = None
     if type == "depth" or type == "tof":
         if np.any(image > 0): range_min, range_max = np.percentile(image[image > 0], [0, 100-color_noise_percent_removal])
         else: range_min, range_max = 0, 0
@@ -147,12 +149,12 @@ def colorize_depth(image, type, label=True, min_val=None, max_val=None, color_no
         # print("depth min max:", range_min, range_max)
         colormap = cv2.COLORMAP_JET
     elif type == "disparity" or type == "neural_disparity" or type == "disparity_rescaled":
-        min_disparity = 0
-        max_disparity = 95
-        if min_val is not None and max_val is not None: min_disparity, max_disparity = min_val, max_val
+        range_min = 0
+        range_max = 95
+        if min_val is not None and max_val is not None: range_min, range_max = min_val, max_val
 
         # Normalize disparity to a fixed range without dynamic adjustments
-        normalized = np.clip((image - min_disparity) / (max_disparity - min_disparity), 0, 1)
+        normalized = np.clip((image - range_min) / (range_max - range_min), 0, 1)
         scaled_disparity = (normalized * 255).astype(np.uint8)
         colored_image = cv2.applyColorMap(scaled_disparity, cv2.COLORMAP_JET )
     elif type == 'difference':

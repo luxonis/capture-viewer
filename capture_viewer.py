@@ -4,7 +4,7 @@ import json
 import tkinter as tk
 import subprocess
 import time
-
+import customtkinter as ctk
 
 # Function to load session metadata from each session folder
 def load_sessions(folder_path):
@@ -53,7 +53,7 @@ def run_capture_script(session, selected_streams):
 
 # Function to create a Tkinter app with buttons for each session and stream selection
 def create_app(sessions):
-    root = tk.Tk()
+    root = ctk.CTk()
     root.title("Session Viewer")
 
     # Define number of columns for grid layout
@@ -62,17 +62,17 @@ def create_app(sessions):
     # Stream options to be selected
     stream_options = ['left', 'right', 'depth', 'disparity', 'isp', 'tof', 'neural_disparity', 'disparity_rescaled']  # Add more as needed
     on_off = [1, 1, 1, 0, 1, 0, 0, 0]
-    selected_streams_vars = {stream: tk.IntVar(value=on_off[idx]) for idx, stream in enumerate(stream_options)}
+    selected_streams_vars = {stream: ctk.IntVar(value=on_off[idx]) for idx, stream in enumerate(stream_options)}
 
     # Create checkboxes for each stream option and display them horizontally
-    stream_frame = tk.Frame(root)
+    stream_frame = ctk.CTkFrame(root)
     stream_frame.grid(row=0, column=0, columnspan=columns, padx=10, pady=10)
 
-    tk.Label(stream_frame, text="Select Streams to Display:").grid(row=0, column=0, columnspan=len(stream_options),
+    ctk.CTkLabel(stream_frame, text="Select Streams to Display:").grid(row=0, column=0, columnspan=len(stream_options),
                                                                    padx=5, pady=5)
 
     for idx, stream in enumerate(stream_options):
-        checkbox = tk.Checkbutton(stream_frame, text=stream, variable=selected_streams_vars[stream])
+        checkbox = ctk.CTkCheckBox(stream_frame, text=stream, variable=selected_streams_vars[stream])
         checkbox.grid(row=1, column=idx, padx=5, pady=5)  # Place each checkbox in a new column
 
     # Function to get selected streams as a list
@@ -89,7 +89,7 @@ def create_app(sessions):
         # Display scene and date on the button
         button_label = f"{camera}\n{scene}\n{date}"
 
-        button = tk.Button(
+        button = ctk.CTkButton(
             root,
             text=button_label,
             command=lambda s=session: run_capture_script(s, get_selected_streams()),

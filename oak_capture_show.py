@@ -149,14 +149,17 @@ if __name__ == "__main__":
     }
 
     # ------------------- TINKER PART --------------------------
-    root = Tk()
+    import customtkinter as ctk
+    root = ctk.CTk()
     root.title(f"Capture Viewer: {capture_folder}")
-    canvas = Canvas(root, width=canvas_width, height=canvas_height, bg="black")
+    print(os.path.dirname(os.path.abspath(__file__)) +"/logo.ico")
+    root.iconbitmap(os.path.dirname(os.path.abspath(__file__)) +"/logo.ico")
+    canvas = ctk.CTkCanvas(root, width=canvas_width, height=canvas_height, bg="black")
     canvas.pack()
 
-    prev_button = Button(root, text="<-", bg="orange", activebackground="yellow",
+    prev_button = ctk.CTkButton(root, text="<-",
                          command=lambda: on_prev(root, canvas, view_info, current_view))
-    next_button = Button(root, text="->", bg="orange", activebackground="yellow",
+    next_button = ctk.CTkButton(root, text="->",
                          command=lambda: on_next(root, canvas, view_info, current_view))
     next_button.pack(side="right")
     prev_button.pack(side="right")
@@ -164,21 +167,21 @@ if __name__ == "__main__":
     def select_alignment():
         current_view["alignSocket"] = align_socket.get()
 
-    pointcloud_button = Button(root, text="OpenCV \nPointCloud", command=lambda: on_pointcloud_rgb(root, view_info, current_view,
+    pointcloud_button = ctk.CTkButton(root, text="OpenCV \nPointCloud", command=lambda: on_pointcloud_rgb(root, view_info, current_view,
                                                                                           downsample=False))
     pointcloud_button.pack(side="right")
 
-    align_button = Button(root, text="OpenCV\nAlignment\nset",
+    align_button = ctk.CTkButton(root, text="OpenCV\nAlignment\nset",
                            command=select_alignment)
     align_button.pack(side="right")
 
 
-    align_socket = StringVar(value="COLOR")
-    radiobutton_color = Radiobutton(root, text="COLOR", variable=align_socket, value="COLOR")
+    align_socket = ctk.StringVar(value="COLOR")
+    radiobutton_color = ctk.CTkRadioButton(root, text="COLOR", variable=align_socket, value="COLOR")
     radiobutton_color.pack(side="right")
     # radiobutton_right = Radiobutton(root, text="RIGHT", variable=align_socket, value="RIGHT")
     # radiobutton_right.pack(side="right")  # right is not working
-    radiobutton_left = Radiobutton(root, text="LEFT", variable=align_socket, value="LEFT")
+    radiobutton_left = ctk.CTkRadioButton(root, text="LEFT", variable=align_socket, value="LEFT")
     radiobutton_left.pack(side="right")
 
 
@@ -194,28 +197,28 @@ if __name__ == "__main__":
     # alignment_button.pack(side="right")
 
 
-    canvas.tooltip = Label(root, text="", background="white", relief="solid", borderwidth=1, padx=2, pady=2)
+    canvas.tooltip = ctk.CTkLabel(root, text="", padx=0, pady=0)
     canvas.tooltip.place_forget()
 
     canvas.bind("<Motion>", lambda event: on_mouse_move(event, canvas))
 
-    replay_button = Button(root, text="REPLAY",  bg="#4169E1", activebackground="#63A8FF",
+    replay_button = ctk.CTkButton(root, text="REPLAY",
                               command=lambda: on_replay(root, view_info, current_view))
     replay_button.pack(side="left")
 
-    info_button = Button(root, text="INFO", bg="#32CD32", activebackground="#90EE90",
+    info_button = ctk.CTkButton(root, text="INFO",
                               command=lambda: show_popup(str(view_info["metadata"])))
     info_button.pack(side="left")
 
-    update_button = Button(root, text="Colorize\nDepth", command=lambda: display_images(root, canvas, view_info, current_view,
+    update_button = ctk.CTkButton(root, text="Colorize\nDepth", command=lambda: display_images(root, canvas, view_info, current_view,
                                                                               min_slider.get(), max_slider.get()))
     update_button.pack(side="right")
 
     # Sliders for setting range
     display_images(root, canvas, view_info, current_view)
     image, range_min, range_max = colorize_depth(current_view["depth"], "depth", False, None, None)
-    min_slider = Scale(root, from_=0, to=slider_upper_range, orient=VERTICAL, label="Min Value")  # Adjust range and labels as needed
-    max_slider = Scale(root, from_=0, to=slider_upper_range, orient=VERTICAL, label="Max Value")  # Adjust range and labels as needed
+    min_slider = ctk.CTkSlider(root, from_=0, to=slider_upper_range)  # Adjust range and labels as needed
+    max_slider = ctk.CTkSlider(root, from_=0, to=slider_upper_range)  # Adjust range and labels as needed
     min_slider.set(range_min)
     max_slider.set(range_max)
     min_slider.pack(side=RIGHT, fill="y")
@@ -230,8 +233,8 @@ if __name__ == "__main__":
             max_slider.set(min_val)
 
     # Link sliders to update their behavior when changed
-    min_slider.config(command=update_sliders)
-    max_slider.config(command=update_sliders)
+    min_slider.configure(command=update_sliders)
+    max_slider.configure(command=update_sliders)
 
     view_info["max_slider"] = max_slider.get()
     view_info["min_slider"] = min_slider.get()

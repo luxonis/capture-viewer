@@ -357,17 +357,17 @@ def on_mouse_move(event, canvas):
                     x_other, y_other = event.x - image_location[0] + x, event.y - image_location[1] + y
                     key2 = key
     if depth_coords and disparity_coords:
-        canvas.tooltip.config(text=f"{key1}: {depth_value}, {key2}: {disparity_value}")
-        canvas.tooltip.place(x=event.x + 15, y=event.y + 15)
+        canvas.tooltip.configure(text=f"{key1}: {depth_value}, {key2}: {disparity_value}")
+        canvas.tooltip.place(x=event.x + 3, y=event.y + 3)
         # print(event.x, event.y, x_other, y_other)
         update_markers(canvas, event.x, event.y, x_other, y_other)
     elif depth_coords:
-        canvas.tooltip.config(text=f"{key1}: {depth_value}")
-        canvas.tooltip.place(x=event.x + 15, y=event.y + 15)
+        canvas.tooltip.configure(text=f"{key1}: {depth_value}")
+        canvas.tooltip.place(x=event.x + 3, y=event.y + 3)
         update_markers(canvas, event.x, event.y)
     elif disparity_coords:
-        canvas.tooltip.config(text=f"{key2}: {disparity_value}")
-        canvas.tooltip.place(x=event.x + 15, y=event.y + 15)
+        canvas.tooltip.configure(text=f"{key2}: {disparity_value}")
+        canvas.tooltip.place(x=event.x + 3, y=event.y + 3)
         update_markers(canvas, event.x, event.y)
     else:
         canvas.tooltip.place_forget()

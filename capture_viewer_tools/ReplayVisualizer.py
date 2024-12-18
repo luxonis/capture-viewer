@@ -18,12 +18,12 @@ from capture_viewer_tools.ReplaySettings import open_replay_settings_screen
 from capture_viewer_tools.pointcloud import rotate_pointcloud
 
 from depth.replay_depth import replay
-
+import customtkinter as ctk
 class ReplayVisualizer:
     def __init__(self, root, view_info, current_view):
-        self.window = tk.Toplevel(root)
+        self.window = ctk.CTkToplevel(root)
         self.window.title("Depth Visualization")
-        self.window.geometry("2200x1200")
+        self.window.geometry("1800x800")
 
         max_image_width = 640
         max_image_height = 400
@@ -47,11 +47,11 @@ class ReplayVisualizer:
         self.already_generated = False
 
         self.image_labels = {
-            'generated_img_label': tk.Label(),
-            'original_img_label': tk.Label(),
-            'difference_img_label' : tk.Label(),
-            'generated_json_label' : tk.Label(),
-            'original_json_label' : tk.Label(),
+            'generated_img_label': ctk.CTkLabel(self.window, text=""),
+            'original_img_label': ctk.CTkLabel(self.window, text=""),
+            'difference_img_label' : ctk.CTkLabel(self.window, text=""),
+            'generated_json_label' : ctk.CTkLabel(self.window, text=""),
+            'original_json_label' : ctk.CTkLabel(self.window, text=""),
         }
 
     def create_layout(self):
@@ -62,18 +62,18 @@ class ReplayVisualizer:
             subprocess.Popen(['python', visualize_pointcloud_path, self.pcl_path, str(self.config_json)])  # o3d.visualization.draw_geometries([pointcloud])
             time.sleep(1)
 
-        capture_depth_text_label = tk.Label(self.window, text="Capture Depth", font=("Arial", 12, "bold"))
+        capture_depth_text_label = ctk.CTkLabel(self.window, text="Capture Depth", font=("Arial", 12, "bold"))
         capture_depth_text_label.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="nsew")
-        generated_depth_text_label = tk.Label(self.window, text="Generated Depth", font=("Arial", 12, "bold"))
+        generated_depth_text_label = ctk.CTkLabel(self.window, text="Generated Depth", font=("Arial", 12, "bold"))
         generated_depth_text_label.grid(row=0, column=1, padx=10, pady=(10, 0), sticky="nsew")
-        difference_depth_text_label = tk.Label(self.window, text="Difference", font=("Arial", 12, "bold"))
+        difference_depth_text_label = ctk.CTkLabel(self.window, text="Difference", font=("Arial", 12, "bold"))
         difference_depth_text_label.grid(row=0, column=3, padx=10, pady=(10, 0), sticky="nsew")
 
-        original_img_label = tk.Label(self.window)
+        original_img_label = ctk.CTkLabel(self.window, text="")
         original_img_label.grid(row=1, column=0, padx=10, pady=10)
-        generated_img_label = tk.Label(self.window)
+        generated_img_label = ctk.CTkLabel(self.window, text="")
         generated_img_label.grid(row=1, column=1, padx=10, pady=10)
-        difference_img_label = tk.Label(self.window)
+        difference_img_label = ctk.CTkLabel(self.window, text="")
         difference_img_label.grid(row=1, column=3, padx=10, pady=10)
 
         # JSON data for each depth image
@@ -83,11 +83,9 @@ class ReplayVisualizer:
         generated_json_str = json.dumps(generated_settings, indent=4)
 
         # Display Original Settings
-        original_json_label = tk.Label(
+        original_json_label = ctk.CTkLabel(
             self.window,
             text=original_json_str,
-            bg="white",
-            fg="black",
             font=("Courier", 8),
             justify="left",
             anchor="nw"
@@ -95,11 +93,9 @@ class ReplayVisualizer:
         original_json_label.grid(row=2, column=0, padx=10, pady=10, sticky="nsew")
 
         # Generated Settings Label (dynamically updated)
-        generated_json_label = tk.Label(
+        generated_json_label = ctk.CTkLabel(
             self.window,
             text=generated_json_str,
-            bg="white",
-            fg="black",
             font=("Courier", 8),
             justify="left",
             anchor="nw"
@@ -107,10 +103,10 @@ class ReplayVisualizer:
         generated_json_label.grid(row=2, column=1, padx=10, pady=10, sticky="nsew")
 
         # Assign the wrapper function to the button command
-        settings_button = tk.Button(self.window, text="Settings", command=self.open_settings_get_config)
+        settings_button = ctk.CTkButton(self.window, text="Settings", command=self.open_settings_get_config)
         settings_button.grid(row=1, column=2)
         # Assign the wrapper function to the button command
-        pointcloud_button = tk.Button(self.window, text="Pointcloud", command=show_pointcloud)
+        pointcloud_button = ctk.CTkButton(self.window, text="Pointcloud", command=show_pointcloud)
         pointcloud_button.grid(row=1, column=2, pady=(50, 0))
 
         self.image_labels['generated_img_label'] = generated_img_label
