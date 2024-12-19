@@ -36,6 +36,8 @@ default_config = {
     'cfg.postProcessing.decimationFilter.decimationMode': 'StereoDepthConfig.PostProcessing.DecimationFilter.DecimationMode.PIXEL_SKIPPING'
 }
 
+last_config = None
+
 def warning():
     print("FILTERING ORDER IS NOT VALID")
     show_popup("FILTERING ORDER IS NOT VALID")
@@ -75,7 +77,7 @@ def get_filter_order_back(order_string):
 
 
 def open_replay_settings_screen(config, original_config=None):
-
+    global last_config
     def update_label(var, label, form="int"):
         """Update the label when slider is moved."""
         if form == "int":
@@ -83,6 +85,7 @@ def open_replay_settings_screen(config, original_config=None):
         elif form == "float":
             label.config(text=str(round(float(var.get()), 1)))
     def on_generate():
+        global last_config
         if filtering_order_enable.get(): # needs to be the first item for the config to not be initialised in case of wrong filtering order
             if not check_valid_filtering_order([decimation_order.get(), median_order.get(), speckle_order.get(), spatial_order.get(), temporal_order.get()]):
                 warning()
@@ -163,10 +166,14 @@ def open_replay_settings_screen(config, original_config=None):
 
         popup_window.destroy()
         popup_window1.destroy()
+        last_config = config
         return config
 
-    if original_config is not None:
+
+    if last_config is None and original_config is not None:
         current_config = settings2config(original_config)
+    elif last_config is not None:
+        current_config = last_config
     else:
         current_config = default_config
 
