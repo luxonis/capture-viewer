@@ -6,6 +6,10 @@ import subprocess
 import time
 import customtkinter as ctk
 
+ctk.set_appearance_mode("dark")  # Modes: system (default), light, dark
+ctk.set_default_color_theme("dark-blue")  # Themes: blue (default), dark-blue, green
+
+
 # Function to load session metadata from each session folder
 def load_sessions(folder_path):
     sessions = []
