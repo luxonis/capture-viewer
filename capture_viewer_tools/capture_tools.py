@@ -140,15 +140,18 @@ def generate_color_scale_with_annotations_v2(range_min, range_max, image_height)
 
 def colorize_depth(image, type, label=True, min_val=None, max_val=None, color_noise_percent_removal=1):
     if type == "depth" or type == "tof":
-        if np.any(image > 0): range_min, range_max = np.percentile(image[image > 0], [0, 100-color_noise_percent_removal])
-        else: range_min, range_max = 0, 0
+        if (np.any(image > 0)):
+            range_min, range_max = np.percentile(image[image > 0], [0, 100-color_noise_percent_removal])
+        else:
+            range_min, range_max = 0, 0
         if min_val is not None and max_val is not None:
             range_min, range_max = min_val, max_val
         # print("depth min max:", range_min, range_max)
         colormap = cv2.COLORMAP_JET
     elif type == "disparity" or type == "neural_disparity" or type == "disparity_rescaled":
         min_disparity, max_disparity = np.percentile(image[image > 0], [0, 100-color_noise_percent_removal])
-        if min_val is not None and max_val is not None: min_disparity, max_disparity = min_val, max_val
+        if min_val is not None and max_val is not None:
+            min_disparity, max_disparity = min_val, max_val
 
         # Normalize disparity to a fixed range without dynamic adjustments
         normalized = np.clip((image - min_disparity) / (max_disparity - min_disparity), 0, 1)
@@ -156,7 +159,7 @@ def colorize_depth(image, type, label=True, min_val=None, max_val=None, color_no
         colored_image = cv2.applyColorMap(scaled_disparity, cv2.COLORMAP_JET )
     elif type == 'difference':
         if np.all(image == 0):
-            return image
+            return image, 0, 0
         else:
             range_min, range_max = np.percentile(image[image > 0], [0, 100 - color_noise_percent_removal])
             if min_val is not None and max_val is not None:
@@ -195,7 +198,7 @@ def colorize_depth(image, type, label=True, min_val=None, max_val=None, color_no
     if label:
         cv2.putText(colored_image, type, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 1, cv2.LINE_AA)
 
-    return colored_image
+    return colored_image, range_min, range_max
 
 def calculate_scaled_dimensions(original_dimensions, max_width, max_height):
     original_width, original_height = original_dimensions

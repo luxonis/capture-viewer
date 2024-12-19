@@ -123,19 +123,29 @@ class ReplayVisualizer:
         if self.generated_depth is None:
             colorized_generated_depth = create_placeholder_frame(self.scaled_original_size, label)
             colorized_difference = None
+            range_min, range_max = 0, 0
         else:
-            colorized_generated_depth = colorize_depth(self.generated_depth, type="depth", label=0)
+            _, range_min, range_max = colorize_depth(self.generated_depth, type="depth", label=0)
             if self.generated_depth.shape != self.depth.shape:  # decimation filter downsamples, this upsamples
                 if self.depth.shape != self.generated_depth.shape:
                     height, width = self.depth.shape
                     self.generated_depth = cv2.resize(self.generated_depth, (width, height),
                                                       interpolation=cv2.INTER_NEAREST)
             depth_difference = np.abs(self.depth - self.generated_depth)
-            colorized_difference = colorize_depth(depth_difference, type="difference", label=0)
+            colorized_difference, _, _ = colorize_depth(depth_difference, type="difference", label=0)
 
         # Update images
         # update original depth
-        colorized_depth = colorize_depth(self.depth, type="depth", label=0)
+        if self.generated_depth is not None:
+            _, range_min_original, range_max_original = colorize_depth(self.depth, type="depth", label=0)
+            range_min = min(range_min_original, range_min)
+            range_max = max(range_max_original, range_max)
+
+            colorized_generated_depth, _, _ = colorize_depth(self.generated_depth, type="depth", label=0, min_val=range_min, max_val=range_max)
+            colorized_depth, _, _ = colorize_depth(self.depth, type="depth", label=0, min_val=range_min, max_val=range_max)
+        else:
+            colorized_depth, range_min, range_max = colorize_depth(self.depth, type="depth", label=0)
+
         resized_depth = cv2.resize(colorized_depth, self.scaled_original_size,
                                              interpolation=cv2.INTER_AREA)
         im_original = ImageTk.PhotoImage(image=Image.fromarray(resized_depth))
