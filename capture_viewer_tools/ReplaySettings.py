@@ -124,13 +124,13 @@ def open_replay_settings_screen(config, original_config=None):
             config['cfg.postProcessing.brightnessFilter.minBrightness'] = min_brightness_slider.get()
 
         # Speckle filter
-        config['cfg.postProcessing.speckleFilter.enable'] = speckle_filter_enable.get()
         if speckle_filter_enable.get():
+            config['cfg.postProcessing.speckleFilter.enable'] = speckle_filter_enable.get()
             config['cfg.postProcessing.speckleFilter.speckleRange'] = speckle_range_slider.get()
 
         # Spacial filter
-        config['cfg.postProcessing.spatialFilter.enable'] = spatial_filter_enable.get()
         if spatial_filter_enable.get():
+            config['cfg.postProcessing.spatialFilter.enable'] = spatial_filter_enable.get()
             config['cfg.postProcessing.spatialFilter.holeFillingRadius'] = hole_filling_radius_slider.get()
             config['cfg.postProcessing.spatialFilter.numIterations'] = num_iterations_slider.get()
             config['cfg.postProcessing.spatialFilter.alpha'] = alpha_slider.get()
@@ -217,14 +217,14 @@ def open_replay_settings_screen(config, original_config=None):
     canvas.bind_all("<Button-5>", lambda event: canvas.yview_scroll(1, "units"))
 
     # ----------------------------------- Initialize the UI elements with default values from current_config -----------------------------------
-    depth_align = tk.StringVar(value=current_config['stereo.setDepthAlign'])
-    profile_preset = tk.StringVar(value=current_config['stereo.setDefaultProfilePreset'])
-    # rectificationBox_val = tk.BooleanVar(value=current_config['stereo.setRectification'])
-    rectificationBox_val = tk.BooleanVar(value=True) # always assume rectification is needed
-    LRBox_val = tk.BooleanVar(value=current_config['stereo.setLeftRightCheck'])
-    extendedBox_val = tk.BooleanVar(value=current_config['stereo.setExtendedDisparity'])
-    subpixelBox_val = tk.BooleanVar(value=current_config['stereo.setSubpixel'])
-    fractional_bits = tk.IntVar(value=current_config['stereo.setSubpixelFractionalBits'])
+    # Initialize tkinter variables, falling back to default_config if a key is missing in current_config
+    depth_align = tk.StringVar(value=current_config.get('stereo.setDepthAlign', default_config['stereo.setDepthAlign']))
+    profile_preset = tk.StringVar(value=current_config.get('stereo.setDefaultProfilePreset', default_config['stereo.setDefaultProfilePreset']))
+    rectificationBox_val = tk.BooleanVar(value=current_config.get('stereo.setRectification', True))  # Default to True if not found
+    LRBox_val = tk.BooleanVar(value=current_config.get('stereo.setLeftRightCheck', default_config['stereo.setLeftRightCheck']))
+    extendedBox_val = tk.BooleanVar(value=current_config.get('stereo.setExtendedDisparity', default_config['stereo.setExtendedDisparity']))
+    subpixelBox_val = tk.BooleanVar(value=current_config.get('stereo.setSubpixel', default_config['stereo.setSubpixel']))
+    fractional_bits = tk.IntVar(value=current_config.get('stereo.setSubpixelFractionalBits', default_config['stereo.setSubpixelFractionalBits']))
 
     # FILTERS -----------------------------------------------------------------------------------
     filtering_order_enable = tk.BooleanVar(value=(True if 'cfg.postProcessing.filteringOrder' in current_config else False))
