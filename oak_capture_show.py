@@ -152,8 +152,6 @@ if __name__ == "__main__":
     import customtkinter as ctk
     root = ctk.CTk()
     root.title(f"Capture Viewer: {capture_folder}")
-    print(os.path.dirname(os.path.abspath(__file__)) +"/logo.ico")
-    root.iconbitmap(os.path.dirname(os.path.abspath(__file__)) +"/logo.ico")
     canvas = ctk.CTkCanvas(root, width=canvas_width, height=canvas_height, bg="black")
     canvas.pack()
 
