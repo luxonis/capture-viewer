@@ -250,6 +250,8 @@ def display_images(root, canvas, view_info, current_view, min_val=None, max_val=
     canvas_height = view_info['canvas_height']
     canvas_width = view_info['canvas_width']
     current_index = view_info["current_index"]
+    view_info["max_slider"] = max_val
+    view_info["min_slider"] = min_val
 
     canvas.delete("all")
     timestamp = timestamps[current_index]
