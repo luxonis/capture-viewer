@@ -215,13 +215,6 @@ if __name__ == "__main__":
     # Sliders for setting range
     display_images(root, canvas, view_info, current_view)
     image, range_min, range_max = colorize_depth(current_view["depth"], "depth", False, None, None)
-    min_slider = ctk.CTkSlider(root, from_=0, to=slider_upper_range)  # Adjust range and labels as needed
-    max_slider = ctk.CTkSlider(root, from_=0, to=slider_upper_range)  # Adjust range and labels as needed
-    min_slider.set(range_min)
-    max_slider.set(range_max)
-    min_slider.pack(side=RIGHT, fill="y")
-    max_slider.pack(side=RIGHT, fill="y")
-    # Function to update slider ranges and constraints
     def update_sliders(*args):
         min_val = min_slider.get()
         max_val = max_slider.get()
@@ -230,9 +223,29 @@ if __name__ == "__main__":
         elif max_val < min_val:
             max_slider.set(min_val)
 
-    # Link sliders to update their behavior when changed
-    min_slider.configure(command=update_sliders)
-    max_slider.configure(command=update_sliders)
+        # Update the value labels dynamically
+        min_label.configure(text=f"Min: {int(min_val)}")
+        max_label.configure(text=f"Max: {int(max_val)}")
+
+    # Create the sliders
+    min_slider = ctk.CTkSlider(root, from_=0, to=slider_upper_range, command=update_sliders)
+    max_slider = ctk.CTkSlider(root, from_=0, to=slider_upper_range, command=update_sliders)
+
+    # Set initial values
+    min_slider.set(range_min)
+    max_slider.set(range_max)
+
+    # Pack sliders
+    min_slider.pack(side="right", fill="y", padx=10, pady=5)
+    max_slider.pack(side="right", fill="y", padx=10, pady=5)
+
+    # Labels to display slider values
+    min_label = ctk.CTkLabel(root, text=f"Min: {int(range_min)}")
+    max_label = ctk.CTkLabel(root, text=f"Max: {int(range_max)}")
+
+    # Pack labels
+    min_label.pack(side="right", padx=5, pady=5)
+    max_label.pack(side="right", padx=5, pady=5)
 
     view_info["max_slider"] = max_slider.get()
     view_info["min_slider"] = min_slider.get()
