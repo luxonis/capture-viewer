@@ -147,8 +147,7 @@ def colorize_depth(image, type, label=True, min_val=None, max_val=None, color_no
         # print("depth min max:", range_min, range_max)
         colormap = cv2.COLORMAP_JET
     elif type == "disparity" or type == "neural_disparity" or type == "disparity_rescaled":
-        min_disparity = 0
-        max_disparity = 95
+        min_disparity, max_disparity = np.percentile(image[image > 0], [0, 100-color_noise_percent_removal])
         if min_val is not None and max_val is not None: min_disparity, max_disparity = min_val, max_val
 
         # Normalize disparity to a fixed range without dynamic adjustments

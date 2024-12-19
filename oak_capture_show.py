@@ -109,7 +109,7 @@ if __name__ == "__main__":
         datas = None, None, None, None, None, None, None, None
 
     if 'disparity' in selected_types or 'neural_disparity' in selected_types:
-        slider_upper_range = 95
+        slider_upper_range = 800
     else: slider_upper_range = 7000
 
     # load metadata
