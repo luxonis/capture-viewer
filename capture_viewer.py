@@ -60,7 +60,7 @@ def create_app(sessions):
     columns = 4
 
     # Stream options to be selected
-    stream_options = ['left', 'right', 'depth', 'disparity', 'isp', 'tof', 'neural_disparity', 'disparity_rescaled']  # Add more as needed
+    stream_options = ['left', 'right', 'depth', 'disparity', 'isp', 'tof_depth', 'neural_disparity', 'disparity_rescaled']  # Add more as needed
     on_off = [1, 1, 1, 0, 1, 0, 0, 0]
     selected_streams_vars = {stream: tk.IntVar(value=on_off[idx]) for idx, stream in enumerate(stream_options)}
 

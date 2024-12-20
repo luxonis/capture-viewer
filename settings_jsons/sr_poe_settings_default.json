@@ -1,0 +1,27 @@
+{
+    "ir": true,
+    "ir_value": 1,
+    "flood_light": false,
+    "flood_light_intensity": 1,
+    "stereoPairResolution": "THE_800_P",
+
+    "alignSocket": "REC_RIGHT",
+    "LRcheck": true,
+    "extendedDisparity": true,
+    "subpixelDisparity": true,
+    "subpixelValue": 5,
+    "highAccuracy": false,
+    "highDensity": true,
+
+    "customTofConfig": false,
+    "tofConfig": {
+        "enableFPPNCorrection": true,
+        "enableOpticalCorrection": true,
+        "enableWiggleCorrection": true,
+        "enableTemperatureCorrection": true,
+        "phaseUnwrappingLevel": 4
+    },
+
+    "FPS": 5,
+    "num_captures": 20
+}

@@ -281,7 +281,7 @@ def display_images(root, canvas, view_info, current_view, min_val=None, max_val=
             original_image = image.copy()  # Keep original for depth value extraction
             if len(image.shape) == 2:  # if grayscale, convert to BGR
                 image = np.stack((image,)*3, axis=-1)
-            if key == 'depth' or key == 'disparity' or key == 'tof' or key == 'neural_disparity' or key == 'disparity_rescaled':
+            if key == 'depth' or key == 'disparity' or key == 'tof_depth' or key == 'neural_disparity' or key == 'disparity_rescaled':
                 image, _, _ = colorize_depth(image, key, False, min_val, max_val)
                 # image, type, label = True, min_val = None, max_val = None, color_noise_percent_removal = 1
 
@@ -332,7 +332,7 @@ def on_mouse_move(event, canvas):
             relative_y = int((event.y - y) * original_image.shape[0] / h)
             image_location = x, y
 
-            if key == 'depth' or key == 'tof' or key=='neural_disparity':
+            if key == 'depth' or key == 'tof_depth' or key=='neural_disparity':
                 depth_value = original_image[relative_y, relative_x]
                 depth_coords = (relative_x, relative_y, x, y, w, h)
                 key1 = key
@@ -345,7 +345,7 @@ def on_mouse_move(event, canvas):
         for (x, y, w, h, original_image, key) in canvas.image_coords:
             # print((x, y, w, h, "original_image", key))  # i want x and y
             if depth_coords is None:
-                if key == 'depth' or key == 'tof' or key=='neural_disparity':
+                if key == 'depth' or key == 'tof_depth' or key=='neural_disparity':
                     depth_value = original_image[relative_y, relative_x]
                     depth_coords = (relative_x, relative_y, x, y, w, h)
                     x_other, y_other = event.x - image_location[0] + x, event.y - image_location[1] + y

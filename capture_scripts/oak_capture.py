@@ -30,6 +30,10 @@ def create_pipeline():
     monoRight.setCamera("right")
     monoLeft.setResolution(dai.MonoCameraProperties.SensorResolution.THE_800_P)
     monoRight.setResolution(dai.MonoCameraProperties.SensorResolution.THE_800_P)
+    # if settings.get("stereoPairResolution", "800P") == "800P":
+    #     monoLeft.setResolution(dai.MonoCameraProperties.SensorResolution.THE_800_P)
+    #     monoRight.setResolution(dai.MonoCameraProperties.SensorResolution.THE_800_P)
+    # elif settings.get("stereoPairResolution", "400P") == "400P":
     monoLeft.setFps(settings["FPS"])
     monoRight.setFps(settings["FPS"])
 
