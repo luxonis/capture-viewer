@@ -9,6 +9,7 @@ import argparse
 # Get the directory where the script is located and choose it as the destination for DATA folder
 script_dir = os.path.dirname(os.path.abspath(__file__))
 root_path = os.path.join(os.path.dirname(script_dir), 'DATA')
+import time
 
 def create_pipeline():
     pipeline = dai.Pipeline()
@@ -197,7 +198,7 @@ def save_frames(out_dir, timestamp, name, frame, tof_depth_frame, tof_raw_frame)
     if name in ["tof_amplitude", "tof_intensity"]:
         np.save(f'{out_dir}/{name}_{timestamp}.npy', frame)
     elif name in ["left", "right"]:
-        # cv2.imwrite(f'{out_dir}/{name}_{timestamp}.png', frame)
+        cv2.imwrite(f'{out_dir}/{name}_{timestamp}.png', frame)
         np.save(f'{out_dir}/{name}_{timestamp}.npy', frame)
     return tof_depth_frame, tof_raw_frame
 
@@ -286,4 +287,32 @@ if __name__ == "__main__":
                 save = False
                 print(f"CAPTURE FINISHED with: {num_captures} captures")
                 num_captures = 0
-                exit(0)
+                medianSettings = [dai.MedianFilter.MEDIAN_OFF, dai.MedianFilter.KERNEL_3x3, dai.MedianFilter.KERNEL_5x5,
+                                  dai.MedianFilter.KERNEL_7x7]
+                currentMedian = tofConfig.median
+                nextMedian = medianSettings[(medianSettings.index(currentMedian) + 1) % len(medianSettings)]
+                print(f"MEDIAN FILTER : {nextMedian.name}")
+                tofConfig.median = nextMedian
+                tofConfigInQueue.send(tofConfig)
+                median_new = "dai.MedianFilter." + str(nextMedian.name)
+                print("settings changed:", median_new)
+                settings["medianFilter"] = median_new
+
+                if median_new == "dai.MedianFilter.MEDIAN_OFF":
+                    print("got to median off, exiting")
+                    exit(1)
+
+                time.sleep(1)
+
+                save = True  # -----------------------------------------------------------------------------------------
+
+                date = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+                out_dir = f"{root_path}/{device_name}_{date}"
+                create_folder(out_dir)
+                calib = device.readCalibration()
+                calib.eepromToJsonFile(f'{out_dir}/calib.json')
+                create_and_save_metadata(device, settings, out_dir, view_name)
+                if save:
+                    print("CAPTURING...")
+                else:
+                    print(f"capture finished with: {num_captures} captures")

@@ -21,7 +21,8 @@
         "enableTemperatureCorrection": true,
         "phaseUnwrappingLevel": 4
     },
+    "medianFilter": "dai.MedianFilter.MEDIAN_OFF",
 
     "FPS": 5,
-    "num_captures": 20
+    "num_captures": 120
 }
