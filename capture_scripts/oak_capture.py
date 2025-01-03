@@ -91,6 +91,8 @@ def create_pipeline():
                 stereo.setMedianFilter(dai.StereoDepthConfig.MedianFilter.KERNEL_7x7)
 
             else: raise ValueError
+        else:
+            stereo.setMedianFilter(dai.StereoDepthConfig.MedianFilter.MEDIAN_OFF)
 
     color.setCamera("color")
 
