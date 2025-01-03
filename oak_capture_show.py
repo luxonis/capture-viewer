@@ -23,6 +23,8 @@ def load_data(folder, types):
                 type_key = 'neural_disparity'
             elif "disparity_rescaled" in filename:
                 type_key = 'disparity_rescaled'
+            elif "tof_depth" in filename:
+                type_key = 'tof_depth'
             else:
                 type_key = filename.split('_')[0]
                 if (height == 0 or width == 0) and type_key == "left":
