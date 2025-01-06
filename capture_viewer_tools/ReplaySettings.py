@@ -128,10 +128,11 @@ def open_replay_settings_screen(config, original_config=None):
             config['stereo.initialConfig.setMedianFilter'] = "MedianFilter.MEDIAN_OFF"
 
         # Bilateral filter
-        config['cfg.postProcessing.bilateralSigmaValue'] = bilateral_sigma_val.get()
-        if bilateral_filter_enable.get():
-            # is this all settings?
-            pass
+        # todo - [1944301021AA992E00] [1.2.2] [9.439] [StereoDepth(2)] [warning] Bilateral filter is deprecated!
+        # config['cfg.postProcessing.bilateralSigmaValue'] = bilateral_sigma_val.get()
+        # if bilateral_filter_enable.get():
+        #     # is this all settings?
+        #     pass
 
         # Brightness filter
         if brightness_filter_enable.get():  # todo can we disable brightness filter?
@@ -263,9 +264,9 @@ def open_replay_settings_screen(config, original_config=None):
     median_val = tk.StringVar(value=current_config.get('stereo.initialConfig.setMedianFilter',
                                                        default_config['stereo.initialConfig.setMedianFilter']))
 
-    bilateral_filter_enable = tk.BooleanVar(value=current_config.get('cfg.postProcessing.bilateralFilter.enable', False))
-    bilateral_sigma_val = tk.IntVar(value=current_config.get('cfg.postProcessing.bilateralSigmaValue',
-                                                             default_config['cfg.postProcessing.bilateralSigmaValue']))
+    # bilateral_filter_enable = tk.BooleanVar(value=current_config.get('cfg.postProcessing.bilateralFilter.enable', False))
+    # bilateral_sigma_val = tk.IntVar(value=current_config.get('cfg.postProcessing.bilateralSigmaValue',
+    #                                                          default_config['cfg.postProcessing.bilateralSigmaValue']))
 
     brightness_filter_enable = tk.BooleanVar(value=current_config.get('cfg.postProcessing.brightnessFilter.enable', False))
     min_brightness_slider = tk.IntVar(value=current_config.get('cfg.postProcessing.brightnessFilter.minBrightness',
@@ -345,7 +346,7 @@ def open_replay_settings_screen(config, original_config=None):
             toggle_frame_settings(speckle_filter_enable, speckle_frame)
             toggle_frame_settings(spatial_filter_enable, spatial_frame)
             toggle_frame_settings(threshold_filter_enable, threshold_frame)
-            toggle_frame_settings(bilateral_filter_enable, bilateral_frame)
+            # toggle_frame_settings(bilateral_filter_enable, bilateral_frame)
             toggle_frame_settings(brightness_filter_enable, brightness_frame)
             toggle_frame_settings(filtering_order_enable, order_frame)
 
@@ -577,25 +578,25 @@ def open_replay_settings_screen(config, original_config=None):
 
     current_row += 1
 
-    # Bilateral Filter Enable
-    ttk.Label(custom_settings_frame, text="Bilateral Filter Enable (NOT TESTED IN GUI)").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
-    bilateral_filter_checkbox = ttk.Checkbutton(custom_settings_frame, variable=bilateral_filter_enable, command=lambda: toggle_frame_settings(bilateral_filter_enable, bilateral_frame))
-    bilateral_filter_checkbox.grid(row=current_row, column=1, padx=10, pady=10, sticky="e")
-    current_row += 1
-
-    # Bilateral Filter Frame
-    bilateral_frame = ttk.LabelFrame(custom_settings_frame, text="Bilateral Filter", padding=(10, 10))
-    bilateral_frame.grid(row=current_row, column=0, columnspan=6, padx=10, pady=10, sticky="ew")
-
-    # Bilateral Sigma Value
-    ttk.Label(bilateral_frame, text="Bilateral Sigma Value").grid(row=1, column=0, padx=10, pady=10, sticky="w")
-    bilateral_sigma_label = ttk.Label(bilateral_frame, text=str(bilateral_sigma_val.get()))
-    bilateral_sigma_label.grid(row=1, column=2, padx=10, pady=10, sticky="w")
-    bilateral_sigma_slider = ttk.Scale(bilateral_frame, from_=0, to=20, variable=bilateral_sigma_val,
-                                       orient="horizontal",
-                                       command=lambda x: update_label(bilateral_sigma_val, bilateral_sigma_label))
-    bilateral_sigma_slider.grid(row=1, column=1, padx=10, pady=10, sticky="e")
-    current_row += 1
+    # # Bilateral Filter Enable
+    # ttk.Label(custom_settings_frame, text="Bilateral Filter Enable (NOT TESTED IN GUI)").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
+    # bilateral_filter_checkbox = ttk.Checkbutton(custom_settings_frame, variable=bilateral_filter_enable, command=lambda: toggle_frame_settings(bilateral_filter_enable, bilateral_frame))
+    # bilateral_filter_checkbox.grid(row=current_row, column=1, padx=10, pady=10, sticky="e")
+    # current_row += 1
+    #
+    # # Bilateral Filter Frame
+    # bilateral_frame = ttk.LabelFrame(custom_settings_frame, text="Bilateral Filter", padding=(10, 10))
+    # bilateral_frame.grid(row=current_row, column=0, columnspan=6, padx=10, pady=10, sticky="ew")
+    #
+    # # Bilateral Sigma Value
+    # ttk.Label(bilateral_frame, text="Bilateral Sigma Value").grid(row=1, column=0, padx=10, pady=10, sticky="w")
+    # bilateral_sigma_label = ttk.Label(bilateral_frame, text=str(bilateral_sigma_val.get()))
+    # bilateral_sigma_label.grid(row=1, column=2, padx=10, pady=10, sticky="w")
+    # bilateral_sigma_slider = ttk.Scale(bilateral_frame, from_=0, to=20, variable=bilateral_sigma_val,
+    #                                    orient="horizontal",
+    #                                    command=lambda x: update_label(bilateral_sigma_val, bilateral_sigma_label))
+    # bilateral_sigma_slider.grid(row=1, column=1, padx=10, pady=10, sticky="e")
+    # current_row += 1
 
 
     # Brightness Filter Enable
