@@ -22,7 +22,8 @@ default_config = {
     'cfg.postProcessing.brightnessFilter.maxBrightness': 255,
     'cfg.postProcessing.brightnessFilter.minBrightness': 0,
     'cfg.postProcessing.speckleFilter.enable': False,
-    'cfg.postProcessing.speckleFilter.speckleRange': 100,
+    'cfg.postProcessing.speckleFilter.speckleRange': 200,
+    'cfg.postProcessing.speckleFilter.differenceThreshold': 2,
     'cfg.postProcessing.spatialFilter.enable': False,
     'cfg.postProcessing.spatialFilter.holeFillingRadius': 1,
     'cfg.postProcessing.spatialFilter.numIterations': 1,
@@ -86,6 +87,17 @@ def open_replay_settings_screen(config, original_config=None):
             label.config(text=str(round(float(var.get()), 1)))
     def on_generate():
         global last_config
+
+        if not custom_settings_val.get():
+            config['stereo.setDepthAlign'] = depth_align.get()
+            if profile_preset.get() != 'None':
+                config['stereo.setDefaultProfilePreset'] = profile_preset.get()
+
+            popup_window.destroy()
+            popup_window1.destroy()
+            last_config = config
+            return config
+
         if filtering_order_enable.get(): # needs to be the first item for the config to not be initialised in case of wrong filtering order
             if not check_valid_filtering_order([decimation_order.get(), median_order.get(), speckle_order.get(), spatial_order.get(), temporal_order.get()]):
                 warning()
@@ -127,6 +139,7 @@ def open_replay_settings_screen(config, original_config=None):
         if speckle_filter_enable.get():
             config['cfg.postProcessing.speckleFilter.enable'] = speckle_filter_enable.get()
             config['cfg.postProcessing.speckleFilter.speckleRange'] = speckle_range_slider.get()
+            config['cfg.postProcessing.speckleFilter.differenceThreshold'] = speckle_difference_threshold.get()
 
         # Spacial filter
         if spatial_filter_enable.get():
@@ -220,6 +233,9 @@ def open_replay_settings_screen(config, original_config=None):
     # Initialize tkinter variables, falling back to default_config if a key is missing in current_config
     depth_align = tk.StringVar(value=current_config.get('stereo.setDepthAlign', default_config['stereo.setDepthAlign']))
     profile_preset = tk.StringVar(value=current_config.get('stereo.setDefaultProfilePreset', default_config['stereo.setDefaultProfilePreset']))
+
+    custom_settings_val = tk.BooleanVar(value=False)
+
     rectificationBox_val = tk.BooleanVar(value=current_config.get('stereo.setRectification', True))  # Default to True if not found
     LRBox_val = tk.BooleanVar(value=current_config.get('stereo.setLeftRightCheck', default_config['stereo.setLeftRightCheck']))
     extendedBox_val = tk.BooleanVar(value=current_config.get('stereo.setExtendedDisparity', default_config['stereo.setExtendedDisparity']))
@@ -256,6 +272,8 @@ def open_replay_settings_screen(config, original_config=None):
     speckle_filter_enable = tk.BooleanVar(value=current_config.get('cfg.postProcessing.speckleFilter.enable', False))
     speckle_range_slider = tk.IntVar(value=current_config.get('cfg.postProcessing.speckleFilter.speckleRange',
                                                               default_config['cfg.postProcessing.speckleFilter.speckleRange']))
+    speckle_difference_threshold = tk.IntVar(value=current_config.get('cfg.postProcessing.speckleFilter.differenceThreshold',
+                                                              default_config['cfg.postProcessing.speckleFilter.differenceThreshold']))
 
     spatial_filter_enable = tk.BooleanVar(value=current_config.get('cfg.postProcessing.spatialFilter.enable', False))
     hole_filling_radius_slider = tk.IntVar(value=current_config.get('cfg.postProcessing.spatialFilter.holeFillingRadius',
@@ -315,32 +333,59 @@ def open_replay_settings_screen(config, original_config=None):
     HN_radiobutton.grid(row=current_row, column=7, padx=10, pady=5, sticky="w")
     current_row += 1
 
+    def toggle_custom_settings():
+        # Enable or disable all frames and their widgets based on the checkbox state
+        if custom_settings_val.get():
+            # Enable custom settings and all nested frames/widgets
+            enable_frame_widgets(custom_settings_frame, True)
+        else:
+            # Disable custom settings and all nested frames/widgets
+            enable_frame_widgets(custom_settings_frame, False)
+
+    def enable_frame_widgets(frame, state):
+        """Recursively enable/disable all widgets in the frame, including nested frames."""
+        for widget in frame.winfo_children():
+            if isinstance(widget, ttk.LabelFrame):  # If widget is a frame, call the function recursively
+                enable_frame_widgets(widget, state)
+                widget.state(['!disabled'] if state else ['disabled'])
+            else:
+                widget.state(['!disabled'] if state else ['disabled'])
+
+    #
+    ttk.Label(popup_window, text="Use Custom Settings").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
+    cust_box = ttk.Checkbutton(popup_window, variable=custom_settings_val, command=toggle_custom_settings)
+    cust_box.grid(row=current_row, column=1, padx=10, pady=10, sticky="e")
+    current_row += 1
+
+    custom_settings_frame = ttk.LabelFrame(popup_window, text="Custom Settings", padding=(10, 10))
+    custom_settings_frame.grid(row=current_row, column=0, columnspan=6, padx=10, pady=10, sticky="ew")
+
     # # Add checkbuttons for rectification
-    ttk.Label(popup_window, text="setRectification").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
-    recbox = ttk.Checkbutton(popup_window, variable=rectificationBox_val)
+    ttk.Label(custom_settings_frame, text="setRectification").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
+    recbox = ttk.Checkbutton(custom_settings_frame, variable=rectificationBox_val)
     recbox.grid(row=current_row, column=1, padx=10, pady=10, sticky="e")
     current_row += 1
 
     # LR CHECK
-    ttk.Label(popup_window, text="setLRcheck").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
-    LRbox = ttk.Checkbutton(popup_window, variable=LRBox_val)
+    ttk.Label(custom_settings_frame, text="setLRcheck").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
+    LRbox = ttk.Checkbutton(custom_settings_frame, variable=LRBox_val)
     LRbox.grid(row=current_row, column=1, padx=10, pady=10, sticky="e")
     current_row += 1
 
     # EXTENDED DISPARITY
-    ttk.Label(popup_window, text="setExtendedDisparity").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
-    extbox = ttk.Checkbutton(popup_window, variable=extendedBox_val)
+    ttk.Label(custom_settings_frame, text="setExtendedDisparity").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
+    extbox = ttk.Checkbutton(custom_settings_frame, variable=extendedBox_val)
     extbox.grid(row=current_row, column=1, padx=10, pady=10, sticky="e")
     current_row += 1
 
     # SetSubpixel Label and Checkbox
-    ttk.Label(popup_window, text="setSubpixel").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
-    subbox = ttk.Checkbutton(popup_window, variable=subpixelBox_val)
+    ttk.Label(custom_settings_frame, text="setSubpixel").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
+    subbox = ttk.Checkbutton(custom_settings_frame, variable=subpixelBox_val)
     subbox.grid(row=current_row, column=1, padx=10, pady=10, sticky="e")
 
     # Add subpixelFractionalBits combobox
-    ttk.Label(popup_window, text="subpixelFractionalBits").grid(row=current_row, column=2, padx=10, pady=10, sticky="w")
-    fractional_bits_combo = ttk.Combobox(popup_window, textvariable=fractional_bits, values=[3, 4, 5],
+    ttk.Label(custom_settings_frame, text="subpixelFractionalBits").grid(row=current_row, column=2, padx=10, pady=10, sticky="w")
+    fractional_bits_combo = ttk.Combobox(custom_settings_frame, textvariable=fractional_bits, values=[3, 4, 5],
                                          state="readonly")
     fractional_bits_combo.grid(row=current_row, column=3, padx=10, pady=10, sticky="e")
 
@@ -349,7 +394,7 @@ def open_replay_settings_screen(config, original_config=None):
 
 
     # Decimation Filter Group (in a LabelFrame with a black border)
-    decimation_frame = ttk.LabelFrame(popup_window, text="Decimation Filter", padding=(10, 10))
+    decimation_frame = ttk.LabelFrame(custom_settings_frame, text="Decimation Filter", padding=(10, 10))
     decimation_frame.grid(row=current_row, column=0, columnspan=6, padx=10, pady=10, sticky="ew")
 
     # Decimation Filter Enable
@@ -377,7 +422,7 @@ def open_replay_settings_screen(config, original_config=None):
 
 
     # Median Filter Frame
-    median_frame = ttk.LabelFrame(popup_window, text="Median Filter", padding=(10, 10))
+    median_frame = ttk.LabelFrame(custom_settings_frame, text="Median Filter", padding=(10, 10))
     median_frame.grid(row=current_row, column=0, columnspan=6, padx=10, pady=10, sticky="ew")
 
     # Median Filter
@@ -398,7 +443,7 @@ def open_replay_settings_screen(config, original_config=None):
 
 
     # Speckle Filter Frame
-    speckle_frame = ttk.LabelFrame(popup_window, text="Speckle Filter", padding=(10, 10))
+    speckle_frame = ttk.LabelFrame(custom_settings_frame, text="Speckle Filter", padding=(10, 10))
     speckle_frame.grid(row=current_row, column=0, columnspan=6, padx=10, pady=10, sticky="ew")
 
     # Speckle Filter Enable
@@ -409,16 +454,26 @@ def open_replay_settings_screen(config, original_config=None):
     # Speckle Range
     ttk.Label(speckle_frame, text="Speckle Range").grid(row=1, column=0, padx=10, pady=10, sticky="w")
     speckle_range_label = ttk.Label(speckle_frame, text=str(speckle_range_slider.get()))
-    speckle_range_label.grid(row=1, column=2, padx=10, pady=10, sticky="w")
-    ttk.Scale(speckle_frame, from_=0, to=500, variable=speckle_range_slider, orient="horizontal",
-              command=lambda x: update_label(speckle_range_slider, speckle_range_label)).grid(row=1, column=1, padx=10,
-                                                                                              pady=10, sticky="e")
+    speckle_range_spinbox = ttk.Spinbox(speckle_frame, from_=0, to=256, textvariable=speckle_range_slider,
+                                        command=lambda: update_label(speckle_range_slider, speckle_range_label))
+    speckle_range_spinbox.grid(row=1, column=1, padx=10, pady=10, sticky="e")
+    ttk.Label(speckle_frame, text="(0, 256)").grid(row=1, column=2, padx=10, pady=10, sticky="w")
+    current_row += 1
+
+    # Speckle Difference Threshold
+    ttk.Label(speckle_frame, text="Speckle Difference Threshold").grid(row=2, column=0, padx=10, pady=10, sticky="w")
+    speckle_difference_label = ttk.Label(speckle_frame, text=str(speckle_difference_threshold.get()))
+    speckle_difference_spinbox = ttk.Spinbox(speckle_frame, from_=0, to=256, textvariable=speckle_difference_threshold,
+                                             command=lambda: update_label(speckle_difference_threshold,
+                                                                          speckle_difference_label))
+    speckle_difference_spinbox.grid(row=2, column=1, padx=10, pady=10, sticky="e")
+    ttk.Label(speckle_frame, text="(0, 256)").grid(row=2, column=2, padx=10, pady=10, sticky="w")
     current_row += 1
 
 
 
     # Spatial Filter Frame
-    spatial_frame = ttk.LabelFrame(popup_window, text="Spatial Filter", padding=(10, 10))
+    spatial_frame = ttk.LabelFrame(custom_settings_frame, text="Spatial Filter", padding=(10, 10))
     spatial_frame.grid(row=current_row, column=0, columnspan=6, padx=10, pady=10, sticky="ew")
 
     # Spatial Filter Enable
@@ -429,13 +484,11 @@ def open_replay_settings_screen(config, original_config=None):
     # Spatial Filter Settings
     ttk.Label(spatial_frame, text="Hole Filling Radius").grid(row=1, column=0, padx=10, pady=10, sticky="w")
     hole_filling_radius_label = ttk.Label(spatial_frame, text=str(hole_filling_radius_slider.get()))
-    hole_filling_radius_label.grid(row=1, column=2, padx=10, pady=10, sticky="w")
-    ttk.Scale(spatial_frame, from_=1, to=10, variable=hole_filling_radius_slider, orient="horizontal",
-              command=lambda x: update_label(hole_filling_radius_slider, hole_filling_radius_label)).grid(row=1,
-                                                                                                          column=1,
-                                                                                                          padx=10,
-                                                                                                          pady=10,
-                                                                                                          sticky="e")
+    hole_filling_radius_spinbox = ttk.Spinbox(spatial_frame, from_=0, to=255, textvariable=hole_filling_radius_slider,
+                                              command=lambda: update_label(hole_filling_radius_slider,
+                                                                           hole_filling_radius_label))
+    hole_filling_radius_spinbox.grid(row=1, column=1, padx=10, pady=10, sticky="e")
+    ttk.Label(spatial_frame, text="(0, 255)").grid(row=1, column=2, padx=10, pady=10, sticky="w")
 
     ttk.Label(spatial_frame, text="Num Iterations").grid(row=1, column=3, padx=10, pady=10, sticky="w")
     num_iterations_label = ttk.Label(spatial_frame, text=str(num_iterations_slider.get()))
@@ -449,7 +502,7 @@ def open_replay_settings_screen(config, original_config=None):
 
 
     # Temporal Filter Frame
-    temporal_frame = ttk.LabelFrame(popup_window, text="Temporal Filter", padding=(10, 10))
+    temporal_frame = ttk.LabelFrame(custom_settings_frame, text="Temporal Filter", padding=(10, 10))
     temporal_frame.grid(row=current_row, column=0, columnspan=6, padx=10, pady=10, sticky="ew")
 
     # Temporal Filter Enable
@@ -478,7 +531,7 @@ def open_replay_settings_screen(config, original_config=None):
 
 
     # Threshold Filter Frame
-    threshold_frame = ttk.LabelFrame(popup_window, text="Threshold Filter", padding=(10, 10))
+    threshold_frame = ttk.LabelFrame(custom_settings_frame, text="Threshold Filter", padding=(10, 10))
     threshold_frame.grid(row=current_row, column=0, columnspan=6, padx=10, pady=10, sticky="ew")
 
     # Threshold Filter Enable
@@ -506,7 +559,7 @@ def open_replay_settings_screen(config, original_config=None):
 
 
     # Bilateral Filter Frame
-    bilateral_frame = ttk.LabelFrame(popup_window, text="Bilateral Filter", padding=(10, 10))
+    bilateral_frame = ttk.LabelFrame(custom_settings_frame, text="Bilateral Filter", padding=(10, 10))
     bilateral_frame.grid(row=current_row, column=0, columnspan=6, padx=10, pady=10, sticky="ew")
 
     # Bilateral Filter Enable
@@ -525,7 +578,7 @@ def open_replay_settings_screen(config, original_config=None):
     current_row += 1
 
     # Brightness Filter Frame
-    brightness_frame = ttk.LabelFrame(popup_window, text="Brightness Filter", padding=(10, 10))
+    brightness_frame = ttk.LabelFrame(custom_settings_frame, text="Brightness Filter", padding=(10, 10))
     brightness_frame.grid(row=current_row, column=0, columnspan=6, padx=10, pady=10, sticky="ew")
 
     # Brightness Filter Enable
@@ -554,7 +607,7 @@ def open_replay_settings_screen(config, original_config=None):
 
 
     # Filter order
-    order_frame = ttk.LabelFrame(popup_window, text="Filtering Order", padding=(10, 10))
+    order_frame = ttk.LabelFrame(custom_settings_frame, text="Filtering Order", padding=(10, 10))
     order_frame.grid(row=current_row, column=0, columnspan=6, padx=10, pady=10, sticky="ew")
 
     # Decimation Filter Enable
@@ -610,6 +663,7 @@ def open_replay_settings_screen(config, original_config=None):
 
     # STEREO ALGORITHM ADVANCED SETTINGS -------------------------------------------------------------------------------
     # todo - add default depthai values
+
     advanced_settings_enable = tk.BooleanVar(value=False)
     mean_mode_enable = tk.BooleanVar(value=False)
     CT_kernel_val = tk.StringVar(value='KERNEL_5x5')
@@ -624,12 +678,20 @@ def open_replay_settings_screen(config, original_config=None):
     CM_beta_val = tk.IntVar(value=0)
     matching_threshold_val = tk.IntVar(value=0)
 
+    def toggle_advanced_settings():
+        if advanced_settings_enable.get():
+            enable_frame_widgets(advanced_stereo_setting_frame, True)
+        else:
+            enable_frame_widgets(advanced_stereo_setting_frame, False)
+
+    ttk.Label(popup_window, text="Enable Advanced Settings (I know what I'm doing)").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
+    advanced_settings_checkbox = ttk.Checkbutton(popup_window, variable=advanced_settings_enable, command=toggle_advanced_settings)
+    advanced_settings_checkbox.grid(row=current_row, column=1, padx=10, pady=10, sticky="e")
+
+    current_row += 1
+
     advanced_stereo_setting_frame = ttk.LabelFrame(popup_window, text="Advanced Settings", padding=(10, 10))
     advanced_stereo_setting_frame.grid(row=current_row, column=0, columnspan=6, padx=10, pady=10, sticky="ew")
-
-    ttk.Label(advanced_stereo_setting_frame, text="Enable Advanced Settings (I know what I'm doing)").grid(row=0, column=0, padx=10, pady=10, sticky="w")
-    advanced_settings_checkbox = ttk.Checkbutton(advanced_stereo_setting_frame, variable=advanced_settings_enable)
-    advanced_settings_checkbox.grid(row=0, column=1, padx=10, pady=10, sticky="e")
 
     ttk.Label(advanced_stereo_setting_frame, text="censusTransform.kernelSize").grid(row=1, column=0, padx=10, pady=10, sticky="w")
     CT_kernel_dropdown = ttk.Combobox(advanced_stereo_setting_frame, textvariable=CT_kernel_val, values=[
@@ -740,6 +802,9 @@ def open_replay_settings_screen(config, original_config=None):
     generate_button.grid(row=current_row, column=0, columnspan=2, pady=20)
     current_row += 1
     # ------------------------------------------------------------------------------------------------------------------------------
+
+    toggle_custom_settings() # turn off by default
+    toggle_advanced_settings() # turn off by default
 
     popup_window.grab_set()  # Make the window modal (disable interaction with the main window)
     popup_window.wait_window()  # Wait for the popup window to be destroyed
