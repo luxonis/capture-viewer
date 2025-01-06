@@ -124,38 +124,42 @@ def open_replay_settings_screen(config, original_config=None):
 
         if median_filter_enable.get():
             config['stereo.initialConfig.setMedianFilter'] = median_val.get()
+        else:
+            config['stereo.initialConfig.setMedianFilter'] = "MedianFilter.MEDIAN_OFF"
 
         # Bilateral filter
+        config['cfg.postProcessing.bilateralSigmaValue'] = bilateral_sigma_val.get()
         if bilateral_filter_enable.get():
             # is this all settings?
-            config['cfg.postProcessing.bilateralSigmaValue'] = bilateral_sigma_val.get()
+            pass
 
         # Brightness filter
-        if brightness_filter_enable.get():
+        if brightness_filter_enable.get():  # todo can we disable brightness filter?
             config['cfg.postProcessing.brightnessFilter.maxBrightness'] = max_brightness_slider.get()
             config['cfg.postProcessing.brightnessFilter.minBrightness'] = min_brightness_slider.get()
 
         # Speckle filter
+        config['cfg.postProcessing.speckleFilter.enable'] = speckle_filter_enable.get()
         if speckle_filter_enable.get():
-            config['cfg.postProcessing.speckleFilter.enable'] = speckle_filter_enable.get()
             config['cfg.postProcessing.speckleFilter.speckleRange'] = speckle_range_slider.get()
             config['cfg.postProcessing.speckleFilter.differenceThreshold'] = speckle_difference_threshold.get()
 
         # Spacial filter
+        config['cfg.postProcessing.spatialFilter.enable'] = spatial_filter_enable.get()
         if spatial_filter_enable.get():
-            config['cfg.postProcessing.spatialFilter.enable'] = spatial_filter_enable.get()
             config['cfg.postProcessing.spatialFilter.holeFillingRadius'] = hole_filling_radius_slider.get()
             config['cfg.postProcessing.spatialFilter.numIterations'] = num_iterations_slider.get()
             config['cfg.postProcessing.spatialFilter.alpha'] = alpha_slider.get()
             config['cfg.postProcessing.spatialFilter.delta'] = delta_slider.get()
 
         # Threshold filter
-        if threshold_filter_enable.get():
+        if threshold_filter_enable.get():  # todo same as brightness filter
             config['cfg.postProcessing.thresholdFilter.minRange'] = min_range_val.get()
             config['cfg.postProcessing.thresholdFilter.maxRange'] = max_range_val.get()
 
         # Decimation filter
-        if decimation_filter_enable.get():
+        config['cfg.postProcessing.decimationFilter.decimationFactor'] = decimation_factor_val.get()
+        if decimation_filter_enable.get():  # todo decimation filter has no attribute enable
             config['cfg.postProcessing.decimationFilter.decimationFactor'] = decimation_factor_val.get()
             config['cfg.postProcessing.decimationFilter.decimationMode'] = handle_dict(decimation_mode_val.get(), decimation_set_dict)  # leave this is correct
 
