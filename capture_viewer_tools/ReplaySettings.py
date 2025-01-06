@@ -333,14 +333,26 @@ def open_replay_settings_screen(config, original_config=None):
     HN_radiobutton.grid(row=current_row, column=7, padx=10, pady=5, sticky="w")
     current_row += 1
 
-    def toggle_custom_settings():
-        # Enable or disable all frames and their widgets based on the checkbox state
+    def toggle_custom_frame_settings():
+        toggle_frame_settings(custom_settings_val, custom_settings_frame)
         if custom_settings_val.get():
+            toggle_frame_settings(decimation_filter_enable, decimation_frame)
+            toggle_frame_settings(median_filter_enable, median_frame)
+            toggle_frame_settings(speckle_filter_enable, speckle_frame)
+            toggle_frame_settings(spatial_filter_enable, spatial_frame)
+            toggle_frame_settings(threshold_filter_enable, threshold_frame)
+            toggle_frame_settings(bilateral_filter_enable, bilateral_frame)
+            toggle_frame_settings(brightness_filter_enable, brightness_frame)
+            toggle_frame_settings(filtering_order_enable, order_frame)
+
+    def toggle_frame_settings(frame_on, frame):
+        # Enable or disable all frames and their widgets based on the checkbox state
+        if frame_on.get():
             # Enable custom settings and all nested frames/widgets
-            enable_frame_widgets(custom_settings_frame, True)
+            enable_frame_widgets(frame, True)
         else:
             # Disable custom settings and all nested frames/widgets
-            enable_frame_widgets(custom_settings_frame, False)
+            enable_frame_widgets(frame, False)
 
     def enable_frame_widgets(frame, state):
         """Recursively enable/disable all widgets in the frame, including nested frames."""
@@ -350,10 +362,11 @@ def open_replay_settings_screen(config, original_config=None):
                 widget.state(['!disabled'] if state else ['disabled'])
             else:
                 widget.state(['!disabled'] if state else ['disabled'])
+        frame.state(['!disabled'] if state else ['disabled'])
 
     #
     ttk.Label(popup_window, text="Use Custom Settings").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
-    cust_box = ttk.Checkbutton(popup_window, variable=custom_settings_val, command=toggle_custom_settings)
+    cust_box = ttk.Checkbutton(popup_window, variable=custom_settings_val, command=toggle_custom_frame_settings)
     cust_box.grid(row=current_row, column=1, padx=10, pady=10, sticky="e")
     current_row += 1
 
@@ -392,15 +405,16 @@ def open_replay_settings_screen(config, original_config=None):
     current_row += 1  # Increment the row
 
 
+    # Decimation Filter Enable
+    ttk.Label(custom_settings_frame, text="Decimation Filter Enable").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
+    decimation_filter_checkbox = ttk.Checkbutton(custom_settings_frame, variable=decimation_filter_enable, command=lambda: toggle_frame_settings(decimation_filter_enable, decimation_frame))
+    decimation_filter_checkbox.grid(row=current_row, column=1, padx=10, pady=10, sticky="e")
+
+    current_row += 1  # Increment the row
 
     # Decimation Filter Group (in a LabelFrame with a black border)
     decimation_frame = ttk.LabelFrame(custom_settings_frame, text="Decimation Filter", padding=(10, 10))
     decimation_frame.grid(row=current_row, column=0, columnspan=6, padx=10, pady=10, sticky="ew")
-
-    # Decimation Filter Enable
-    ttk.Label(decimation_frame, text="Decimation Filter Enable").grid(row=0, column=0, padx=10, pady=10, sticky="w")
-    decimation_filter_checkbox = ttk.Checkbutton(decimation_frame, variable=decimation_filter_enable)
-    decimation_filter_checkbox.grid(row=0, column=1, padx=10, pady=10, sticky="e")
 
     # Decimation Filter (Factor and Mode on one row)
     ttk.Label(decimation_frame, text="Factor").grid(row=1, column=0, padx=10, pady=10, sticky="w")
@@ -421,35 +435,37 @@ def open_replay_settings_screen(config, original_config=None):
 
 
 
+    # Median Filter
+    ttk.Label(custom_settings_frame, text="Median Enable").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
+    median_filter_checkbox = ttk.Checkbutton(custom_settings_frame, variable=median_filter_enable, command=lambda: toggle_frame_settings(median_filter_enable, median_frame))
+    median_filter_checkbox.grid(row=current_row, column=1, padx=10, pady=10, sticky="e")
+    current_row += 1
+
     # Median Filter Frame
     median_frame = ttk.LabelFrame(custom_settings_frame, text="Median Filter", padding=(10, 10))
     median_frame.grid(row=current_row, column=0, columnspan=6, padx=10, pady=10, sticky="ew")
 
-    # Median Filter
-    ttk.Label(median_frame, text="Median Enable").grid(row=0, column=0, padx=10, pady=10, sticky="w")
-    ttk.Label(median_frame, text="Median").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
-    median_filter_checkbox = ttk.Checkbutton(median_frame, variable=median_filter_enable)
-    median_filter_checkbox.grid(row=0, column=1, padx=10, pady=10, sticky="e")
+    ttk.Label(median_frame, text="Median").grid(row=0, column=0, padx=10, pady=10, sticky="w")
     # median_off_button = ttk.Radiobutton(median_frame, text="MEDIAN_OFF", variable=median_val, value="MEDIAN_OFF")
     median_3_button = ttk.Radiobutton(median_frame, text="MEDIAN_3x3", variable=median_val, value="MedianFilter.KERNEL_3x3")
     median_5_button = ttk.Radiobutton(median_frame, text="MEDIAN_5x5", variable=median_val, value="MedianFilter.KERNEL_5x5")
     median_7_button = ttk.Radiobutton(median_frame, text="MEDIAN_7x7", variable=median_val, value="MedianFilter.KERNEL_7x7")
     # median_off_button.grid(row=current_row, column=1, padx=10, pady=5, sticky="w")
-    median_3_button.grid(row=current_row, column=1, padx=10, pady=5, sticky="w")
-    median_5_button.grid(row=current_row, column=2, padx=10, pady=5, sticky="w")
-    median_7_button.grid(row=current_row, column=3, padx=10, pady=5, sticky="w")
+    median_3_button.grid(row=0, column=1, padx=10, pady=5, sticky="w")
+    median_5_button.grid(row=0, column=2, padx=10, pady=5, sticky="w")
+    median_7_button.grid(row=0, column=3, padx=10, pady=5, sticky="w")
     current_row += 1
 
 
+    # Speckle Filter Enable
+    ttk.Label(custom_settings_frame, text="Speckle Filter Enable").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
+    speckle_filter_checkbox = ttk.Checkbutton(custom_settings_frame, variable=speckle_filter_enable, command=lambda: toggle_frame_settings(speckle_filter_enable, speckle_frame))
+    speckle_filter_checkbox.grid(row=current_row, column=1, padx=10, pady=10, sticky="e")
+    current_row += 1
 
     # Speckle Filter Frame
     speckle_frame = ttk.LabelFrame(custom_settings_frame, text="Speckle Filter", padding=(10, 10))
     speckle_frame.grid(row=current_row, column=0, columnspan=6, padx=10, pady=10, sticky="ew")
-
-    # Speckle Filter Enable
-    ttk.Label(speckle_frame, text="Speckle Filter Enable").grid(row=0, column=0, padx=10, pady=10, sticky="w")
-    speckle_filter_checkbox = ttk.Checkbutton(speckle_frame, variable=speckle_filter_enable)
-    speckle_filter_checkbox.grid(row=0, column=1, padx=10, pady=10, sticky="e")
 
     # Speckle Range
     ttk.Label(speckle_frame, text="Speckle Range").grid(row=1, column=0, padx=10, pady=10, sticky="w")
@@ -472,14 +488,16 @@ def open_replay_settings_screen(config, original_config=None):
 
 
 
+
+    # Spatial Filter Enable
+    ttk.Label(custom_settings_frame, text="Spatial Filter Enable").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
+    spatial_filter_checkbox = ttk.Checkbutton(custom_settings_frame, variable=spatial_filter_enable, command=lambda: toggle_frame_settings(spatial_filter_enable, spatial_frame))
+    spatial_filter_checkbox.grid(row=current_row, column=1, padx=10, pady=10, sticky="e")
+    current_row += 1
+
     # Spatial Filter Frame
     spatial_frame = ttk.LabelFrame(custom_settings_frame, text="Spatial Filter", padding=(10, 10))
     spatial_frame.grid(row=current_row, column=0, columnspan=6, padx=10, pady=10, sticky="ew")
-
-    # Spatial Filter Enable
-    ttk.Label(spatial_frame, text="Spatial Filter Enable").grid(row=0, column=0, padx=10, pady=10, sticky="w")
-    spatial_filter_checkbox = ttk.Checkbutton(spatial_frame, variable=spatial_filter_enable)
-    spatial_filter_checkbox.grid(row=0, column=1, padx=10, pady=10, sticky="e")
 
     # Spatial Filter Settings
     ttk.Label(spatial_frame, text="Hole Filling Radius").grid(row=1, column=0, padx=10, pady=10, sticky="w")
@@ -500,18 +518,6 @@ def open_replay_settings_screen(config, original_config=None):
     current_row += 1
 
 
-
-    # Temporal Filter Frame
-    temporal_frame = ttk.LabelFrame(custom_settings_frame, text="Temporal Filter", padding=(10, 10))
-    temporal_frame.grid(row=current_row, column=0, columnspan=6, padx=10, pady=10, sticky="ew")
-
-    # Temporal Filter Enable
-    ttk.Label(temporal_frame, text="Temporal filter not available due to the nature of data").grid(row=0, column=0, padx=10, pady=10, sticky="w")
-
-    current_row += 1
-
-
-
     ttk.Label(spatial_frame, text="Alpha").grid(row=2, column=0, padx=10, pady=10, sticky="w")
     alpha_label = ttk.Label(spatial_frame, text=str(alpha_slider.get()))
     alpha_label.grid(row=2, column=2, padx=10, pady=10, sticky="w")
@@ -529,15 +535,26 @@ def open_replay_settings_screen(config, original_config=None):
     current_row += 1
 
 
+    # Temporal Filter Frame
+    temporal_frame = ttk.LabelFrame(custom_settings_frame, text="Temporal Filter", padding=(10, 10))
+    temporal_frame.grid(row=current_row, column=0, columnspan=6, padx=10, pady=10, sticky="ew")
+
+    # Temporal Filter Enable
+    ttk.Label(temporal_frame, text="Temporal filter not available due to the nature of data").grid(row=0, column=0, padx=10, pady=10, sticky="w")
+
+    current_row += 1
+
+
+
+    # Threshold Filter Enable
+    ttk.Label(custom_settings_frame, text="Threshold Filter Enable").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
+    threshold_filter_checkbox = ttk.Checkbutton(custom_settings_frame, variable=threshold_filter_enable, command=lambda: toggle_frame_settings(threshold_filter_enable, threshold_frame))
+    threshold_filter_checkbox.grid(row=current_row, column=1, padx=10, pady=10, sticky="e")
+    current_row += 1
 
     # Threshold Filter Frame
     threshold_frame = ttk.LabelFrame(custom_settings_frame, text="Threshold Filter", padding=(10, 10))
     threshold_frame.grid(row=current_row, column=0, columnspan=6, padx=10, pady=10, sticky="ew")
-
-    # Threshold Filter Enable
-    ttk.Label(threshold_frame, text="Threshold Filter Enable").grid(row=0, column=0, padx=10, pady=10, sticky="w")
-    threshold_filter_checkbox = ttk.Checkbutton(threshold_frame, variable=threshold_filter_enable)
-    threshold_filter_checkbox.grid(row=0, column=1, padx=10, pady=10, sticky="e")
 
     # Threshold Filter Min and Max with Spinboxes
     ttk.Label(threshold_frame, text="Min").grid(row=1, column=0, padx=10, pady=10, sticky="w")
@@ -556,16 +573,15 @@ def open_replay_settings_screen(config, original_config=None):
 
     current_row += 1
 
-
+    # Bilateral Filter Enable
+    ttk.Label(custom_settings_frame, text="Bilateral Filter Enable (NOT TESTED IN GUI)").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
+    bilateral_filter_checkbox = ttk.Checkbutton(custom_settings_frame, variable=bilateral_filter_enable, command=lambda: toggle_frame_settings(bilateral_filter_enable, bilateral_frame))
+    bilateral_filter_checkbox.grid(row=current_row, column=1, padx=10, pady=10, sticky="e")
+    current_row += 1
 
     # Bilateral Filter Frame
     bilateral_frame = ttk.LabelFrame(custom_settings_frame, text="Bilateral Filter", padding=(10, 10))
     bilateral_frame.grid(row=current_row, column=0, columnspan=6, padx=10, pady=10, sticky="ew")
-
-    # Bilateral Filter Enable
-    ttk.Label(bilateral_frame, text="Bilateral Filter Enable (NOT TESTED IN GUI)").grid(row=0, column=0, padx=10, pady=10, sticky="w")
-    bilateral_filter_checkbox = ttk.Checkbutton(bilateral_frame, variable=bilateral_filter_enable)
-    bilateral_filter_checkbox.grid(row=0, column=1, padx=10, pady=10, sticky="e")
 
     # Bilateral Sigma Value
     ttk.Label(bilateral_frame, text="Bilateral Sigma Value").grid(row=1, column=0, padx=10, pady=10, sticky="w")
@@ -577,14 +593,16 @@ def open_replay_settings_screen(config, original_config=None):
     bilateral_sigma_slider.grid(row=1, column=1, padx=10, pady=10, sticky="e")
     current_row += 1
 
+
+    # Brightness Filter Enable
+    ttk.Label(custom_settings_frame, text="Brightness Filter Enable (NOT TESTED IN GUI)").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
+    brightness_filter_checkbox = ttk.Checkbutton(custom_settings_frame, variable=brightness_filter_enable, command=lambda: toggle_frame_settings(brightness_filter_enable, brightness_frame))
+    brightness_filter_checkbox.grid(row=current_row, column=1, padx=10, pady=10, sticky="e")
+    current_row += 1
+
     # Brightness Filter Frame
     brightness_frame = ttk.LabelFrame(custom_settings_frame, text="Brightness Filter", padding=(10, 10))
     brightness_frame.grid(row=current_row, column=0, columnspan=6, padx=10, pady=10, sticky="ew")
-
-    # Brightness Filter Enable
-    ttk.Label(brightness_frame, text="Brightness Filter Enable (NOT TESTED IN GUI)").grid(row=0, column=0, padx=10, pady=10, sticky="w")
-    brightness_filter_checkbox = ttk.Checkbutton(brightness_frame, variable=brightness_filter_enable)
-    brightness_filter_checkbox.grid(row=0, column=1, padx=10, pady=10, sticky="e")
 
     # Brightness Filter Sliders
     ttk.Label(brightness_frame, text="Min Brightness").grid(row=1, column=0, padx=10, pady=10, sticky="w")
@@ -605,15 +623,15 @@ def open_replay_settings_screen(config, original_config=None):
     current_row += 1
 
 
+    # Filter Order Enable
+    ttk.Label(custom_settings_frame, text="Filter Order Selection Enable (NOT TESTED IN GUI)").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
+    send_filter_order_checkbox = ttk.Checkbutton(custom_settings_frame, variable=filtering_order_enable, command=lambda: toggle_frame_settings(filtering_order_enable, order_frame))
+    send_filter_order_checkbox.grid(row=current_row, column=1, padx=10, pady=10, sticky="e")
+    current_row += 1
 
     # Filter order
     order_frame = ttk.LabelFrame(custom_settings_frame, text="Filtering Order", padding=(10, 10))
     order_frame.grid(row=current_row, column=0, columnspan=6, padx=10, pady=10, sticky="ew")
-
-    # Decimation Filter Enable
-    ttk.Label(order_frame, text="Filter Order Selection Enable (NOT TESTED IN GUI)").grid(row=0, column=0, padx=10, pady=10, sticky="w")
-    send_filter_order_checkbox = ttk.Checkbutton(order_frame, variable=filtering_order_enable)
-    send_filter_order_checkbox.grid(row=0, column=1, padx=10, pady=10, sticky="e")
 
     row = 1
     ttk.Label(order_frame, text="Decimation").grid(row=row, column=0, padx=10, pady=10, sticky="w")
@@ -803,7 +821,7 @@ def open_replay_settings_screen(config, original_config=None):
     current_row += 1
     # ------------------------------------------------------------------------------------------------------------------------------
 
-    toggle_custom_settings() # turn off by default
+    toggle_custom_frame_settings()
     toggle_advanced_settings() # turn off by default
 
     popup_window.grab_set()  # Make the window modal (disable interaction with the main window)
