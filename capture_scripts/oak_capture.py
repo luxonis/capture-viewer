@@ -124,7 +124,9 @@ def create_pipeline():
 
     return pipeline
 
-def create_folder(out_dir):
+def create_folder(root_path, device):
+    date = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+    out_dir = f"{root_path}/{device.getDeviceName()}_{device.getMxId()}_{date}"
     if not os.path.exists(root_path):
         os.makedirs(root_path)
     if not os.path.exists(os.path.join(root_path, out_dir)):
@@ -133,9 +135,15 @@ def create_folder(out_dir):
     else:
         print(f"Folder '{out_dir}' already exists.")
 
+    calib = device.readCalibration()
+    calib.eepromToJsonFile(f'{out_dir}/calib.json')
+    create_and_save_metadata(device, settings, out_dir, view_name, date=date)
+
+    return out_dir
+
 def create_and_save_metadata(device, settings, output_dir,
                              scene_name, capture_type=None,
-                             author=None, notes=None):
+                             author=None, notes=None, date=''):
     model_name = device.getDeviceName()
     mxId = device.getMxId()
     metadata = {
@@ -171,6 +179,7 @@ def parseArguments():
     parser.add_argument("view_name", help="What part of the scene the camera is looking at")
     # Optional argument with a flag for device_ip
     parser.add_argument("--device-ip", dest="device_ip", help="IP of remote device", default=None)
+    parser.add_argument("--autostart", default=-1, type=int, help='Automatically start capturing after given number of frames (-1 to disable)')
 
     args = parser.parse_args()
     settings_path = args.settings_file_path
@@ -189,11 +198,11 @@ def parseArguments():
             settings_path = settings_path_2
         else: raise FileNotFoundError(f"Settings file '{settings_path}' does not exist.")
 
-    return settings_path, view_name, device_info
+    return settings_path, view_name, device_info, args.autostart
 
 if __name__ == "__main__":
     print("Running OAK capture script")
-    settings_path, view_name, device_info = parseArguments()
+    settings_path, view_name, device_info, autostart = parseArguments()
 
     with open(settings_path, 'r') as file:
         settings = json.load(file)
@@ -207,7 +216,6 @@ if __name__ == "__main__":
     print("\nConnecting device...")
     with dai.Device(create_pipeline(), device_info) as device:
         print("Device Connected!")
-        device_name = device.getDeviceName()
         out_dir = None
 
         queue = device.getOutputQueue("xout", 10, False)
@@ -220,6 +228,11 @@ if __name__ == "__main__":
 
         isp_frame = None
         while True:
+            if autostart >= -1:
+                autostart -= 1
+            if autostart == -1:
+                out_dir = create_folder(root_path, device)
+                save = True
             msgGrp = queue.get()
             for name, msg in msgGrp:
                 if save:
@@ -264,18 +277,11 @@ if __name__ == "__main__":
                     print("CAPTURING...")
                 else:
                     print(f"capture finished with: {num_captures} captures")
-                    num_captures = 0
                     exit(0)
 
-                date = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-                out_dir = f"{root_path}/{device_name}_{date}"
-                create_folder(out_dir)
-                calib = device.readCalibration()
-                calib.eepromToJsonFile(f'{out_dir}/calib.json')
-                create_and_save_metadata(device, settings, out_dir, view_name)
+                out_dir = create_folder(root_path, device)
 
             if num_captures == settings["num_captures"]:
                 save = False
                 print(f"CAPTURE FINISHED with: {num_captures} captures")
-                num_captures = 0
                 exit(0)
