@@ -16,6 +16,12 @@ root_path = os.path.join(os.path.dirname(script_dir), 'DATA')
 def create_pipeline(frame_syn_num=-1):
     pipeline = dai.Pipeline()
 
+    # # A watchdog to wait for camera to be truly available (default is 10 secconds after connection
+    # config = dai.BoardConfig()
+    # config.watchdogInitialDelayMs = 5000
+    # config.watchdogTimeoutMs = 4500  # maximum value
+    # pipeline.setBoardConfig(config)
+
     output_settings = settings["output_settings"]
 
     active_cams = []
@@ -262,6 +268,7 @@ if __name__ == "__main__":
     print("Connecting device...")
 
     pipeline, tofConfig = create_pipeline(frame_syn_num)
+
 
     with dai.Device(pipeline, device_info) as device:
         print("Device Connected!")
