@@ -7,6 +7,7 @@ import os
 import json
 import datetime
 import argparse
+import time
 
 # Get the directory where the script is located and choose it as the destination for DATA folder
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -154,6 +155,7 @@ def create_and_save_metadata(device, settings, output_dir,
     print(f"Metadata saved to {filepath}")
 
 def initialize_capture(root_path, device):
+    print("Starting capture")
     date = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
     out_dir = f"{root_path}/{device.getDeviceName()}_{device.getMxId()}_{date}"
     if not os.path.exists(root_path):
@@ -169,6 +171,13 @@ def initialize_capture(root_path, device):
     create_and_save_metadata(device, settings, out_dir, view_name, date=date)
 
     return out_dir
+
+def end_capture(start_time, num_captures):
+    end_time = time.time()
+    print("Capture took " + str(end_time - start_time) + " seconds.")
+    print(f"CAPTURE FINISHED with: {num_captures} captures")
+    print(f"Capture was {round(num_captures / (end_time - start_time), 2)} FPS")
+    exit(0)
 
 def parseArguments():
     # PARSE ARGUMENTS
@@ -209,7 +218,8 @@ def save_frames(out_dir, timestamp, name, frame, last_timestamps):
         np.save(f'{out_dir}/{name}_{timestamp}.npy', frame)
     elif name in ["tof_depth", "tof_raw", "tof_amplitude", "tof_intensity"]:
         if not last_timestamps:
-            pass
+            if not (settings["output_settings"]["left"] or settings["output_settings"]["left"]):
+                np.save(f'{out_dir}/{name}_{timestamp}.npy', frame)
         else:
             np.save(f'{out_dir}/{name}_{last_timestamps[-1]}.npy', frame)
     elif name in ["left", "right"]:
@@ -256,13 +266,15 @@ if __name__ == "__main__":
         last_timestamps = []
         tof_counter = 0
 
+        start_time = None
+
         while True:
             if autostart >= -1:
                 autostart -= 1
             if autostart == -1:
                 out_dir = initialize_capture(root_path, device)
                 save = True
-                print("Starting capture via autosave")
+                start_time = time.time()
 
             msgGrp = queue.get()
             if save: num_captures += 1
@@ -297,15 +309,12 @@ if __name__ == "__main__":
                 break
             elif key == ord("s"):
                 save = not save
-
-                out_dir = initialize_capture(root_path, device)
                 if save:
-                    print("Starting capture")
+                    out_dir = initialize_capture(root_path, device)
+                    start_time = time.time()
                 else:
-                    print(f"capture finished with: {num_captures} captures")
+                    end_capture(start_time, num_captures)
 
             if num_captures == settings["num_captures"]:
                 save = False
-                print(f"CAPTURE FINISHED with: {num_captures} captures")
-                num_captures = 0
-                exit(0)
+                end_capture(start_time, num_captures)

@@ -9,11 +9,11 @@
         "left": true,
         "right": true,
         "tof": true,
-        "tof_raw": true,
+        "tof_raw": false,
         "tof_depth": true,
-        "tof_amplitude": true,
-        "tof_intensity": true,
-        "stereo_depth": true
+        "tof_amplitude": false,
+        "tof_intensity": false,
+        "stereo_depth": false
     },
 
     "alignSocket": "REC_RIGHT",
