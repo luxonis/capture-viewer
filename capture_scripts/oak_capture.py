@@ -6,6 +6,7 @@ import json
 import datetime
 from datetime import timedelta
 import argparse
+import time
 
 # Get the directory where the script is located and choose it as the destination for DATA folder
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -17,110 +18,122 @@ def create_pipeline():
     global disparityMultiplier
     pipeline = dai.Pipeline()
 
-    monoLeft = pipeline.create(dai.node.MonoCamera)
-    monoRight = pipeline.create(dai.node.MonoCamera)
-    color = pipeline.create(dai.node.ColorCamera)
-    stereo = pipeline.create(dai.node.StereoDepth)
+    output_settings = settings["output_settings"]
+    if output_settings["left"] or output_settings["left_raw"]:
+        monoLeft = pipeline.create(dai.node.MonoCamera)
+        monoLeft.setCamera("left")
+        monoLeft.setResolution(eval("dai.MonoCameraProperties.SensorResolution." + settings["stereoResolution"]))
+        monoLeft.setFps(settings["FPS"])
+
+        if settings["autoexposure"]: monoLeft.initialControl.setAutoExposureEnable()
+        else: monoLeft.initialControl.setManualExposure(settings["expTime"], settings["sensIso"])
+
+    if output_settings["right"] or output_settings["right_raw"]:
+        monoRight = pipeline.create(dai.node.MonoCamera)
+        monoRight.setCamera("right")
+        monoRight.setFps(settings["FPS"])
+        monoRight.setResolution(eval("dai.MonoCameraProperties.SensorResolution." + settings["stereoResolution"]))
+
+        if settings["autoexposure"]: monoRight.initialControl.setAutoExposureEnable()
+        else: monoRight.initialControl.setManualExposure(settings["expTime"], settings["sensIso"])
+
+    if output_settings["rgb"] or output_settings["rgb_png"]:
+        color = pipeline.create(dai.node.ColorCamera)
+        color.setCamera("color")
+        color.setResolution(eval("dai.ColorCameraProperties.SensorResolution." + settings["rgbResolution"]))
+
+    if output_settings["depth"] or output_settings["disparity"]:
+        stereo = pipeline.create(dai.node.StereoDepth)
+        monoLeft.out.link(stereo.left)
+        monoRight.out.link(stereo.right)
+        disparityMultiplier = 1 / stereo.initialConfig.getMaxDisparity()
+
     sync = pipeline.create(dai.node.Sync)
 
     xoutGrp = pipeline.create(dai.node.XLinkOut)
     xoutGrp.setStreamName("xout")
 
-    monoLeft.setCamera("left")
-    monoRight.setCamera("right")
-    monoLeft.setResolution(dai.MonoCameraProperties.SensorResolution.THE_800_P)
-    monoRight.setResolution(dai.MonoCameraProperties.SensorResolution.THE_800_P)
-    # if settings.get("stereoPairResolution", "800P") == "800P":
-    #     monoLeft.setResolution(dai.MonoCameraProperties.SensorResolution.THE_800_P)
-    #     monoRight.setResolution(dai.MonoCameraProperties.SensorResolution.THE_800_P)
-    # elif settings.get("stereoPairResolution", "400P") == "400P":
-    monoLeft.setFps(settings["FPS"])
-    monoRight.setFps(settings["FPS"])
-
-    if settings["alignSocket"] == "RIGHT":
-        ALIGN_SOCKET = dai.CameraBoardSocket.RIGHT
-        stereo.setDepthAlign(ALIGN_SOCKET)
-    elif settings["alignSocket"] == "LEFT":
-        ALIGN_SOCKET = dai.CameraBoardSocket.LEFT
-        stereo.setDepthAlign(ALIGN_SOCKET)
-    elif settings["alignSocket"] == "REC_LEFT":
-        stereo.initialConfig.setDepthAlign(dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_LEFT)
-    elif settings["alignSocket"] == "REC_RIGHT":
-        stereo.initialConfig.setDepthAlign(dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_RIGHT)
-    elif settings["alignSocket"] == "COLOR":
-        ALIGN_SOCKET = dai.CameraBoardSocket.RGB
-        stereo.setDepthAlign(ALIGN_SOCKET)
-    else:
-        raise ValueError("Invalid align socket")
-
-    if settings["autoexposure"]:
-        monoLeft.initialControl.setAutoExposureEnable()
-        monoRight.initialControl.setAutoExposureEnable()
-    else:
-        monoLeft.initialControl.setManualExposure(settings["expTime"], settings["sensIso"])
-        monoRight.initialControl.setManualExposure(settings["expTime"], settings["sensIso"])
-
-    stereo.setLeftRightCheck(settings["LRcheck"])
-    if settings["extendedDisparity"]: stereo.setExtendedDisparity(True)
-    if settings["subpixelDisparity"]: stereo.setSubpixel(True)
-    if settings["subpixelValue"]: stereo.initialConfig.setSubpixelFractionalBits(settings["subpixelValue"])
-    if settings["highAccuracy"]: stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_ACCURACY)
-    elif settings["highDensity"]: stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
-
-    if settings["filters_on"]:
-        stereoConfig = stereo.initialConfig.get()
-        if settings["filters"]["threshold_filter"]:
-            stereoConfig.postProcessing.thresholdFilter.minRange = settings["filters"]["lower_threshold_filter"]
-            stereoConfig.postProcessing.thresholdFilter.maxRange = settings["filters"]["upper_threshold_filter"]
-        if settings["filters"]["decimation_filter"]:
-            stereoConfig.postProcessing.decimationFilter.decimationFactor = settings["filters"]["decimation_factor"]
-        if settings["filters"]["spacial_filter"]:
-            stereoConfig.postProcessing.spatialFilter.enable = True
-            # stereoConfig.postProcessing.spatialFilter.holeFillingRadius = 2
-            # stereoConfig.postProcessing.spatialFilter.numIterations = 1
-        if settings["filters"]["temporal_filter"]:
-            stereoConfig.postProcessing.temporalFilter.enable = True
-        if settings["filters"]["speckle_filter"]:
-            stereoConfig.postProcessing.speckleFilter.enable = True
-            stereoConfig.postProcessing.speckleFilter.speckleRange = settings["filters"]["speckle_range"]
-
-        stereo.initialConfig.set(stereoConfig)  # RUN BEFORE SETTING MEDIAN FILTER
-
-        if settings["filters"]["median_filter"]:
-            if settings["filters"]["median_size"] == "MEDIAN_3x3":
-                stereo.setMedianFilter(dai.StereoDepthConfig.MedianFilter.KERNEL_3x3)
-            elif settings["filters"]["median_size"] == "MEDIAN_5x5":
-                stereo.setMedianFilter(dai.StereoDepthConfig.MedianFilter.KERNEL_5x5)
-            elif settings["filters"]["median_size"] == "MEDIAN_7x7":
-                stereo.setMedianFilter(dai.StereoDepthConfig.MedianFilter.KERNEL_7x7)
-
-            else: raise ValueError
+    if output_settings["depth"] or output_settings["disparity"]:
+        if settings["alignSocket"] == "RIGHT":
+            ALIGN_SOCKET = dai.CameraBoardSocket.RIGHT
+            stereo.setDepthAlign(ALIGN_SOCKET)
+        elif settings["alignSocket"] == "LEFT":
+            ALIGN_SOCKET = dai.CameraBoardSocket.LEFT
+            stereo.setDepthAlign(ALIGN_SOCKET)
+        elif settings["alignSocket"] == "REC_LEFT":
+            stereo.initialConfig.setDepthAlign(dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_LEFT)
+        elif settings["alignSocket"] == "REC_RIGHT":
+            stereo.initialConfig.setDepthAlign(dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_RIGHT)
+        elif settings["alignSocket"] == "COLOR":
+            ALIGN_SOCKET = dai.CameraBoardSocket.RGB
+            stereo.setDepthAlign(ALIGN_SOCKET)
         else:
-            stereo.setMedianFilter(dai.StereoDepthConfig.MedianFilter.MEDIAN_OFF)
+            raise ValueError("Invalid align socket")
 
-    color.setCamera("color")
+        stereo.setLeftRightCheck(settings["LRcheck"])
+        if settings["extendedDisparity"]: stereo.setExtendedDisparity(True)
+        if settings["subpixelDisparity"]: stereo.setSubpixel(True)
+        if settings["subpixelValue"]: stereo.initialConfig.setSubpixelFractionalBits(settings["subpixelValue"])
+        if settings["highAccuracy"]: stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_ACCURACY)
+        elif settings["highDensity"]: stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
+
+        if settings["filters_on"]:
+            stereoConfig = stereo.initialConfig.get()
+            if settings["filters"]["threshold_filter"]:
+                stereoConfig.postProcessing.thresholdFilter.minRange = settings["filters"]["lower_threshold_filter"]
+                stereoConfig.postProcessing.thresholdFilter.maxRange = settings["filters"]["upper_threshold_filter"]
+            if settings["filters"]["decimation_filter"]:
+                stereoConfig.postProcessing.decimationFilter.decimationFactor = settings["filters"]["decimation_factor"]
+            if settings["filters"]["spacial_filter"]:
+                stereoConfig.postProcessing.spatialFilter.enable = True
+                # stereoConfig.postProcessing.spatialFilter.holeFillingRadius = 2
+                # stereoConfig.postProcessing.spatialFilter.numIterations = 1
+            if settings["filters"]["temporal_filter"]:
+                stereoConfig.postProcessing.temporalFilter.enable = True
+            if settings["filters"]["speckle_filter"]:
+                stereoConfig.postProcessing.speckleFilter.enable = True
+                stereoConfig.postProcessing.speckleFilter.speckleRange = settings["filters"]["speckle_range"]
+
+            stereo.initialConfig.set(stereoConfig)  # RUN BEFORE SETTING MEDIAN FILTER
+
+            if settings["filters"]["median_filter"]:
+                if settings["filters"]["median_size"] == "MEDIAN_3x3":
+                    stereo.setMedianFilter(dai.StereoDepthConfig.MedianFilter.KERNEL_3x3)
+                elif settings["filters"]["median_size"] == "MEDIAN_5x5":
+                    stereo.setMedianFilter(dai.StereoDepthConfig.MedianFilter.KERNEL_5x5)
+                elif settings["filters"]["median_size"] == "MEDIAN_7x7":
+                    stereo.setMedianFilter(dai.StereoDepthConfig.MedianFilter.KERNEL_7x7)
+
+                else: raise ValueError
+            else:
+                stereo.setMedianFilter(dai.StereoDepthConfig.MedianFilter.MEDIAN_OFF)
 
     sync.setSyncThreshold(timedelta(milliseconds=50))
 
-    monoLeft.out.link(stereo.left)
-    monoRight.out.link(stereo.right)
-
-    stereo.disparity.link(sync.inputs["disparity"])
-    stereo.syncedLeft.link(sync.inputs["left"])
-    stereo.syncedRight.link(sync.inputs["right"])
-    monoLeft.raw.link(sync.inputs["left_raw"])
-    monoRight.raw.link(sync.inputs["right_raw"])
-    stereo.depth.link(sync.inputs["depth"])
-    color.isp.link(sync.inputs["isp"])
+    if output_settings["disparity"]:
+        stereo.disparity.link(sync.inputs["disparity"])
+    if output_settings["rgb"] or output_settings["rgb_png"]:
+        color.isp.link(sync.inputs["isp"])
+    if output_settings["depth"]:
+        stereo.depth.link(sync.inputs["depth"])
+        stereo.syncedLeft.link(sync.inputs["left"])
+        stereo.syncedRight.link(sync.inputs["right"])
+    else:
+        if output_settings["left"]:
+            monoLeft.out.link(sync.inputs["left"])
+        if output_settings["right"]:
+            monoRight.out.link(sync.inputs["right"])
+    if output_settings["left_raw"]:
+        monoLeft.raw.link(sync.inputs["left_raw"])
+    if output_settings["right_raw"]:
+        monoRight.raw.link(sync.inputs["right_raw"])
 
     sync.out.link(xoutGrp.input)
 
-    disparityMultiplier = 1 / stereo.initialConfig.getMaxDisparity()
-
-    controlIn = pipeline.create(dai.node.XLinkIn)
-    controlIn.setStreamName('control')
-    controlIn.out.link(monoRight.inputControl)
-    controlIn.out.link(monoLeft.inputControl)
+    # controlIn = pipeline.create(dai.node.XLinkIn)
+    # controlIn.setStreamName('control')
+    # controlIn.out.link(monoRight.inputControl)
+    # controlIn.out.link(monoLeft.inputControl)
 
     return pipeline
 
@@ -207,6 +220,10 @@ if __name__ == "__main__":
     with open(settings_path, 'r') as file:
         settings = json.load(file)
 
+    if settings["output_settings"]["depth"] == False and settings["output_settings"]["disparity"] == True:
+        print("Warning: depth settings not enabled, disparity will not work.")
+        exit(1)
+
     print("\nUSAGE:")
     print("Press S to start capture")
     print("Press Q to quit")
@@ -214,7 +231,7 @@ if __name__ == "__main__":
     print("Or press S again to end the capture early.")
 
     print("\nConnecting device...")
-    with dai.Device(create_pipeline(), device_info) as device:
+    with (dai.Device(create_pipeline(), device_info) as device):
         print("Device Connected!")
         out_dir = None
 
@@ -226,7 +243,10 @@ if __name__ == "__main__":
         save = False
         num_captures = 0
 
-        isp_frame = None
+        last_timestamps = []
+        isp_counter = 0
+
+        start_time = time.time()
         while True:
             if autostart >= -1:
                 autostart -= 1
@@ -234,26 +254,40 @@ if __name__ == "__main__":
                 out_dir = initialize_capture(root_path, device)
                 save = True
                 print("Starting capture via autosave")
+                start_time = time.time()
             msgGrp = queue.get()
             for name, msg in msgGrp:
                 if save:
-                    time = int(msg.getTimestamp().total_seconds() * 1000)
+                    timestamp = int(msg.getTimestamp().total_seconds() * 1000)
                     frame = msg.getCvFrame()
                     if name == "left_raw" or name == "right_raw":
                         data = msg.getData()
-                        np.save(f'{out_dir}/{name}_{time}', data)
+                        np.save(f'{out_dir}/{name}_{timestamp}', data)
+                        if not (settings["output_settings"]["rgb"] or settings["output_settings"]["rgb_png"]
+                            or settings["output_settings"]["left"] or settings["output_settings"]["right"]):
+                            num_captures += 0.5
                         continue
+                    elif name == "left" or name == "right":
+                        data = msg.getData()
+                        np.save(f'{out_dir}/{name}_{timestamp}', data)
+                        if not (settings["output_settings"]["rgb"] or settings["output_settings"]["rgb_png"]):
+                            num_captures += 0.5
+                        if last_timestamps and timestamp != last_timestamps[-1]: last_timestamps.append(timestamp)
                     elif name == 'depth':
-                        num_captures += 1
-                        np.save(f'{out_dir}/{name}_{time}', frame)
-                        if isp_frame is not None:
-                            np.save(f'{out_dir}/isp_{time}', isp_frame)
-                            cv2.imwrite(f'{out_dir}/isp_{time}.png', isp_frame)
-                            isp_frame = None
+                        np.save(f'{out_dir}/{name}_{timestamp}', frame)
+                        pass
                     elif name == 'isp':
-                        isp_frame = frame
+                        if len(last_timestamps) == 0:
+                            isp_timestamp = timestamp
+                        else:
+                            isp_timestamp = last_timestamps[isp_counter]
+
+                        if settings["output_settings"]["rgb"]: np.save(f'{out_dir}/{name}_{isp_timestamp}', frame)
+                        if settings["output_settings"]["rgb_png"]: cv2.imwrite(f'{out_dir}/{name}_{timestamp}.png', frame)
+                        num_captures += 1
                     else:
-                        np.save(f'{out_dir}/{name}_{time}', frame)
+                        np.save(f'{out_dir}/{name}_{timestamp}', frame)
+                        pass
                 else: frame = msg.getCvFrame()
 
                 if name == "disparity":
@@ -281,8 +315,12 @@ if __name__ == "__main__":
                     exit(0)
 
                 out_dir = initialize_capture(root_path, device)
+                start_time = time.time()
 
             if num_captures == settings["num_captures"]:
+                end_time = time.time()
+                print("Capture took " + str(end_time - start_time) + " seconds.")
                 save = False
                 print(f"CAPTURE FINISHED with: {num_captures} captures")
+                print(f"Capture was {round(num_captures / (end_time - start_time), 2)} FPS")
                 exit(0)
