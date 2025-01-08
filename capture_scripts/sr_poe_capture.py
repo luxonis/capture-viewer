@@ -1,3 +1,5 @@
+from asyncio import timeout_at
+
 import depthai as dai
 import numpy as np
 import cv2
@@ -13,90 +15,101 @@ root_path = os.path.join(os.path.dirname(script_dir), 'DATA')
 def create_pipeline():
     pipeline = dai.Pipeline()
 
-    # Time-of-Flight (ToF) setup
-    tof = pipeline.create(dai.node.ToF)
-    tof.setNumShaves(4)
+    output_settings = settings["output_settings"]
 
-    # ToF configuration
-    tofConfig = tof.initialConfig.get()
-    if settings["customTofConfig"]:
-        tofConfig.enableFPPNCorrection = settings["tofConfig"]["enableFPPNCorrection"]
-        tofConfig.enableOpticalCorrection = settings["tofConfig"]["enableOpticalCorrection"]
-        tofConfig.enableWiggleCorrection = settings["tofConfig"]["enableWiggleCorrection"]
-        tofConfig.enableTemperatureCorrection = settings["tofConfig"]["enableTemperatureCorrection"]
-        tofConfig.phaseUnwrappingLevel = settings["tofConfig"]["phaseUnwrappingLevel"]
-        tof.initialConfig.set(tofConfig)
+    if output_settings["tof"]:
+        tof = pipeline.create(dai.node.ToF)
+        tof.setNumShaves(4)
 
-    cam_tof = pipeline.create(dai.node.Camera)
-    cam_tof.setBoardSocket(dai.CameraBoardSocket.CAM_A)
-    cam_tof.setFps(settings["FPS"])
-    cam_tof.raw.link(tof.input)
+        # ToF configuration
+        tofConfig = tof.initialConfig.get()
+        if settings["customTofConfig"]:
+            tofConfig.enableFPPNCorrection = settings["tofConfig"]["enableFPPNCorrection"]
+            tofConfig.enableOpticalCorrection = settings["tofConfig"]["enableOpticalCorrection"]
+            tofConfig.enableWiggleCorrection = settings["tofConfig"]["enableWiggleCorrection"]
+            tofConfig.enableTemperatureCorrection = settings["tofConfig"]["enableTemperatureCorrection"]
+            tofConfig.phaseUnwrappingLevel = settings["tofConfig"]["phaseUnwrappingLevel"]
+            tof.initialConfig.set(tofConfig)
+
+        cam_tof = pipeline.create(dai.node.Camera)
+        cam_tof.setBoardSocket(dai.CameraBoardSocket.CAM_A)
+        cam_tof.setFps(settings["FPS"])
+        cam_tof.raw.link(tof.input)
 
     # RGB Cameras
-    colorLeft = pipeline.create(dai.node.ColorCamera)
-    colorRight = pipeline.create(dai.node.ColorCamera)
-    colorLeft.setBoardSocket(dai.CameraBoardSocket.CAM_B)
-    colorRight.setBoardSocket(dai.CameraBoardSocket.CAM_C)
-
     resolutions = ["THE_800_P", "THE_720_P"]
     resolution = settings["stereoPairResolution"]
     if resolution not in resolutions:
         raise Exception("Stereo pair resolution not supported")
 
-    # Dynamically set the resolution using getattr
-    colorLeft.setResolution(getattr(dai.ColorCameraProperties.SensorResolution, resolution))
-    colorRight.setResolution(getattr(dai.ColorCameraProperties.SensorResolution, resolution))
+    if output_settings["left"]:
+        colorLeft = pipeline.create(dai.node.ColorCamera)
+        colorLeft.setBoardSocket(dai.CameraBoardSocket.CAM_B)
+        colorLeft.setFps(settings["FPS"])
+        colorLeft.setResolution(getattr(dai.ColorCameraProperties.SensorResolution, resolution))
+    if output_settings["right"]:
+        colorRight = pipeline.create(dai.node.ColorCamera)
+        colorRight.setBoardSocket(dai.CameraBoardSocket.CAM_C)
+        colorRight.setFps(settings["FPS"])
+        colorRight.setResolution(getattr(dai.ColorCameraProperties.SensorResolution, resolution))
 
-    colorLeft.setFps(settings["FPS"])
-    colorRight.setFps(settings["FPS"])
 
     # Stereo Depth
-    stereo = pipeline.create(dai.node.StereoDepth)
+    if output_settings["stereo_depth"]:
+        stereo = pipeline.create(dai.node.StereoDepth)
 
-    if settings["highAccuracy"]: stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_ACCURACY)
-    elif settings["highDensity"]: stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
+        if settings["highAccuracy"]: stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_ACCURACY)
+        elif settings["highDensity"]: stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
 
 
-    stereo.setLeftRightCheck(settings["LRcheck"])
-    stereo.setExtendedDisparity(settings["extendedDisparity"])
-    stereo.setSubpixel(settings["subpixelDisparity"])
+        stereo.setLeftRightCheck(settings["LRcheck"])
+        stereo.setExtendedDisparity(settings["extendedDisparity"])
+        stereo.setSubpixel(settings["subpixelDisparity"])
 
-    if settings["subpixelDisparity"]: stereo.initialConfig.setSubpixelFractionalBits(settings.get("subpixelValue", 3))
+        if settings["subpixelDisparity"]: stereo.initialConfig.setSubpixelFractionalBits(settings.get("subpixelValue", 3))
 
-    if settings["alignSocket"] == "RIGHT":
-        ALIGN_SOCKET = dai.CameraBoardSocket.CAM_C
-        stereo.setDepthAlign(ALIGN_SOCKET)
-    elif settings["alignSocket"] == "LEFT":
-        ALIGN_SOCKET = dai.CameraBoardSocket.CAM_B
-        stereo.setDepthAlign(ALIGN_SOCKET)
-    elif settings["alignSocket"] == "REC_LEFT":
-        stereo.initialConfig.setDepthAlign(dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_LEFT)
-    elif settings["alignSocket"] == "REC_RIGHT":
-        stereo.initialConfig.setDepthAlign(dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_RIGHT)
-    elif settings["alignSocket"] == "TOF":
-        raise ValueError("Can't align to TOF socket")
-    elif settings["alignSocket"] == "COLOR":
-        print("No color socket, aligning to DEFAULT SOCKET instead")
-    else:
-        raise ValueError("Invalid align socket")
+        if settings["alignSocket"] == "RIGHT":
+            ALIGN_SOCKET = dai.CameraBoardSocket.CAM_C
+            stereo.setDepthAlign(ALIGN_SOCKET)
+        elif settings["alignSocket"] == "LEFT":
+            ALIGN_SOCKET = dai.CameraBoardSocket.CAM_B
+            stereo.setDepthAlign(ALIGN_SOCKET)
+        elif settings["alignSocket"] == "REC_LEFT":
+            stereo.initialConfig.setDepthAlign(dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_LEFT)
+        elif settings["alignSocket"] == "REC_RIGHT":
+            stereo.initialConfig.setDepthAlign(dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_RIGHT)
+        elif settings["alignSocket"] == "TOF":
+            raise ValueError("Can't align to TOF socket")
+        elif settings["alignSocket"] == "COLOR":
+            print("No color socket, aligning to DEFAULT SOCKET instead")
+        else:
+            raise ValueError("Invalid align socket")
 
-    # Linking cameras to stereo
-    colorLeft.isp.link(stereo.left)
-    colorRight.isp.link(stereo.right)
+        # Linking cameras to stereo
+        colorLeft.isp.link(stereo.left)
+        colorRight.isp.link(stereo.right)
 
     # Sync node
     sync = pipeline.create(dai.node.Sync)
     sync.setSyncThreshold(datetime.timedelta(milliseconds=250))
 
-    cam_tof.raw.link(sync.inputs["tof_raw"])
+    if output_settings["tof"]:
+        if output_settings["tof_raw"]:
+            cam_tof.raw.link(sync.inputs["tof_raw"])
+        if output_settings["tof_depth"]:
+            tof.depth.link(sync.inputs["tof_depth"])
+        if output_settings["tof_intensity"]:
+            tof.intensity.link(sync.inputs["tof_intensity"])
+        if output_settings["tof_amplitude"]:
+            tof.amplitude.link(sync.inputs["tof_amplitude"])
 
-    tof.depth.link(sync.inputs["tof_depth"])
-    tof.intensity.link(sync.inputs["tof_intensity"])
-    tof.amplitude.link(sync.inputs["tof_amplitude"])
+    if output_settings["stereo_depth"]:
+        stereo.depth.link(sync.inputs["depth"])  # naming consistent with stereo captures
 
-    stereo.depth.link(sync.inputs["depth"])  # naming consistent with stereo captures
-    colorLeft.isp.link(sync.inputs["left"])
-    colorRight.isp.link(sync.inputs["right"])
+    if output_settings["left"]:
+        colorLeft.isp.link(sync.inputs["left"])
+    if output_settings["right"]:
+        colorRight.isp.link(sync.inputs["right"])
 
     # Xin
     xinTofConfig = pipeline.create(dai.node.XLinkIn)
@@ -110,18 +123,9 @@ def create_pipeline():
 
     return pipeline, tofConfig
 
-def create_folder(out_dir):
-    if not os.path.exists(root_path):
-        os.makedirs(root_path)
-    if not os.path.exists(os.path.join(root_path, out_dir)):
-        os.makedirs(out_dir)
-        print(f"Folder '{out_dir}' created.")
-    else:
-        print(f"Folder '{out_dir}' already exists.")
-
 def create_and_save_metadata(device, settings, output_dir,
                              scene_name, capture_type=None,
-                             author=None, notes=None):
+                             author=None, notes=None, date=''):
     model_name = device.getDeviceName()
     mxId = device.getMxId()
     metadata = {
@@ -148,6 +152,24 @@ def create_and_save_metadata(device, settings, output_dir,
         json.dump(metadata, json_file, indent=4)
 
     print(f"Metadata saved to {filepath}")
+
+def initialize_capture(root_path, device):
+    date = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+    out_dir = f"{root_path}/{device.getDeviceName()}_{device.getMxId()}_{date}"
+    if not os.path.exists(root_path):
+        os.makedirs(root_path)
+    if not os.path.exists(os.path.join(root_path, out_dir)):
+        os.makedirs(out_dir)
+        print(f"Folder '{out_dir}' created.")
+    else:
+        print(f"Folder '{out_dir}' already exists.")
+
+    calib = device.readCalibration()
+    calib.eepromToJsonFile(f'{out_dir}/calib.json')
+    create_and_save_metadata(device, settings, out_dir, view_name, date=date)
+
+    return out_dir
+
 def parseArguments():
     # PARSE ARGUMENTS
     parser = argparse.ArgumentParser()
@@ -156,6 +178,7 @@ def parseArguments():
     parser.add_argument("view_name", help="What part of the scene the camera is looking at")
     # Optional argument with a flag for device_ip
     parser.add_argument("--device-ip", dest="device_ip", help="IP of remote device", default=None)
+    parser.add_argument("--autostart", default=-1, type=int, help='Automatically start capturing after given number of frames (-1 to disable)')
 
     args = parser.parse_args()
     settings_path = args.settings_file_path
@@ -174,35 +197,33 @@ def parseArguments():
             settings_path = settings_path_2
         else: raise FileNotFoundError(f"Settings file '{settings_path}' does not exist.")
 
-    return settings_path, view_name, device_info
+    return settings_path, view_name, device_info, args.autostart
 
 def colorize_depth(frame, min_depth=20, max_depth=5000):
     depth_colorized = np.interp(frame, (min_depth, max_depth), (0, 255)).astype(np.uint8)
     return cv2.applyColorMap(depth_colorized, cv2.COLORMAP_JET)
 
 
-def save_frames(out_dir, timestamp, name, frame, tof_depth_frame, tof_raw_frame):
+def save_frames(out_dir, timestamp, name, frame, last_timestamps):
     if name == "depth":
         np.save(f'{out_dir}/{name}_{timestamp}.npy', frame)
-        if tof_depth_frame is not None:
-            np.save(f'{out_dir}/tof_depth_{timestamp}.npy', tof_depth_frame)
-            tof_depth_frame = None
-        if tof_raw_frame is not None:
-            np.save(f'{out_dir}/tof_raw_{timestamp}.npy', tof_raw_frame)
-            tof_raw_frame = None
-    elif name == "tof_depth":
-        tof_depth_frame = frame  # tof depth is saved too fast so its unaligned
-    elif name == "tof_raw":
-        tof_raw_frame = frame
-    if name in ["tof_amplitude", "tof_intensity"]:
-        np.save(f'{out_dir}/{name}_{timestamp}.npy', frame)
+    elif name in ["tof_depth", "tof_raw", "tof_amplitude", "tof_intensity"]:
+        if not last_timestamps:
+            pass
+        else:
+            np.save(f'{out_dir}/{name}_{last_timestamps[-1]}.npy', frame)
     elif name in ["left", "right"]:
         # cv2.imwrite(f'{out_dir}/{name}_{timestamp}.png', frame)
         np.save(f'{out_dir}/{name}_{timestamp}.npy', frame)
-    return tof_depth_frame, tof_raw_frame
+        if not last_timestamps: last_timestamps.append(timestamp)
+        elif last_timestamps[-1] != timestamp: last_timestamps.append(timestamp)
+    else:
+        print("Unhandled name", name)
+        raise ValueError("Unhandled name")
+    return last_timestamps
 
 if __name__ == "__main__":
-    settings_path, view_name, device_info = parseArguments()
+    settings_path, view_name, device_info, autostart = parseArguments()
 
     with open(settings_path, 'r') as file:
         settings = json.load(file)
@@ -232,18 +253,24 @@ if __name__ == "__main__":
         save = False
         num_captures = 0
 
-        tof_raw_frame = None
-        tof_depth_frame = None
+        last_timestamps = []
+        tof_counter = 0
+
         while True:
+            if autostart >= -1:
+                autostart -= 1
+            if autostart == -1:
+                out_dir = initialize_capture(root_path, device)
+                save = True
+                print("Starting capture via autosave")
+
             msgGrp = queue.get()
             if save: num_captures += 1
             for name, msg in msgGrp:
                 if save:
                     timestamp = int(msg.getTimestamp().total_seconds() * 1000)
                     frame = msg.getCvFrame()
-                    tof_depth_frame, tof_raw_frame = save_frames(out_dir, timestamp,
-                                                                 name, frame,
-                                                                 tof_depth_frame, tof_raw_frame)
+                    last_timestamps = save_frames(out_dir, timestamp, name, frame, last_timestamps)
                 else:
                     frame = msg.getCvFrame()
 
@@ -271,14 +298,9 @@ if __name__ == "__main__":
             elif key == ord("s"):
                 save = not save
 
-                date = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-                out_dir = f"{root_path}/{device_name}_{date}"
-                create_folder(out_dir)
-                calib = device.readCalibration()
-                calib.eepromToJsonFile(f'{out_dir}/calib.json')
-                create_and_save_metadata(device, settings, out_dir, view_name)
+                out_dir = initialize_capture(root_path, device)
                 if save:
-                    print("CAPTURING...")
+                    print("Starting capture")
                 else:
                     print(f"capture finished with: {num_captures} captures")
 

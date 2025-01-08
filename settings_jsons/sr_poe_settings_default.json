@@ -5,6 +5,17 @@
     "flood_light_intensity": 1,
     "stereoPairResolution": "THE_800_P",
 
+    "output_settings": {
+        "left": true,
+        "right": true,
+        "tof": true,
+        "tof_raw": true,
+        "tof_depth": true,
+        "tof_amplitude": true,
+        "tof_intensity": true,
+        "stereo_depth": true
+    },
+
     "alignSocket": "REC_RIGHT",
     "LRcheck": true,
     "extendedDisparity": true,
@@ -24,5 +35,5 @@
     "medianFilter": "dai.MedianFilter.MEDIAN_OFF",
 
     "FPS": 5,
-    "num_captures": 120
+    "num_captures": 10
 }

@@ -272,7 +272,8 @@ if __name__ == "__main__":
                         np.save(f'{out_dir}/{name}_{timestamp}', data)
                         if not (settings["output_settings"]["rgb"] or settings["output_settings"]["rgb_png"]):
                             num_captures += 0.5
-                        if last_timestamps and timestamp != last_timestamps[-1]: last_timestamps.append(timestamp)
+                        if not last_timestamps: last_timestamps.append(timestamp)
+                        elif last_timestamps and timestamp != last_timestamps[-1]: last_timestamps.append(timestamp)
                     elif name == 'depth':
                         np.save(f'{out_dir}/{name}_{timestamp}', frame)
                         pass
