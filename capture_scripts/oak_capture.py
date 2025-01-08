@@ -124,7 +124,7 @@ def create_pipeline():
 
     return pipeline
 
-def create_folder(root_path, device):
+def initialize_capture(root_path, device):
     date = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
     out_dir = f"{root_path}/{device.getDeviceName()}_{device.getMxId()}_{date}"
     if not os.path.exists(root_path):
@@ -231,8 +231,9 @@ if __name__ == "__main__":
             if autostart >= -1:
                 autostart -= 1
             if autostart == -1:
-                out_dir = create_folder(root_path, device)
+                out_dir = initialize_capture(root_path, device)
                 save = True
+                print("Starting capture via autosave")
             msgGrp = queue.get()
             for name, msg in msgGrp:
                 if save:
@@ -279,7 +280,7 @@ if __name__ == "__main__":
                     print(f"capture finished with: {num_captures} captures")
                     exit(0)
 
-                out_dir = create_folder(root_path, device)
+                out_dir = initialize_capture(root_path, device)
 
             if num_captures == settings["num_captures"]:
                 save = False
