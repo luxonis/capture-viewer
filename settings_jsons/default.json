@@ -8,6 +8,16 @@
     "autoexposure": true,
     "expTime": 200,
     "sensIso": 800,
+    "output_settings": {
+        "left": true,
+        "right": true,
+        "left_raw": false,
+        "right_raw": false,
+        "rgb": true,
+        "rgb_png": false,
+        "depth": false,
+        "disparity": false
+    },
     "LRcheck": true,
     "extendedDisparity": false,
     "subpixelDisparity": true,
