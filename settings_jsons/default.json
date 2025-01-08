@@ -6,7 +6,7 @@
     "stereoResolution": "THE_800_P",
     "rgbResolution": "THE_1080_P",
     "stereoAlign": true,
-    "alignSocket": "REC_LEFT",
+    "alignSocket": "COLOR",
     "autoexposure": true,
     "expTime": 200,
     "sensIso": 800,

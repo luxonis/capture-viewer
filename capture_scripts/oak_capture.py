@@ -254,6 +254,7 @@ if __name__ == "__main__":
                 out_dir = initialize_capture(root_path, device)
                 save = True
                 print("Starting capture via autosave")
+                start_time = time.time()
             msgGrp = queue.get()
             for name, msg in msgGrp:
                 if save:
@@ -274,6 +275,7 @@ if __name__ == "__main__":
                         if last_timestamps and timestamp != last_timestamps[-1]: last_timestamps.append(timestamp)
                     elif name == 'depth':
                         np.save(f'{out_dir}/{name}_{timestamp}', frame)
+                        pass
                     elif name == 'isp':
                         if len(last_timestamps) == 0:
                             isp_timestamp = timestamp
@@ -285,6 +287,7 @@ if __name__ == "__main__":
                         num_captures += 1
                     else:
                         np.save(f'{out_dir}/{name}_{timestamp}', frame)
+                        pass
                 else: frame = msg.getCvFrame()
 
                 if name == "disparity":
@@ -312,6 +315,7 @@ if __name__ == "__main__":
                     exit(0)
 
                 out_dir = initialize_capture(root_path, device)
+                start_time = time.time()
 
             if num_captures == settings["num_captures"]:
                 end_time = time.time()
