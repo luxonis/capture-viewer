@@ -34,6 +34,6 @@
     },
     "medianFilter": "dai.MedianFilter.MEDIAN_OFF",
 
-    "FPS": 5,
+    "FPS": 15,
     "num_captures": 10
 }

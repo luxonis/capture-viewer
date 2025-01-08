@@ -13,10 +13,12 @@ import time
 script_dir = os.path.dirname(os.path.abspath(__file__))
 root_path = os.path.join(os.path.dirname(script_dir), 'DATA')
 
-def create_pipeline():
+def create_pipeline(frame_syn_num=-1):
     pipeline = dai.Pipeline()
 
     output_settings = settings["output_settings"]
+
+    active_cams = []
 
     if output_settings["tof"]:
         tof = pipeline.create(dai.node.ToF)
@@ -36,6 +38,7 @@ def create_pipeline():
         cam_tof.setBoardSocket(dai.CameraBoardSocket.CAM_A)
         cam_tof.setFps(settings["FPS"])
         cam_tof.raw.link(tof.input)
+        active_cams.append(cam_tof)
 
     # RGB Cameras
     resolutions = ["THE_800_P", "THE_720_P"]
@@ -48,11 +51,13 @@ def create_pipeline():
         colorLeft.setBoardSocket(dai.CameraBoardSocket.CAM_B)
         colorLeft.setFps(settings["FPS"])
         colorLeft.setResolution(getattr(dai.ColorCameraProperties.SensorResolution, resolution))
+        active_cams.append(colorLeft)
     if output_settings["right"]:
         colorRight = pipeline.create(dai.node.ColorCamera)
         colorRight.setBoardSocket(dai.CameraBoardSocket.CAM_C)
         colorRight.setFps(settings["FPS"])
         colorRight.setResolution(getattr(dai.ColorCameraProperties.SensorResolution, resolution))
+        active_cams.append(colorRight)
 
 
     # Stereo Depth
@@ -111,6 +116,17 @@ def create_pipeline():
         colorLeft.isp.link(sync.inputs["left"])
     if output_settings["right"]:
         colorRight.isp.link(sync.inputs["right"])
+
+    # Set Fsync
+    if frame_syn_num != -1:
+        for cam in active_cams:
+            if frame_syn_num > 0:
+                cam.initialControl.setFrameSyncMode(dai.CameraControl.FrameSyncMode.INPUT)
+            elif frame_syn_num == 0:
+                cam.initialControl.setFrameSyncMode(dai.CameraControl.FrameSyncMode.OUTPUT)
+
+            if cam == cam_tof:
+                cam.initialControl.setMisc('frame-sync-id', frame_syn_num)
 
     # Xin
     xinTofConfig = pipeline.create(dai.node.XLinkIn)
@@ -188,6 +204,7 @@ def parseArguments():
     # Optional argument with a flag for device_ip
     parser.add_argument("--device-ip", dest="device_ip", help="IP of remote device", default=None)
     parser.add_argument("--autostart", default=-1, type=int, help='Automatically start capturing after given number of frames (-1 to disable)')
+    parser.add_argument("--frame-sync-num", default=-1, type=int, help='Set mode as OUTPUT (0) or INPUT (1, 2, ..., n) or set -1 to disable')
 
     args = parser.parse_args()
     settings_path = args.settings_file_path
@@ -206,7 +223,7 @@ def parseArguments():
             settings_path = settings_path_2
         else: raise FileNotFoundError(f"Settings file '{settings_path}' does not exist.")
 
-    return settings_path, view_name, device_info, args.autostart
+    return settings_path, view_name, device_info, args.autostart, args.frame_sync_num
 
 def colorize_depth(frame, min_depth=20, max_depth=5000):
     depth_colorized = np.interp(frame, (min_depth, max_depth), (0, 255)).astype(np.uint8)
@@ -233,7 +250,7 @@ def save_frames(out_dir, timestamp, name, frame, last_timestamps):
     return last_timestamps
 
 if __name__ == "__main__":
-    settings_path, view_name, device_info, autostart = parseArguments()
+    settings_path, view_name, device_info, autostart, frame_syn_num = parseArguments()
 
     with open(settings_path, 'r') as file:
         settings = json.load(file)
@@ -244,7 +261,7 @@ if __name__ == "__main__":
 
     print("Connecting device...")
 
-    pipeline, tofConfig = create_pipeline()
+    pipeline, tofConfig = create_pipeline(frame_syn_num)
 
     with dai.Device(pipeline, device_info) as device:
         print("Device Connected!")
@@ -264,8 +281,6 @@ if __name__ == "__main__":
         num_captures = 0
 
         last_timestamps = []
-        tof_counter = 0
-
         start_time = None
 
         while True:
