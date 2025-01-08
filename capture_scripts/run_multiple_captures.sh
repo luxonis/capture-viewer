@@ -1,5 +1,5 @@
-JSON_CONFIG=long_nodepth_irOff.json
-#JSON_CONFIG=long_nodepth.json
+JSON_CONFIG=default.json
+#JSON_CONFIG=default_irOff.json
 AUTOSTART=100
 
 python capture_scripts/oak_capture.py settings_jsons/${JSON_CONFIG} LEFT --autostart ${AUTOSTART} --device-ip "19443010B1D99A2E00" &
