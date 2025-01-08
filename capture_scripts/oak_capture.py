@@ -22,11 +22,7 @@ def create_pipeline():
     if output_settings["left"] or output_settings["left_raw"]:
         monoLeft = pipeline.create(dai.node.MonoCamera)
         monoLeft.setCamera("left")
-        monoLeft.setResolution(dai.MonoCameraProperties.SensorResolution.THE_800_P)
-        # if settings.get("stereoPairResolution", "800P") == "800P":
-        #     monoLeft.setResolution(dai.MonoCameraProperties.SensorResolution.THE_800_P)
-        #     monoRight.setResolution(dai.MonoCameraProperties.SensorResolution.THE_800_P)
-        # elif settings.get("stereoPairResolution", "400P") == "400P":
+        monoLeft.setResolution(eval("dai.MonoCameraProperties.SensorResolution." + settings["stereoResolution"]))
         monoLeft.setFps(settings["FPS"])
 
         if settings["autoexposure"]: monoLeft.initialControl.setAutoExposureEnable()
@@ -36,7 +32,7 @@ def create_pipeline():
         monoRight = pipeline.create(dai.node.MonoCamera)
         monoRight.setCamera("right")
         monoRight.setFps(settings["FPS"])
-        monoRight.setResolution(dai.MonoCameraProperties.SensorResolution.THE_800_P)
+        monoRight.setResolution(eval("dai.MonoCameraProperties.SensorResolution." + settings["stereoResolution"]))
 
         if settings["autoexposure"]: monoRight.initialControl.setAutoExposureEnable()
         else: monoRight.initialControl.setManualExposure(settings["expTime"], settings["sensIso"])
@@ -44,6 +40,7 @@ def create_pipeline():
     if output_settings["rgb"] or output_settings["rgb_png"]:
         color = pipeline.create(dai.node.ColorCamera)
         color.setCamera("color")
+        color.setResolution(eval("dai.ColorCameraProperties.SensorResolution." + settings["rgbResolution"]))
 
     if output_settings["depth"] or output_settings["disparity"]:
         stereo = pipeline.create(dai.node.StereoDepth)

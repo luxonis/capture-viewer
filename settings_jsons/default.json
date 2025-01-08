@@ -3,6 +3,8 @@
     "ir_value": 1,
     "flood_light": false,
     "flood_light_intensity": 1,
+    "stereoResolution": "THE_800_P",
+    "rgbResolution": "THE_1080_P",
     "stereoAlign": true,
     "alignSocket": "REC_LEFT",
     "autoexposure": true,
