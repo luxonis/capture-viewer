@@ -33,6 +33,7 @@ decimation_set_dict = {
 }
 
 CT_kernel_dict = {
+    "KERNEL_AUTO": "StereoDepthConfig.CensusTransform.KernelSize.AUTO",
     "KERNEL_5x5": "StereoDepthConfig.CensusTransform.KernelSize.KERNEL_5x5",
     "KERNEL_7x7": "StereoDepthConfig.CensusTransform.KernelSize.KERNEL_7x7",
     "KERNEL_7x9": "StereoDepthConfig.CensusTransform.KernelSize.KERNEL_7x9"

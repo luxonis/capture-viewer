@@ -123,7 +123,7 @@ def main():
         # for running in Pycharm
         script_dir = os.path.dirname(os.path.abspath(__file__))
         folder_path = os.path.join(script_dir, 'DATA')
-        folder_path = '/home/katka/DATA/20240905_scene_regal'
+        folder_path = '/mnt/nas/calibration/datasets/20240905_office4/20240905_scene_lady'
         # folder_path = os.path.join(folder_path, 'tools_ground')  # select subfolder if needed
 
     sessions = load_sessions(folder_path)

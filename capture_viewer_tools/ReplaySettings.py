@@ -685,21 +685,19 @@ def open_replay_settings_screen(config, original_config=None):
 
 
     # STEREO ALGORITHM ADVANCED SETTINGS -------------------------------------------------------------------------------
-    # todo - add default depthai values
-
     advanced_settings_enable = tk.BooleanVar(value=False)
-    mean_mode_enable = tk.BooleanVar(value=False)
-    CT_kernel_val = tk.StringVar(value='KERNEL_5x5')
+    mean_mode_enable = tk.BooleanVar(value=True)
+    CT_kernel_val = tk.StringVar(value='KERNEL_AUTO')
     CT_threshold_val = tk.IntVar(value=0)
     division_factor_val = tk.IntVar(value=1)
-    horizontal_penalty_p1_val = tk.IntVar(value=0)
-    horizontal_penalty_p2_val = tk.IntVar(value=0)
-    vertical_penalty_p1_val = tk.IntVar(value=0)
-    vertical_penalty_p2_val = tk.IntVar(value=0)
-    confidence_threshold_val = tk.IntVar(value=0)
+    horizontal_penalty_p1_val = tk.IntVar(value=250)
+    horizontal_penalty_p2_val = tk.IntVar(value=500)
+    vertical_penalty_p1_val = tk.IntVar(value=250)
+    vertical_penalty_p2_val = tk.IntVar(value=500)
+    confidence_threshold_val = tk.IntVar(value=245)
     CM_alpha_val = tk.IntVar(value=0)
-    CM_beta_val = tk.IntVar(value=0)
-    matching_threshold_val = tk.IntVar(value=0)
+    CM_beta_val = tk.IntVar(value=2)
+    matching_threshold_val = tk.IntVar(value=127)
 
     def toggle_advanced_settings():
         if advanced_settings_enable.get():
@@ -718,6 +716,7 @@ def open_replay_settings_screen(config, original_config=None):
 
     ttk.Label(advanced_stereo_setting_frame, text="censusTransform.kernelSize").grid(row=1, column=0, padx=10, pady=10, sticky="w")
     CT_kernel_dropdown = ttk.Combobox(advanced_stereo_setting_frame, textvariable=CT_kernel_val, values=[
+        'KERNEL_AUTO',
         'KERNEL_5x5',
         'KERNEL_7x7',
         'KERNEL_7x9'
