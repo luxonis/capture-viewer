@@ -12,8 +12,6 @@ import time
 script_dir = os.path.dirname(os.path.abspath(__file__))
 root_path = os.path.join(os.path.dirname(script_dir), 'DATA')
 
-# todo - missing implementation of brightness filter in capture
-
 def create_pipeline():
     global max_disparity
     pipeline = dai.Pipeline()
@@ -79,9 +77,9 @@ def create_pipeline():
         # FILTER SETTINGS
         if settings["use_filter_settings"]:
             if settings["filters"]["median_filter"]:
-                stereo.setMedianFilter(eval(f"dai.StereoDepthConfig.MedianFilter.{settings['filters']['median_size']}"))
+                stereo.initialConfig.setMedianFilter(eval(f"dai.StereoDepthConfig.MedianFilter.{settings['filters']['median_size']}"))
             else:
-                stereo.setMedianFilter(dai.StereoDepthConfig.MedianFilter.MEDIAN_OFF)
+                stereo.initialConfig.setMedianFilter(dai.StereoDepthConfig.MedianFilter.MEDIAN_OFF)
 
             stereoConfig = stereo.initialConfig.get()
             if settings["filters"]["threshold_filter"]:
@@ -104,9 +102,19 @@ def create_pipeline():
                 stereoConfig.postProcessing.speckleFilter.enable = True
                 stereoConfig.postProcessing.speckleFilter.speckleRange = settings["filters"]["speckle_range"]
                 stereoConfig.postProcessing.speckleFilter.differenceThreshold = settings["filters"]["speckle_difference_threshold"]
+
+            # brigntness filter does not seem to be working
+            # settings for stereo json:
+            # "brightness_filter": true,
+            # "lower_brightness_filter": 0,
+            # "upper_brightness_filter": 10,
+            # if settings["filters"]["brightness_filter"]:
+            #     stereoConfig.postProcessing.brightnessFilter.maxBrightness = settings["filters"]["lower_threshold_filter"]
+            #     stereoConfig.postProcessing.brightnessFilter.minBrightness = settings["filters"]["lower_threshold_filter"]
+
             stereo.initialConfig.set(stereoConfig)
         else:
-            stereo.setMedianFilter(dai.StereoDepthConfig.MedianFilter.MEDIAN_OFF)
+            stereo.initialConfig.setMedianFilter(dai.StereoDepthConfig.MedianFilter.MEDIAN_OFF)
 
     # PASSING THROUGH THE SYNC NODE
     sync = pipeline.create(dai.node.Sync)

@@ -26,7 +26,7 @@
     "subpixelValue": 3,
     "highAccuracy": false,
     "highDensity": true,
-    "use_filter_settings": true,
+    "use_filter_settings": false,
     "filters": {
         "threshold_filter": false,
         "lower_threshold_filter": 1000,
@@ -46,7 +46,7 @@
         "speckle_range": 200,
         "speckle_difference_threshold": 2,
 
-        "median_filter": true,
+        "median_filter": false,
         "median_size": "KERNEL_3x3"
     },
     "FPS": 30,
