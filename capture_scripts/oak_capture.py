@@ -12,10 +12,10 @@ import time
 script_dir = os.path.dirname(os.path.abspath(__file__))
 root_path = os.path.join(os.path.dirname(script_dir), 'DATA')
 
-# todo - missing implementation of bilateral and brightness filter in capture
+# todo - missing implementation of brightness filter in capture
 
 def create_pipeline():
-    global disparityMultiplier
+    global max_disparity
     pipeline = dai.Pipeline()
 
     output_settings = settings["output_settings"]
@@ -46,30 +46,28 @@ def create_pipeline():
         stereo = pipeline.create(dai.node.StereoDepth)
         monoLeft.out.link(stereo.left)
         monoRight.out.link(stereo.right)
-        disparityMultiplier = 1 / stereo.initialConfig.getMaxDisparity()
 
-    sync = pipeline.create(dai.node.Sync)
-
-    xoutGrp = pipeline.create(dai.node.XLinkOut)
-    xoutGrp.setStreamName("xout")
 
     if output_settings["depth"] or output_settings["disparity"]:
+
+        # ALIGNMENT SETTINGS
         if settings["alignSocket"] == "RIGHT":
-            ALIGN_SOCKET = dai.CameraBoardSocket.RIGHT
+            ALIGN_SOCKET = dai.CameraBoardSocket.CAM_C
             stereo.setDepthAlign(ALIGN_SOCKET)
         elif settings["alignSocket"] == "LEFT":
-            ALIGN_SOCKET = dai.CameraBoardSocket.LEFT
+            ALIGN_SOCKET = dai.CameraBoardSocket.CAM_B
             stereo.setDepthAlign(ALIGN_SOCKET)
         elif settings["alignSocket"] == "REC_LEFT":
             stereo.initialConfig.setDepthAlign(dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_LEFT)
         elif settings["alignSocket"] == "REC_RIGHT":
             stereo.initialConfig.setDepthAlign(dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_RIGHT)
         elif settings["alignSocket"] == "COLOR":
-            ALIGN_SOCKET = dai.CameraBoardSocket.RGB
+            ALIGN_SOCKET = dai.CameraBoardSocket.CAM_A
             stereo.setDepthAlign(ALIGN_SOCKET)
         else:
             raise ValueError("Invalid align socket")
 
+        # STEREO SETTINGS
         stereo.setLeftRightCheck(settings["LRcheck"])
         if settings["extendedDisparity"]: stereo.setExtendedDisparity(True)
         if settings["subpixelDisparity"]: stereo.setSubpixel(True)
@@ -77,41 +75,46 @@ def create_pipeline():
         if settings["highAccuracy"]: stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_ACCURACY)
         elif settings["highDensity"]: stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
 
-        if settings["filters_on"]:
+
+        # FILTER SETTINGS
+        if settings["use_filter_settings"]:
+            if settings["filters"]["median_filter"]:
+                stereo.setMedianFilter(eval(f"dai.StereoDepthConfig.MedianFilter.{settings['filters']['median_size']}"))
+            else:
+                stereo.setMedianFilter(dai.StereoDepthConfig.MedianFilter.MEDIAN_OFF)
+
             stereoConfig = stereo.initialConfig.get()
             if settings["filters"]["threshold_filter"]:
                 stereoConfig.postProcessing.thresholdFilter.minRange = settings["filters"]["lower_threshold_filter"]
                 stereoConfig.postProcessing.thresholdFilter.maxRange = settings["filters"]["upper_threshold_filter"]
             if settings["filters"]["decimation_filter"]:
                 stereoConfig.postProcessing.decimationFilter.decimationFactor = settings["filters"]["decimation_factor"]
+                stereoConfig.postProcessing.decimationFilter.decimationMode = eval(f"dai.StereoDepthConfig.PostProcessing.DecimationFilter.DecimationMode.{settings['filters']['decimation_mode']}")
             if settings["filters"]["spacial_filter"]:
                 stereoConfig.postProcessing.spatialFilter.enable = True
-                # stereoConfig.postProcessing.spatialFilter.holeFillingRadius = 2
-                # stereoConfig.postProcessing.spatialFilter.numIterations = 1
+                stereoConfig.postProcessing.spatialFilter.holeFillingRadius = settings["filters"]["spatial_hole_filling_radius"]
+                stereoConfig.postProcessing.spatialFilter.numIterations = settings["filters"]["spatial_num_iterations"]
+                stereoConfig.postProcessing.spatialFilter.alpha = settings["filters"]["spatial_alfa"]
+                stereoConfig.postProcessing.spatialFilter.delta = settings["filters"]["spatial_delta"]
             if settings["filters"]["temporal_filter"]:
                 stereoConfig.postProcessing.temporalFilter.enable = True
+                stereoConfig.postProcessing.temporalFilter.alpha = settings["filters"]["temporal_alfa"]
+                stereoConfig.postProcessing.temporalFilter.delta = settings["filters"]["temporal_delta"]
             if settings["filters"]["speckle_filter"]:
                 stereoConfig.postProcessing.speckleFilter.enable = True
                 stereoConfig.postProcessing.speckleFilter.speckleRange = settings["filters"]["speckle_range"]
+                stereoConfig.postProcessing.speckleFilter.differenceThreshold = settings["filters"]["speckle_difference_threshold"]
+            stereo.initialConfig.set(stereoConfig)
+        else:
+            stereo.setMedianFilter(dai.StereoDepthConfig.MedianFilter.MEDIAN_OFF)
 
-            stereo.initialConfig.set(stereoConfig)  # RUN BEFORE SETTING MEDIAN FILTER
-
-            if settings["filters"]["median_filter"]:
-                if settings["filters"]["median_size"] == "MEDIAN_3x3":
-                    stereo.setMedianFilter(dai.StereoDepthConfig.MedianFilter.KERNEL_3x3)
-                elif settings["filters"]["median_size"] == "MEDIAN_5x5":
-                    stereo.setMedianFilter(dai.StereoDepthConfig.MedianFilter.KERNEL_5x5)
-                elif settings["filters"]["median_size"] == "MEDIAN_7x7":
-                    stereo.setMedianFilter(dai.StereoDepthConfig.MedianFilter.KERNEL_7x7)
-
-                else: raise ValueError
-            else:
-                stereo.setMedianFilter(dai.StereoDepthConfig.MedianFilter.MEDIAN_OFF)
-
+    # PASSING THROUGH THE SYNC NODE
+    sync = pipeline.create(dai.node.Sync)
     sync.setSyncThreshold(timedelta(milliseconds=50))
 
     if output_settings["disparity"]:
         stereo.disparity.link(sync.inputs["disparity"])
+        max_disparity = stereo.initialConfig.getMaxDisparity()
     if output_settings["rgb"] or output_settings["rgb_png"]:
         color.isp.link(sync.inputs["isp"])
     if output_settings["depth"]:
@@ -128,6 +131,9 @@ def create_pipeline():
     if output_settings["right_raw"]:
         monoRight.raw.link(sync.inputs["right_raw"])
 
+    # XOUT
+    xoutGrp = pipeline.create(dai.node.XLinkOut)
+    xoutGrp.setStreamName("xout")
     sync.out.link(xoutGrp.input)
 
     # controlIn = pipeline.create(dai.node.XLinkIn)
@@ -183,6 +189,10 @@ def create_and_save_metadata(device, settings, output_dir,
         json.dump(metadata, json_file, indent=4)
 
     print(f"Metadata saved to {filepath}")
+
+def colorize_depth(frame, min_depth=20, max_depth=5000):
+    depth_colorized = np.interp(frame, (min_depth, max_depth), (0, 255)).astype(np.uint8)
+    return cv2.applyColorMap(depth_colorized, cv2.COLORMAP_JET)
 
 def parseArguments():
     # PARSE ARGUMENTS
@@ -291,16 +301,17 @@ if __name__ == "__main__":
                 else: frame = msg.getCvFrame()
 
                 if name == "disparity":
-                    frame1 = (frame * disparityMultiplier * 255).astype(np.uint8)
-                    # frame2 = (frame * disparityMultiplier * 65535).astype(np.uint16)
-                    # plt.imshow(frame2)
-                    # plt.show()
-                    frame1 = cv2.applyColorMap(frame1, cv2.COLORMAP_JET)
-                    cv2.imshow(name, frame1)
-                if name == "left":
-                    cv2.imshow(name, frame)
-                # if name == "right":
+                    colorized_disparity = colorize_depth(frame, min_depth=0, max_depth=max_disparity)
+                    cv2.imshow(name, colorized_disparity)
+                elif name == "depth":
+                    colorized_depth = colorize_depth(frame, min_depth=0, max_depth=7000)
+                    cv2.imshow(name, colorized_depth)
+                # elif name == "left":
                 #     cv2.imshow(name, frame)
+                # elif name == "right":
+                #     cv2.imshow(name, frame)
+                else:
+                    cv2.imshow(name, frame)
 
             key = cv2.waitKey(1)
             if key == ord("q"):

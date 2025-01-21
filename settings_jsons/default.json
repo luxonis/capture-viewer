@@ -15,10 +15,10 @@
         "right": true,
         "left_raw": false,
         "right_raw": false,
-        "rgb": true,
+        "rgb": false,
         "rgb_png": false,
-        "depth": false,
-        "disparity": false
+        "depth": true,
+        "disparity": true
     },
     "LRcheck": true,
     "extendedDisparity": false,
@@ -26,19 +26,28 @@
     "subpixelValue": 3,
     "highAccuracy": false,
     "highDensity": true,
-    "filters_on": false,
+    "use_filter_settings": true,
     "filters": {
         "threshold_filter": false,
         "lower_threshold_filter": 1000,
         "upper_threshold_filter": 5000,
-        "decimation_filter": true,
-        "decimation_factor": 2,
+        "decimation_filter": false,
+        "decimation_factor": 1,
+        "decimation_mode" : "PIXEL_SKIPPING",
         "spacial_filter": false,
+        "spatial_alfa": 0.5,
+        "spatial_delta": 3,
+        "spatial_num_iterations": 1,
+        "spatial_hole_filling_radius": 1,
         "temporal_filter": false,
+        "temporal_alfa": 0.5,
+        "temporal_delta": 3,
         "speckle_filter": false,
-        "speckle_range": 50,
-        "median_filter": false,
-        "median_size": "MEDIAN_OFF"
+        "speckle_range": 200,
+        "speckle_difference_threshold": 2,
+
+        "median_filter": true,
+        "median_size": "KERNEL_3x3"
     },
     "FPS": 30,
     "num_captures": 20
