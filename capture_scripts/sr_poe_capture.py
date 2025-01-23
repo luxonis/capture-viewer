@@ -70,7 +70,17 @@ if __name__ == "__main__":
 
         tof_raw_frame = None
         tof_depth_frame = None
+
+        start_time = time.time()
         while True:
+            if autostart >= -1:
+                autostart -= 1
+            if autostart == -1:
+                out_dir = initialize_capture(root_path, device, settings_path, view_name)
+                save = True
+                print("Starting capture via autosave")
+                start_time = time.time()
+
             msgGrp = queue.get()
             if save: num_captures += 1
             for name, msg in msgGrp:
