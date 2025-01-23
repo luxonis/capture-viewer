@@ -36,7 +36,7 @@ def save_frames(out_dir, timestamp, name, frame, tof_depth_frame, tof_raw_frame)
     return tof_depth_frame, tof_raw_frame
 
 if __name__ == "__main__":
-    settings_path, view_name, device_info, autostart = parseArguments()  # todo add autostart
+    settings_path, view_name, device_info, autostart = parseArguments()
 
     with open(settings_path, 'r') as file:
         settings = json.load(file)
