@@ -8,92 +8,13 @@ from datetime import timedelta
 import argparse
 import time
 
-from .pipelines.oak_stereo_pipeline import get_pipeline
+from pipelines.oak_stereo_pipeline import get_pipeline
+from utils.capture_universal import parseArguments, initialize_capture, colorize_depth
 
 # Get the directory where the script is located and choose it as the destination for DATA folder
 script_dir = os.path.dirname(os.path.abspath(__file__))
 root_path = os.path.join(os.path.dirname(script_dir), 'DATA')
 
-
-def initialize_capture(root_path, device):
-    date = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-    out_dir = f"{root_path}/{device.getDeviceName()}_{device.getMxId()}_{date}"
-    if not os.path.exists(root_path):
-        os.makedirs(root_path)
-    if not os.path.exists(os.path.join(root_path, out_dir)):
-        os.makedirs(out_dir)
-        print(f"Folder '{out_dir}' created.")
-    else:
-        print(f"Folder '{out_dir}' already exists.")
-
-    calib = device.readCalibration()
-    calib.eepromToJsonFile(f'{out_dir}/calib.json')
-    create_and_save_metadata(device, settings, out_dir, view_name, date=date)
-
-    return out_dir
-
-def create_and_save_metadata(device, settings, output_dir,
-                             scene_name, capture_type=None,
-                             author=None, notes=None, date=''):
-    model_name = device.getDeviceName()
-    mxId = device.getMxId()
-    metadata = {
-        "model_name": model_name,
-        "mxId": mxId,
-        "capture_type": capture_type,
-        "scene": scene_name,
-        "date": date,
-        "notes": notes,
-        "author": author,
-        'settings_name': settings_path,
-        "settings": settings
-    }
-
-    # Ensure the output directory exists
-    os.makedirs(output_dir, exist_ok=True)
-
-    # Define the filename for the JSON file
-    filename = f"metadata.json"
-    filepath = os.path.join(output_dir, filename)
-
-    # Write the metadata to a JSON file
-    with open(filepath, 'w') as json_file:
-        json.dump(metadata, json_file, indent=4)
-
-    print(f"Metadata saved to {filepath}")
-
-def colorize_depth(frame, min_depth=20, max_depth=5000):
-    depth_colorized = np.interp(frame, (min_depth, max_depth), (0, 255)).astype(np.uint8)
-    return cv2.applyColorMap(depth_colorized, cv2.COLORMAP_JET)
-
-def parseArguments():
-    # PARSE ARGUMENTS
-    parser = argparse.ArgumentParser()
-    # Mandatory arguments
-    parser.add_argument("settings_file_path", help="Path to settings JSON")
-    parser.add_argument("view_name", help="What part of the scene the camera is looking at")
-    # Optional argument with a flag for device_ip
-    parser.add_argument("--device-ip", dest="device_ip", help="IP of remote device", default=None)
-    parser.add_argument("--autostart", default=-1, type=int, help='Automatically start capturing after given number of frames (-1 to disable)')
-
-    args = parser.parse_args()
-    settings_path = args.settings_file_path
-    view_name = args.view_name
-    device_info = None
-    if args.device_ip:
-        device_info = dai.DeviceInfo(args.device_ip)
-
-    # SETTINGS loading
-    if not os.path.exists(settings_path):
-        settings_path_1 = f"settings_jsons/{settings_path}.json"
-        settings_path_2 = f"settings_jsons/{settings_path}"
-        if os.path.exists(settings_path_1):
-            settings_path = settings_path_1
-        elif os.path.exists(settings_path_2):
-            settings_path = settings_path_2
-        else: raise FileNotFoundError(f"Settings file '{settings_path}' does not exist.")
-
-    return settings_path, view_name, device_info, args.autostart
 
 if __name__ == "__main__":
     print("Running OAK capture script")
@@ -134,7 +55,7 @@ if __name__ == "__main__":
             if autostart >= -1:
                 autostart -= 1
             if autostart == -1:
-                out_dir = initialize_capture(root_path, device)
+                out_dir = initialize_capture(root_path, device, settings_path, view_name)
                 save = True
                 print("Starting capture via autosave")
                 start_time = time.time()
@@ -198,7 +119,7 @@ if __name__ == "__main__":
                     print(f"capture finished with: {num_captures} captures")
                     exit(0)
 
-                out_dir = initialize_capture(root_path, device)
+                out_dir = initialize_capture(root_path, device, settings_path, view_name)
                 start_time = time.time()
 
             if num_captures == settings["num_captures"]:
