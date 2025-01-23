@@ -8,145 +8,12 @@ from datetime import timedelta
 import argparse
 import time
 
+from .pipelines.oak_stereo_pipeline import get_pipeline
+
 # Get the directory where the script is located and choose it as the destination for DATA folder
 script_dir = os.path.dirname(os.path.abspath(__file__))
 root_path = os.path.join(os.path.dirname(script_dir), 'DATA')
 
-def create_pipeline():
-    global max_disparity
-    pipeline = dai.Pipeline()
-
-    output_settings = settings["output_settings"]
-    if output_settings["left"] or output_settings["left_raw"]:
-        monoLeft = pipeline.create(dai.node.MonoCamera)
-        monoLeft.setCamera("left")
-        monoLeft.setResolution(eval("dai.MonoCameraProperties.SensorResolution." + settings["stereoResolution"]))
-        monoLeft.setFps(settings["FPS"])
-
-        if settings["autoexposure"]: monoLeft.initialControl.setAutoExposureEnable()
-        else: monoLeft.initialControl.setManualExposure(settings["expTime"], settings["sensIso"])
-
-    if output_settings["right"] or output_settings["right_raw"]:
-        monoRight = pipeline.create(dai.node.MonoCamera)
-        monoRight.setCamera("right")
-        monoRight.setFps(settings["FPS"])
-        monoRight.setResolution(eval("dai.MonoCameraProperties.SensorResolution." + settings["stereoResolution"]))
-
-        if settings["autoexposure"]: monoRight.initialControl.setAutoExposureEnable()
-        else: monoRight.initialControl.setManualExposure(settings["expTime"], settings["sensIso"])
-
-    if output_settings["rgb"] or output_settings["rgb_png"]:
-        color = pipeline.create(dai.node.ColorCamera)
-        color.setCamera("color")
-        color.setResolution(eval("dai.ColorCameraProperties.SensorResolution." + settings["rgbResolution"]))
-
-    if output_settings["depth"] or output_settings["disparity"]:
-        stereo = pipeline.create(dai.node.StereoDepth)
-        monoLeft.out.link(stereo.left)
-        monoRight.out.link(stereo.right)
-
-
-    if output_settings["depth"] or output_settings["disparity"]:
-
-        # ALIGNMENT SETTINGS
-        if settings["alignSocket"] == "RIGHT":
-            ALIGN_SOCKET = dai.CameraBoardSocket.CAM_C
-            stereo.setDepthAlign(ALIGN_SOCKET)
-        elif settings["alignSocket"] == "LEFT":
-            ALIGN_SOCKET = dai.CameraBoardSocket.CAM_B
-            stereo.setDepthAlign(ALIGN_SOCKET)
-        elif settings["alignSocket"] == "REC_LEFT":
-            stereo.initialConfig.setDepthAlign(dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_LEFT)
-        elif settings["alignSocket"] == "REC_RIGHT":
-            stereo.initialConfig.setDepthAlign(dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_RIGHT)
-        elif settings["alignSocket"] == "COLOR":
-            ALIGN_SOCKET = dai.CameraBoardSocket.CAM_A
-            stereo.setDepthAlign(ALIGN_SOCKET)
-        else:
-            raise ValueError("Invalid align socket")
-
-        # STEREO SETTINGS
-        stereo.setLeftRightCheck(settings["LRcheck"])
-        if settings["extendedDisparity"]: stereo.setExtendedDisparity(True)
-        if settings["subpixelDisparity"]: stereo.setSubpixel(True)
-        if settings["subpixelValue"]: stereo.initialConfig.setSubpixelFractionalBits(settings["subpixelValue"])
-        stereo.setDefaultProfilePreset(eval(f"dai.node.StereoDepth.PresetMode.{settings['profilePreset']}"))
-
-
-        # FILTER SETTINGS
-        if settings["use_filter_settings"]:
-            if settings["filters"]["median_filter"]:
-                stereo.initialConfig.setMedianFilter(eval(f"dai.StereoDepthConfig.MedianFilter.{settings['filters']['median_size']}"))
-            else:
-                stereo.initialConfig.setMedianFilter(dai.StereoDepthConfig.MedianFilter.MEDIAN_OFF)
-
-            stereoConfig = stereo.initialConfig.get()
-            if settings["filters"]["threshold_filter"]:
-                stereoConfig.postProcessing.thresholdFilter.minRange = settings["filters"]["lower_threshold_filter"]
-                stereoConfig.postProcessing.thresholdFilter.maxRange = settings["filters"]["upper_threshold_filter"]
-            if settings["filters"]["decimation_filter"]:
-                stereoConfig.postProcessing.decimationFilter.decimationFactor = settings["filters"]["decimation_factor"]
-                stereoConfig.postProcessing.decimationFilter.decimationMode = eval(f"dai.StereoDepthConfig.PostProcessing.DecimationFilter.DecimationMode.{settings['filters']['decimation_mode']}")
-            if settings["filters"]["spacial_filter"]:
-                stereoConfig.postProcessing.spatialFilter.enable = True
-                stereoConfig.postProcessing.spatialFilter.holeFillingRadius = settings["filters"]["spatial_hole_filling_radius"]
-                stereoConfig.postProcessing.spatialFilter.numIterations = settings["filters"]["spatial_num_iterations"]
-                stereoConfig.postProcessing.spatialFilter.alpha = settings["filters"]["spatial_alfa"]
-                stereoConfig.postProcessing.spatialFilter.delta = settings["filters"]["spatial_delta"]
-            if settings["filters"]["temporal_filter"]:
-                stereoConfig.postProcessing.temporalFilter.enable = True
-                stereoConfig.postProcessing.temporalFilter.alpha = settings["filters"]["temporal_alfa"]
-                stereoConfig.postProcessing.temporalFilter.delta = settings["filters"]["temporal_delta"]
-            if settings["filters"]["speckle_filter"]:
-                stereoConfig.postProcessing.speckleFilter.enable = True
-                stereoConfig.postProcessing.speckleFilter.speckleRange = settings["filters"]["speckle_range"]
-                stereoConfig.postProcessing.speckleFilter.differenceThreshold = settings["filters"]["speckle_difference_threshold"]
-
-            # brigntness filter does not seem to be working
-            # settings for stereo json:
-            # "brightness_filter": true,
-            # "lower_brightness_filter": 0,
-            # "upper_brightness_filter": 10,
-            # if settings["filters"]["brightness_filter"]:
-            #     stereoConfig.postProcessing.brightnessFilter.maxBrightness = settings["filters"]["lower_threshold_filter"]
-            #     stereoConfig.postProcessing.brightnessFilter.minBrightness = settings["filters"]["lower_threshold_filter"]
-
-            stereo.initialConfig.set(stereoConfig)
-
-    # PASSING THROUGH THE SYNC NODE
-    sync = pipeline.create(dai.node.Sync)
-    sync.setSyncThreshold(timedelta(milliseconds=50))
-
-    if output_settings["disparity"]:
-        stereo.disparity.link(sync.inputs["disparity"])
-        max_disparity = stereo.initialConfig.getMaxDisparity()
-    if output_settings["rgb"] or output_settings["rgb_png"]:
-        color.isp.link(sync.inputs["isp"])
-    if output_settings["depth"]:
-        stereo.depth.link(sync.inputs["depth"])
-        stereo.syncedLeft.link(sync.inputs["left"])
-        stereo.syncedRight.link(sync.inputs["right"])
-    else:
-        if output_settings["left"]:
-            monoLeft.out.link(sync.inputs["left"])
-        if output_settings["right"]:
-            monoRight.out.link(sync.inputs["right"])
-    if output_settings["left_raw"]:
-        monoLeft.raw.link(sync.inputs["left_raw"])
-    if output_settings["right_raw"]:
-        monoRight.raw.link(sync.inputs["right_raw"])
-
-    # XOUT
-    xoutGrp = pipeline.create(dai.node.XLinkOut)
-    xoutGrp.setStreamName("xout")
-    sync.out.link(xoutGrp.input)
-
-    # controlIn = pipeline.create(dai.node.XLinkIn)
-    # controlIn.setStreamName('control')
-    # controlIn.out.link(monoRight.inputControl)
-    # controlIn.out.link(monoLeft.inputControl)
-
-    return pipeline
 
 def initialize_capture(root_path, device):
     date = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
@@ -246,7 +113,8 @@ if __name__ == "__main__":
     print("Or press S again to end the capture early.")
 
     print("\nConnecting device...")
-    with (dai.Device(create_pipeline(), device_info) as device):
+    pipeline_output = get_pipeline(settings)
+    with (dai.Device(pipeline_output["pipeline"], device_info) as device):
         print("Device Connected!")
         out_dir = None
 
@@ -306,7 +174,7 @@ if __name__ == "__main__":
                 else: frame = msg.getCvFrame()
 
                 if name == "disparity":
-                    colorized_disparity = colorize_depth(frame, min_depth=0, max_depth=max_disparity)
+                    colorized_disparity = colorize_depth(frame, min_depth=0, max_depth=pipeline_output["max_disparity"])
                     cv2.imshow(name, colorized_disparity)
                 elif name == "depth":
                     colorized_depth = colorize_depth(frame, min_depth=0, max_depth=7000)

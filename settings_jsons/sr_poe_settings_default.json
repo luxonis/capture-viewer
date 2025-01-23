@@ -3,7 +3,7 @@
     "ir_value": 1,
     "flood_light": false,
     "flood_light_intensity": 1,
-    "stereoPairResolution": "THE_800_P",
+    "stereoResolution": "THE_800_P",
 
     "alignSocket": "REC_RIGHT",
     "LRcheck": true,
@@ -12,6 +12,21 @@
     "subpixelValue": 5,
     "highAccuracy": false,
     "highDensity": true,
+
+    "output_settings": {
+        "left": true,
+        "right": false,
+        "left_raw": false,
+        "right_raw": false,
+        "tof": true,
+        "tof_depth": true,
+        "tof_intensity": false,
+        "tof_amplitude": false,
+        "rgb": false,
+        "rgb_png": false,
+        "depth": false,
+        "disparity": false
+    },
 
     "customTofConfig": false,
     "tofConfig": {

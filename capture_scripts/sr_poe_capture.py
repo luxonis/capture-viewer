@@ -6,109 +6,11 @@ import json
 import datetime
 import argparse
 
+from pipelines.oak_tof_pipeline import get_pipeline
+
 # Get the directory where the script is located and choose it as the destination for DATA folder
 script_dir = os.path.dirname(os.path.abspath(__file__))
 root_path = os.path.join(os.path.dirname(script_dir), 'DATA')
-
-def create_pipeline():
-    pipeline = dai.Pipeline()
-
-    # Time-of-Flight (ToF) setup
-    tof = pipeline.create(dai.node.ToF)
-    tof.setNumShaves(4)
-
-    # ToF configuration
-    tofConfig = tof.initialConfig.get()
-    if settings["customTofConfig"]:
-        tofConfig.enableFPPNCorrection = settings["tofConfig"]["enableFPPNCorrection"]
-        tofConfig.enableOpticalCorrection = settings["tofConfig"]["enableOpticalCorrection"]
-        tofConfig.enableWiggleCorrection = settings["tofConfig"]["enableWiggleCorrection"]
-        tofConfig.enableTemperatureCorrection = settings["tofConfig"]["enableTemperatureCorrection"]
-        tofConfig.phaseUnwrappingLevel = settings["tofConfig"]["phaseUnwrappingLevel"]
-        tof.initialConfig.set(tofConfig)
-
-    cam_tof = pipeline.create(dai.node.Camera)
-    cam_tof.setBoardSocket(dai.CameraBoardSocket.CAM_A)
-    cam_tof.setFps(settings["FPS"])
-    cam_tof.raw.link(tof.input)
-
-    # RGB Cameras
-    colorLeft = pipeline.create(dai.node.ColorCamera)
-    colorRight = pipeline.create(dai.node.ColorCamera)
-    colorLeft.setBoardSocket(dai.CameraBoardSocket.CAM_B)
-    colorRight.setBoardSocket(dai.CameraBoardSocket.CAM_C)
-
-    resolutions = ["THE_800_P", "THE_720_P"]
-    resolution = settings["stereoPairResolution"]
-    if resolution not in resolutions:
-        raise Exception("Stereo pair resolution not supported")
-
-    # Dynamically set the resolution using getattr
-    colorLeft.setResolution(getattr(dai.ColorCameraProperties.SensorResolution, resolution))
-    colorRight.setResolution(getattr(dai.ColorCameraProperties.SensorResolution, resolution))
-
-    colorLeft.setFps(settings["FPS"])
-    colorRight.setFps(settings["FPS"])
-
-    # Stereo Depth
-    stereo = pipeline.create(dai.node.StereoDepth)
-
-    if settings["highAccuracy"]: stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_ACCURACY)
-    elif settings["highDensity"]: stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
-
-
-    stereo.setLeftRightCheck(settings["LRcheck"])
-    stereo.setExtendedDisparity(settings["extendedDisparity"])
-    stereo.setSubpixel(settings["subpixelDisparity"])
-
-    if settings["subpixelDisparity"]: stereo.initialConfig.setSubpixelFractionalBits(settings.get("subpixelValue", 3))
-
-    if settings["alignSocket"] == "RIGHT":
-        ALIGN_SOCKET = dai.CameraBoardSocket.CAM_C
-        stereo.setDepthAlign(ALIGN_SOCKET)
-    elif settings["alignSocket"] == "LEFT":
-        ALIGN_SOCKET = dai.CameraBoardSocket.CAM_B
-        stereo.setDepthAlign(ALIGN_SOCKET)
-    elif settings["alignSocket"] == "REC_LEFT":
-        stereo.initialConfig.setDepthAlign(dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_LEFT)
-    elif settings["alignSocket"] == "REC_RIGHT":
-        stereo.initialConfig.setDepthAlign(dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_RIGHT)
-    elif settings["alignSocket"] == "TOF":
-        raise ValueError("Can't align to TOF socket")
-    elif settings["alignSocket"] == "COLOR":
-        print("No color socket, aligning to DEFAULT SOCKET instead")
-    else:
-        raise ValueError("Invalid align socket")
-
-    # Linking cameras to stereo
-    colorLeft.isp.link(stereo.left)
-    colorRight.isp.link(stereo.right)
-
-    # Sync node
-    sync = pipeline.create(dai.node.Sync)
-    sync.setSyncThreshold(datetime.timedelta(milliseconds=250))
-
-    cam_tof.raw.link(sync.inputs["tof_raw"])
-
-    tof.depth.link(sync.inputs["tof_depth"])
-    tof.intensity.link(sync.inputs["tof_intensity"])
-    tof.amplitude.link(sync.inputs["tof_amplitude"])
-
-    stereo.depth.link(sync.inputs["depth"])  # naming consistent with stereo captures
-    colorLeft.isp.link(sync.inputs["left"])
-    colorRight.isp.link(sync.inputs["right"])
-
-    # Xin
-    xinTofConfig = pipeline.create(dai.node.XLinkIn)
-    xinTofConfig.setStreamName("tofConfig")
-    xinTofConfig.out.link(tof.inputConfig)
-
-    # Xout
-    xoutGrp = pipeline.create(dai.node.XLinkOut)
-    xoutGrp.setStreamName("xout")
-    sync.out.link(xoutGrp.input)
-
-    return pipeline, tofConfig
 
 def create_folder(out_dir):
     if not os.path.exists(root_path):
@@ -148,6 +50,7 @@ def create_and_save_metadata(device, settings, output_dir,
         json.dump(metadata, json_file, indent=4)
 
     print(f"Metadata saved to {filepath}")
+
 def parseArguments():
     # PARSE ARGUMENTS
     parser = argparse.ArgumentParser()
@@ -213,9 +116,9 @@ if __name__ == "__main__":
 
     print("Connecting device...")
 
-    pipeline, tofConfig = create_pipeline()
+    pipeline_output = get_pipeline(settings)
 
-    with dai.Device(pipeline, device_info) as device:
+    with dai.Device(pipeline_output['pipeline'], device_info) as device:
         print("Device Connected!")
         device_name = device.getDeviceName()
         out_dir = None
@@ -226,8 +129,10 @@ if __name__ == "__main__":
         if settings["ir"]: device.setIrLaserDotProjectorIntensity(settings["ir_value"])
         if settings["flood_light"]: device.setIrFloodLightIntensity(settings["flood_light_intensity"])
 
-        tofConfig.median = eval(settings["medianFilter"])
-        tofConfigInQueue.send(tofConfig)
+        tofConfig = pipeline_output.get('tofConfig', None)
+        if tofConfig is not None:
+            tofConfig.median = eval(settings["medianFilter"])
+            tofConfigInQueue.send(tofConfig)
 
         save = False
         num_captures = 0
