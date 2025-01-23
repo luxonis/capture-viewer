@@ -78,8 +78,6 @@ def set_stereo_node(pipeline, settings):
 def get_pipeline(settings):
     pipeline = dai.Pipeline()
 
-    # todo - write a function to check whether settings is valid
-
     def create_camera_node(socket):
         camera = pipeline.create(dai.node.MonoCamera)
         camera.setBoardSocket(socket)
