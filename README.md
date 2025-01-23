@@ -62,7 +62,7 @@ visualize individual sessions.
 
 ## Settings Options for Captures
 
-During capture, you can configure various parameters. Below is an example settings configuration:
+For capture, you can configure various parameters. Below is an example settings configuration:
 
 ```json
 {
@@ -91,8 +91,7 @@ During capture, you can configure various parameters. Below is an example settin
     "extendedDisparity": false,
     "subpixelDisparity": true,
     "subpixelValue": 3,
-    "highAccuracy": false,
-    "highDensity": true,
+    "profilePreset": "ROBOTICS",
     "use_filter_settings": false,
     "filters": {
         "threshold_filter": false,
@@ -120,17 +119,22 @@ During capture, you can configure various parameters. Below is an example settin
     "num_captures": 20
 }
 
+
 ```
+
+This settings need to be configured before the capture start. To change the settings, simply 
+edit parameters in the json and restart the capture script.
 
 - `ir` : IR dot projector, available on PRO models.
 - `flood_light` : IR floodlight, available on PRO models.
 - If `autoexposure` is set to false, `expTime` and `sensIso` will be used.
 - `extendedDisparity` : extendedDisparity
 - `subpixelDisparity`: subpixelDisparity with the selected `subpixelValue`
-- preset mode selection: `highAccuracy` or `highDensity`
+- `profilePreset`: select a Profile Preset such as `DEFAULT`, `HIGH_DETAIL`, `FACE` or `ROBOTICS` based on your needs. 
+Profiles `HIGH_ACCURACY` and `HIGH_DENSITY` are also available but will be removed in future versions/
 - `output_settings` : select what streams you'd like to visualize. Some stream combinations might not be valid 
 (such as choosing depth stream but not selecting left and right)
-- `use_filter_settings`: if set to false, none of the following filters will be used
+- `use_filter_settings`: **if set to false, none of the following filters will be used**. Set to true to use custom filter settings.
   - `filters`: self-explanatory
 - `FPS`: will be applied to mono camera streams as well as the color camera
 - `num_captures` : the number of depth frames which will be saved before the capture ending
@@ -138,7 +142,7 @@ During capture, you can configure various parameters. Below is an example settin
 These are the basic information about the capture. Settings for the capture can be edited and re-applied using the **Replay** feature 
 in the capture viewer. 
 
-**The REPLAY feature offers also additional settings.**
+**The REPLAY feature offers additional settings.**
 
 ---
 

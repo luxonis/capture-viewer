@@ -70,8 +70,7 @@ def create_pipeline():
         if settings["extendedDisparity"]: stereo.setExtendedDisparity(True)
         if settings["subpixelDisparity"]: stereo.setSubpixel(True)
         if settings["subpixelValue"]: stereo.initialConfig.setSubpixelFractionalBits(settings["subpixelValue"])
-        if settings["highAccuracy"]: stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_ACCURACY)
-        elif settings["highDensity"]: stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
+        stereo.setDefaultProfilePreset(eval(f"dai.node.StereoDepth.PresetMode.{settings['profilePreset']}"))
 
 
         # FILTER SETTINGS
@@ -113,8 +112,6 @@ def create_pipeline():
             #     stereoConfig.postProcessing.brightnessFilter.minBrightness = settings["filters"]["lower_threshold_filter"]
 
             stereo.initialConfig.set(stereoConfig)
-        else:
-            stereo.initialConfig.setMedianFilter(dai.StereoDepthConfig.MedianFilter.MEDIAN_OFF)
 
     # PASSING THROUGH THE SYNC NODE
     sync = pipeline.create(dai.node.Sync)

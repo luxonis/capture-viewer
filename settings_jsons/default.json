@@ -24,8 +24,7 @@
     "extendedDisparity": false,
     "subpixelDisparity": true,
     "subpixelValue": 3,
-    "highAccuracy": false,
-    "highDensity": true,
+    "profilePreset": "DEFAULT",
     "use_filter_settings": false,
     "filters": {
         "threshold_filter": false,
