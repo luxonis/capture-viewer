@@ -25,7 +25,8 @@
         "rgb": false,
         "rgb_png": false,
         "depth": false,
-        "disparity": false
+        "disparity": false,
+        "sync": false
     },
 
     "customTofConfig": false,
@@ -38,6 +39,6 @@
     },
     "medianFilter": "dai.MedianFilter.MEDIAN_OFF",
 
-    "FPS": 5,
+    "FPS": 30,
     "num_captures": 20
 }

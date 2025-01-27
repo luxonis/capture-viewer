@@ -32,7 +32,6 @@ def get_pipeline(settings, frame_syn_num=-1):
     pipeline = dai.Pipeline()
 
     output_settings = settings["output_settings"]
-    print(f'[{frame_syn_num}] output_settings: {output_settings}')
 
     def create_camera_node(socket):
         camera = pipeline.create(dai.node.ColorCamera)
@@ -58,28 +57,68 @@ def get_pipeline(settings, frame_syn_num=-1):
         tof, cam_tof = set_tof_node(pipeline, settings)
         cam_tof.raw.link(tof.input)
 
-    # Sync node
-    sync = pipeline.create(dai.node.Sync)
-    sync.setSyncThreshold(timedelta(milliseconds=250))
+        if frame_syn_num == -1:
+            pass
+        elif frame_syn_num == 0:
+            # OUTPUT NODE
+            print("OUTPUT")
+            cam_tof.initialControl.setMisc('frame-sync-id', frame_syn_num)
+            pass
+        else:
+            # INPUT NODE
+            print("INPUT")
+            cam_tof.initialControl.setMisc('frame-sync-id', frame_syn_num)
+            pass
 
-    if output_settings["tof"]:
-        if output_settings.get("tof_raw", False): cam_tof.raw.link(sync.inputs["tof_raw"])
-        if output_settings.get("tof_depth", False): tof.depth.link(sync.inputs["tof_depth"])
-        if output_settings.get("tof_intensity", False): tof.intensity.link(sync.inputs["tof_intensity"])
-        if output_settings.get("tof_amplitude", False): tof.amplitude.link(sync.inputs["tof_amplitude"])
 
-        xinTofConfig = pipeline.create(dai.node.XLinkIn)
-        xinTofConfig.setStreamName("tofConfig")
-        xinTofConfig.out.link(tof.inputConfig)
+    if output_settings["sync"]:
+        # Sync node
+        sync = pipeline.create(dai.node.Sync)
+        sync.setSyncThreshold(timedelta(milliseconds=250))
 
-    if output_settings["depth"]: stereo.depth.link(sync.inputs["depth"])
-    if output_settings["left"]: colorLeft.isp.link(sync.inputs["left"])
-    if output_settings["right"]: colorRight.isp.link(sync.inputs["right"])
+        if output_settings["tof"]:
+            if output_settings.get("tof_raw", False): cam_tof.raw.link(sync.inputs["tof_raw"])
+            if output_settings.get("tof_depth", False): tof.depth.link(sync.inputs["tof_depth"])
+            if output_settings.get("tof_intensity", False): tof.intensity.link(sync.inputs["tof_intensity"])
+            if output_settings.get("tof_amplitude", False): tof.amplitude.link(sync.inputs["tof_amplitude"])
 
-    # Xout
-    xoutGrp = pipeline.create(dai.node.XLinkOut)
-    xoutGrp.setStreamName("xout")
-    sync.out.link(xoutGrp.input)
+            xinTofConfig = pipeline.create(dai.node.XLinkIn)
+            xinTofConfig.setStreamName("tofConfig")
+            xinTofConfig.out.link(tof.inputConfig)
+
+        if output_settings["depth"]: stereo.depth.link(sync.inputs["depth"])
+        if output_settings["left"]: colorLeft.isp.link(sync.inputs["left"])
+        if output_settings["right"]: colorRight.isp.link(sync.inputs["right"])
+
+        # Xout
+        xoutGrp = pipeline.create(dai.node.XLinkOut)
+        xoutGrp.setStreamName("xout")
+        sync.out.link(xoutGrp.input)
+
+    else:
+        xout_tof_raw = create_xout_node("tof_raw")
+        xout_tof_depth = create_xout_node("tof_depth")
+        xout_tof_intensity = create_xout_node("tof_intensity")
+        xout_tof_amplitude = create_xout_node("tof_amplitude")
+
+        xout_depth = create_xout_node("depth")
+        xout_left = create_xout_node("left")
+        xout_right = create_xout_node("right")
+        
+        if output_settings["tof"]:
+            if output_settings.get("tof_raw", False): cam_tof.raw.link(xout_tof_raw.input)
+            if output_settings.get("tof_depth", False): tof.depth.link(xout_tof_depth.input)
+            if output_settings.get("tof_intensity", False): tof.intensity.link(xout_tof_intensity.input)
+            if output_settings.get("tof_amplitude", False): tof.amplitude.link(xout_tof_amplitude.input)
+    
+            xinTofConfig = pipeline.create(dai.node.XLinkIn)
+            xinTofConfig.setStreamName("tofConfig")
+            xinTofConfig.out.link(tof.inputConfig)
+    
+        if output_settings["depth"]: stereo.depth.link(xout_depth.input)
+        if output_settings["left"]: colorLeft.isp.link(xout_left.input)
+        if output_settings["right"]: colorRight.isp.link(xout_right.input)
+
 
     pipeline_output = {
         'pipeline': pipeline,
