@@ -15,13 +15,13 @@
 
     "output_settings": {
         "left": false,
-        "right": false,
+        "right": true,
         "left_raw": false,
         "right_raw": false,
         "tof": true,
         "tof_depth": true,
-        "tof_intensity": false,
-        "tof_amplitude": false,
+        "tof_intensity": true,
+        "tof_amplitude": true,
         "rgb": false,
         "rgb_png": false,
         "depth": false,

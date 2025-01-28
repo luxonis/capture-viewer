@@ -9,31 +9,12 @@ import argparse
 
 from pipelines.oak_tof_pipeline import get_pipeline
 from utils.capture_universal import parseArguments, initialize_capture, colorize_depth
+from utils.frame_saving import save_frames
 
 # Get the directory where the script is located and choose it as the destination for DATA folder
 script_dir = os.path.dirname(os.path.abspath(__file__))
 root_path = os.path.join(os.path.dirname(script_dir), 'DATA')
 
-
-def save_frames(out_dir, timestamp, name, frame, tof_depth_frame, tof_raw_frame):
-    if name == "depth":
-        np.save(f'{out_dir}/{name}_{timestamp}.npy', frame)
-        if tof_depth_frame is not None:
-            np.save(f'{out_dir}/tof_depth_{timestamp}.npy', tof_depth_frame)
-            tof_depth_frame = None
-        if tof_raw_frame is not None:
-            np.save(f'{out_dir}/tof_raw_{timestamp}.npy', tof_raw_frame)
-            tof_raw_frame = None
-    elif name == "tof_depth":
-        tof_depth_frame = frame  # tof depth is saved too fast so its unaligned
-    elif name == "tof_raw":
-        tof_raw_frame = frame
-    if name in ["tof_amplitude", "tof_intensity"]:
-        np.save(f'{out_dir}/{name}_{timestamp}.npy', frame)
-    elif name in ["left", "right"]:
-        # cv2.imwrite(f'{out_dir}/{name}_{timestamp}.png', frame)
-        np.save(f'{out_dir}/{name}_{timestamp}.npy', frame)
-    return tof_depth_frame, tof_raw_frame
 
 if __name__ == "__main__":
     settings_path, view_name, device_info, autostart = parseArguments()
@@ -87,9 +68,8 @@ if __name__ == "__main__":
                 if save:
                     timestamp = int(msg.getTimestamp().total_seconds() * 1000)
                     frame = msg.getCvFrame()
-                    tof_depth_frame, tof_raw_frame = save_frames(out_dir, timestamp,
-                                                                 name, frame,
-                                                                 tof_depth_frame, tof_raw_frame)
+                    save_output = save_frames(out_dir, timestamp, name, frame, tof_depth_frame, tof_raw_frame)
+                    tof_depth_frame, tof_raw_frame = save_output["tof_depth_frame"], save_output["tof_raw_frame"]
                 else:
                     frame = msg.getCvFrame()
 

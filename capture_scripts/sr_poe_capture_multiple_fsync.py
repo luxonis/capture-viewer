@@ -5,18 +5,34 @@ import threading
 import contextlib
 import cv2
 import json
+import os
+
+from matplotlib.pyplot import autoscale
 
 print(dai.__version__)
 
 # This can be customized to pass multiple parameters
 from pipelines.oak_tof_pipeline import get_pipeline
-from utils.capture_universal import colorize_depth
+from utils.capture_universal import colorize_depth, parseArguments, initialize_capture
 
-def worker(mxid, stack, devices, settings, num):
+script_dir = os.path.dirname(os.path.abspath(__file__))
+root_path = os.path.join(os.path.dirname(script_dir), 'DATA')
+
+def count_output_streams(output_streams):
+    stream_names = []
+    for item in output_streams.keys():
+        if item in ["tof", "sync", "rgb_png"]: continue
+        if output_streams[item]:
+            stream_names.append(item)
+    return stream_names
+
+def worker(mxid, stack, devices, settings, num, shared_devices):
     openvino_version = dai.OpenVINO.Version.VERSION_2021_4
     usb2_mode = False
     device_info = dai.DeviceInfo(mxid)
     device = stack.enter_context(dai.Device(openvino_version, device_info, usb2_mode))
+
+    shared_devices[mxid] = device
 
     print("=== Connected to " + mxid + f"fsync: {num}")
 
@@ -67,89 +83,157 @@ with contextlib.ExitStack() as stack:
             break
 
     devices = {}
+    shared_devices = {}
+    output_folders = {}
+    num_captures = {}
     threads = []
 
+    # settings_path, view_name, device_info, autostart = parseArguments()
+
     settings_path = '/home/katka/PycharmProjects/capture-viewer/settings_jsons/sr_poe_settings_default.json'
+    autostart = -1
+    view_name = "name"
+
     with open(settings_path) as settings_file:
         settings = json.load(settings_file)
 
     print("Starting threads")
     for i, mxid in enumerate(mxids):
-        thread = threading.Thread(target=worker, args=(mxid, stack, devices, settings, i))
+        thread = threading.Thread(target=worker, args=(mxid, stack, devices, settings, i, shared_devices))
         thread.start()
         threads.append(thread)
+        num_captures[mxid] = 0
 
     print("Waiting for cameras to inicialize")
     for t in threads:
         t.join() # Wait for all threads to finish (to connect to devices)
     print("Cameras inicialized")
 
+    save = False
+    capture_ended = False
+
+    tof_depth_frame, tof_raw_frame = None, None
+
+    streams = count_output_streams(settings['output_settings'])
+    print(f"Streams: {streams}")
+    print(f"Number of streams: {len(streams)}")
+
+    final_num_captures = settings['num_captures']*len(streams)
+
+    print(f"Will capture max frames ({settings['num_captures']}) * number of streams ({len(streams)}) = {final_num_captures}")
+
     print("Starting loop...")
     while True:
+        if autostart >= -1:
+            autostart -= 1
+        if autostart == -1:
+            for mxid in shared_devices.keys():
+                device = shared_devices[mxid]
+                out_dir = initialize_capture(root_path, device, settings_path, view_name)
+                output_folders[mxid] = out_dir
+            save = True
+            print("Starting capture via autosave")
+            start_time = time.time()
+
         for mxid, q in devices.items():
-            try:
-                if settings['output_settings']['sync']:
-                    if not q['sync'].has():
-                        continue
-                    msgGrp = q['sync'].get()
-                    for name, msg in msgGrp:
-                        # if save:
-                        #     timestamp = int(msg.getTimestamp().total_seconds() * 1000)
-                        #     frame = msg.getCvFrame()
-                        #     tof_depth_frame, tof_raw_frame = save_frames(out_dir, timestamp,
-                        #                                                  name, frame,
-                        #                                                  tof_depth_frame, tof_raw_frame)
-                        # else:
+            if settings['output_settings']['sync']:
+                if not q['sync'].has():
+                    continue
+                msgGrp = q['sync'].get()
+                for name, msg in msgGrp:
+                    timestamp = int(msg.getTimestamp().total_seconds() * 1000)
+                    frame = msg.getCvFrame()
+                    if save:
+                        np.save(f'{output_folders[mxid]}/{name}_{timestamp}.npy', frame)
+                        num_captures[mxid] += 1
+
+                    # visuzalize frames
+                    if name == "tof_amplitude":
+                        depth_vis = (frame * 255 / frame.max()).astype(np.uint8)
+                        depth_vis = cv2.applyColorMap(depth_vis, cv2.COLORMAP_JET)
+                        cv2.imshow(f"{mxid} {name}", depth_vis)
+                    elif name == "tof_intensity":
+                        cv2.imshow(f"{mxid} {name}", frame)
+                    elif name == "depth":
+                        depth_vis = colorize_depth(frame)
+
+                        depth_vis = cv2.putText(depth_vis, f"{timestamp} ms", (10, 30),
+                                                      cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+
+                        cv2.imshow(f"{mxid} {name}", depth_vis)
+                    elif name == "tof_depth":
+                        tof_depth_colorized = colorize_depth(frame)
+
+                        tof_depth_colorized = cv2.putText(tof_depth_colorized, f"{timestamp} ms", (10, 30),
+                                                cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+
+                        cv2.imshow(f"{mxid} {name}", tof_depth_colorized)
+                    elif name in ["left", "right"]:
+                        left = cv2.putText(frame, f"{timestamp} ms", (10, 30),
+                                                cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+
+                        cv2.imshow(f"{mxid} {name}", left)
+                    else:
                         frame = msg.getCvFrame()
-                        timestamp = msg.getTimestamp().total_seconds()
-                        # visuzalize frames
-                        if name == "tof_amplitude":
-                            depth_vis = (frame * 255 / frame.max()).astype(np.uint8)
-                            depth_vis = cv2.applyColorMap(depth_vis, cv2.COLORMAP_JET)
-                            cv2.imshow(f"{mxid} {name}", depth_vis)
-                        elif name == "tof_intensity":
-                            cv2.imshow(f"{mxid} {name}", frame)
-                        elif name == "depth":
-                            depth_vis = colorize_depth(frame)
+            else:
+                for name in q.keys():
+                    frame = q[name].get().getCvFrame()
+                    timestamp = int(q[name].get().getTimestamp().total_seconds() * 1000)
+                    if save:
+                        np.save(f'{output_folders[mxid]}/{name}_{timestamp}.npy', frame)
+                        num_captures[mxid] += 1
+                    if name == "tof_depth":
+                        # depthImg: dai.ImgFrame = q[name].get()
+                        # depth = depthImg.getFrame()
+                        max_depth = 5 * 1500 # 100MHz modulation freq.
+                        depth_colorized = np.interp(frame, (0, max_depth), (0, 255)).astype(np.uint8)
+                        depth_colorized = cv2.applyColorMap(depth_colorized, cvColorMap)
+                        # timestamp = depthImg.getTimestamp().total_seconds()
+                        depth_colorized = cv2.putText(depth_colorized, f"{timestamp} ms", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                        cv2.imshow(mxid + " tof", depth_colorized)
+                    if name in ["left", "right"]:
+                        # left: dai.ImgFrame = q[name].get()
+                        # frame = left.getCvFrame()
+                        # Print exposreexpure time and sensitivity to frame
+                        # timestamp = left.getTimestamp().total_seconds()
+                        frame = cv2.putText(frame, f"{timestamp} ms", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                        cv2.imshow(mxid + " " + name, frame)
 
-                            depth_vis = cv2.putText(depth_vis, f"{timestamp} ms", (10, 30),
-                                                          cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord('q'): break
+        elif key == ord("s"):
+            save = not save
 
-                            cv2.imshow(f"{mxid} {name}", depth_vis)
-                        elif name == "tof_depth":
-                            tof_depth_colorized = colorize_depth(frame)
+            if save:
+                print("CAPTURING...")
+            else:
+                for mxid in shared_devices.keys():
+                    if num_captures[mxid] >= final_num_captures:
+                        end_time = time.time()
+                        print(mxid)
+                        print("Capture took " + str(end_time - start_time) + " seconds.")
+                        save = False
+                        print(f"CAPTURE FINISHED with: {num_captures[mxid]} captures")
+                        print(f"Capture was {round(num_captures[mxid] / (end_time - start_time), 2)} FPS")
+                        capture_ended = True
 
-                            tof_depth_colorized = cv2.putText(tof_depth_colorized, f"{timestamp} ms", (10, 30),
-                                                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+            for mxid in shared_devices.keys():
+                device = shared_devices[mxid]
+                out_dir = initialize_capture(root_path, device, settings_path, view_name)
+                output_folders[mxid] = out_dir
+            save = True
+            print("Starting capture")
+            start_time = time.time()
 
-                            cv2.imshow(f"{mxid} {name}", tof_depth_colorized)
-                        elif name in ["left", "right"]:
-                            left = cv2.putText(frame, f"{timestamp} ms", (10, 30),
-                                                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+        for mxid in shared_devices.keys():
+            if num_captures[mxid] >= final_num_captures:
+                end_time = time.time()
+                print(mxid)
+                print("Capture took " + str(end_time - start_time) + " seconds.")
+                save = False
+                print(f"CAPTURE FINISHED with: {num_captures[mxid]} captures")
+                print(f"Capture was {round(num_captures[mxid] / (end_time - start_time), 2)} FPS")
+                capture_ended = True
 
-                            cv2.imshow(f"{mxid} {name}", left)
-                        else:
-                            frame = msg.getCvFrame()
-                else:
-                    for name in q.keys():
-                        if name == "tof_depth":
-                            depthImg: dai.ImgFrame = q[name].get()
-                            depth = depthImg.getFrame()
-                            max_depth = 5 * 1500 # 100MHz modulation freq.
-                            depth_colorized = np.interp(depth, (0, max_depth), (0, 255)).astype(np.uint8)
-                            depth_colorized = cv2.applyColorMap(depth_colorized, cvColorMap)
-                            timestamp = depthImg.getTimestamp().total_seconds()
-                            depth_colorized = cv2.putText(depth_colorized, f"{timestamp} ms", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-                            cv2.imshow(mxid + " tof", depth_colorized)
-                        if name in ["left", "right"]:
-                            left: dai.ImgFrame = q[name].get()
-                            frame = left.getCvFrame()
-                            # Print exposreexpure time and sensitivity to frame
-                            timestamp = left.getTimestamp().total_seconds()
-                            frame = cv2.putText(frame, f"Exp: {left.getExposureTime().total_seconds() * 1e6} us. Sens: {left.getSensitivity()}, ts {timestamp} ms", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-                            cv2.imshow(mxid + " " + name, frame)
-            except Exception as e:
-                print(e)
-                continue
-        if cv2.waitKey(1) == ord('q'):
+        if capture_ended:
             break
