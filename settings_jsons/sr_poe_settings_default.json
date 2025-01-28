@@ -1,5 +1,5 @@
 {
-    "ir": true,
+    "ir": false,
     "ir_value": 1,
     "flood_light": false,
     "flood_light_intensity": 1,
@@ -11,10 +11,10 @@
     "subpixelDisparity": true,
     "subpixelValue": 5,
     "highAccuracy": false,
-    "highDensity": true,
+    "highDensity": false,
 
     "output_settings": {
-        "left": true,
+        "left": false,
         "right": false,
         "left_raw": false,
         "right_raw": false,
@@ -39,6 +39,6 @@
     },
     "medianFilter": "dai.MedianFilter.MEDIAN_OFF",
 
-    "FPS": 30,
+    "FPS": 60,
     "num_captures": 20
 }

@@ -8,9 +8,8 @@ TOF_SOCKET = dai.CameraBoardSocket.CAM_A
 from .oak_stereo_pipeline import set_stereo_node
 
 def set_tof_node(pipeline, settings):
-    # Time-of-Flight (ToF) setup
     tof = pipeline.create(dai.node.ToF)
-    tof.setNumShaves(4)
+    # tof.setNumShaves(4)
 
     # ToF configuration
     tofConfig = tof.initialConfig.get()
@@ -38,6 +37,7 @@ def get_pipeline(settings, frame_syn_num=-1):
         camera.setBoardSocket(socket)
         camera.setResolution(eval("dai.ColorCameraProperties.SensorResolution." + settings["stereoResolution"]))
         camera.setFps(settings["FPS"])
+        if frame_syn_num != -1: camera.initialControl.setAutoExposureLimit(10000)
         return camera
 
     def create_xout_node(stream_name):

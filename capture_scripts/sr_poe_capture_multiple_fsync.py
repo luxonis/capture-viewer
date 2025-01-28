@@ -6,6 +6,8 @@ import contextlib
 import cv2
 import json
 
+print(dai.__version__)
+
 # This can be customized to pass multiple parameters
 from pipelines.oak_tof_pipeline import get_pipeline
 from utils.capture_universal import colorize_depth
@@ -28,10 +30,19 @@ def worker(mxid, stack, devices, settings, num):
             'sync': device.getOutputQueue(name="xout")
         }
     else:
-        devices[mxid] = {
-            'tof_depth': device.getOutputQueue(name="tof_depth"),
-            'left': device.getOutputQueue(name="left")
-        }
+        devices[mxid] = {}
+        output_settings = settings['output_settings']
+        # This code configures output queues for different settings based on the `output_settings` dictionary.
+        if output_settings["tof"]:
+            if output_settings.get("tof_raw", False): devices[mxid]['tof_raw'] = device.getOutputQueue(name="tof_raw")
+            if output_settings.get("tof_depth", False): devices[mxid]['tof_depth'] = device.getOutputQueue(name="tof_depth")
+            if output_settings.get("tof_intensity", False): devices[mxid]['tof_intensity'] = device.getOutputQueue(name="tof_intensity")
+            if output_settings.get("tof_amplitude", False): devices[mxid]['tof_amplitude'] = device.getOutputQueue(name="tof_amplitude")
+
+        if output_settings["depth"]: devices[mxid]['depth'] = device.getOutputQueue(name="depth")
+        if output_settings["left"]: devices[mxid]['left'] = device.getOutputQueue(name="left")
+        if output_settings["right"]: devices[mxid]['right'] = device.getOutputQueue(name="right")
+
 
 import numpy as np
 import time
@@ -40,6 +51,7 @@ cvColorMap[0] = [0, 0, 0]
 
 # https://docs.python.org/3/library/contextlib.html#contextlib.ExitStack
 mxids = ['14442C1091F5D9E700', '14442C10F10AC8D600']
+# mxids = ['14442C1091F5D9E700']
 
 with contextlib.ExitStack() as stack:
     for attempt in range(10):  # try to connect to the correct cameras
@@ -61,14 +73,18 @@ with contextlib.ExitStack() as stack:
     with open(settings_path) as settings_file:
         settings = json.load(settings_file)
 
+    print("Starting threads")
     for i, mxid in enumerate(mxids):
         thread = threading.Thread(target=worker, args=(mxid, stack, devices, settings, i))
         thread.start()
         threads.append(thread)
 
+    print("Waiting for cameras to inicialize")
     for t in threads:
         t.join() # Wait for all threads to finish (to connect to devices)
+    print("Cameras inicialized")
 
+    print("Starting loop...")
     while True:
         for mxid, q in devices.items():
             try:
@@ -115,24 +131,25 @@ with contextlib.ExitStack() as stack:
                         else:
                             frame = msg.getCvFrame()
                 else:
-                    if q['tof_depth'].has():
-                        depthImg: dai.ImgFrame = q['tof_depth'].get()
-                        depth = depthImg.getFrame()
-                        max_depth = 5 * 1500 # 100MHz modulation freq.
-                        depth_colorized = np.interp(depth, (0, max_depth), (0, 255)).astype(np.uint8)
-                        depth_colorized = cv2.applyColorMap(depth_colorized, cvColorMap)
-                        timestamp = depthImg.getTimestamp().total_seconds()
-                        depth_colorized = cv2.putText(depth_colorized, f"{timestamp} ms", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-                        cv2.imshow(mxid + " tof", depth_colorized)
-                    if q['left'].has():
-                        left: dai.ImgFrame = q['left'].get()
-                        frame = left.getCvFrame()
-                        # Print exposreexpure time and sensitivity to frame
-                        timestamp = left.getTimestamp().total_seconds()
-                        frame = cv2.putText(frame, f"Exp: {left.getExposureTime().total_seconds() * 1e6} us. Sens: {left.getSensitivity()}, ts {timestamp} ms", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-                        cv2.imshow(mxid + " left", frame)
-
+                    for name in q.keys():
+                        if name == "tof_depth":
+                            depthImg: dai.ImgFrame = q[name].get()
+                            depth = depthImg.getFrame()
+                            max_depth = 5 * 1500 # 100MHz modulation freq.
+                            depth_colorized = np.interp(depth, (0, max_depth), (0, 255)).astype(np.uint8)
+                            depth_colorized = cv2.applyColorMap(depth_colorized, cvColorMap)
+                            timestamp = depthImg.getTimestamp().total_seconds()
+                            depth_colorized = cv2.putText(depth_colorized, f"{timestamp} ms", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                            cv2.imshow(mxid + " tof", depth_colorized)
+                        if name in ["left", "right"]:
+                            left: dai.ImgFrame = q[name].get()
+                            frame = left.getCvFrame()
+                            # Print exposreexpure time and sensitivity to frame
+                            timestamp = left.getTimestamp().total_seconds()
+                            frame = cv2.putText(frame, f"Exp: {left.getExposureTime().total_seconds() * 1e6} us. Sens: {left.getSensitivity()}, ts {timestamp} ms", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                            cv2.imshow(mxid + " " + name, frame)
             except Exception as e:
                 print(e)
+                continue
         if cv2.waitKey(1) == ord('q'):
             break
