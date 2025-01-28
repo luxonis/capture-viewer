@@ -87,6 +87,7 @@ def get_pipeline(settings, frame_syn_num=-1):
             xinTofConfig.out.link(tof.inputConfig)
 
         if output_settings["depth"]: stereo.depth.link(sync.inputs["depth"])
+        if output_settings["disparity"]: stereo.disparity.link(sync.inputs["disparity"])
         if output_settings["left"]: colorLeft.isp.link(sync.inputs["left"])
         if output_settings["right"]: colorRight.isp.link(sync.inputs["right"])
 
@@ -102,6 +103,7 @@ def get_pipeline(settings, frame_syn_num=-1):
         xout_tof_amplitude = create_xout_node("tof_amplitude")
 
         xout_depth = create_xout_node("depth")
+        xout_disparity = create_xout_node("disparity")
         xout_left = create_xout_node("left")
         xout_right = create_xout_node("right")
         
@@ -116,6 +118,7 @@ def get_pipeline(settings, frame_syn_num=-1):
             xinTofConfig.out.link(tof.inputConfig)
     
         if output_settings["depth"]: stereo.depth.link(xout_depth.input)
+        if output_settings["disparity"]: stereo.disparity.link(xout_disparity.input)
         if output_settings["left"]: colorLeft.isp.link(xout_left.input)
         if output_settings["right"]: colorRight.isp.link(xout_right.input)
 

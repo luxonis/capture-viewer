@@ -9,7 +9,6 @@ import argparse
 
 from pipelines.oak_tof_pipeline import get_pipeline
 from utils.capture_universal import parseArguments, initialize_capture, colorize_depth
-from utils.frame_saving import save_frames
 
 # Get the directory where the script is located and choose it as the destination for DATA folder
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -17,6 +16,9 @@ root_path = os.path.join(os.path.dirname(script_dir), 'DATA')
 
 
 if __name__ == "__main__":
+    print("This script is not fully compatible with all settings, use sr_poe_multiple_fsync.py, but specify only one device for the same functionality")
+    print("Exiting script")
+    exit(0)
     settings_path, view_name, device_info, autostart = parseArguments()
 
     with open(settings_path, 'r') as file:
@@ -49,9 +51,6 @@ if __name__ == "__main__":
         save = False
         num_captures = 0
 
-        tof_raw_frame = None
-        tof_depth_frame = None
-
         start_time = time.time()
         while True:
             if autostart >= -1:
@@ -65,13 +64,10 @@ if __name__ == "__main__":
             msgGrp = queue.get()
             if save: num_captures += 1
             for name, msg in msgGrp:
+                timestamp = int(msg.getTimestamp().total_seconds() * 1000)
+                frame = msg.getCvFrame()
                 if save:
-                    timestamp = int(msg.getTimestamp().total_seconds() * 1000)
-                    frame = msg.getCvFrame()
-                    save_output = save_frames(out_dir, timestamp, name, frame, tof_depth_frame, tof_raw_frame)
-                    tof_depth_frame, tof_raw_frame = save_output["tof_depth_frame"], save_output["tof_raw_frame"]
-                else:
-                    frame = msg.getCvFrame()
+                    np.save(f'{out_dir}/{name}_{timestamp}.npy', frame)
 
                 # visuzalize frames
                 if name == "tof_amplitude":
@@ -86,7 +82,7 @@ if __name__ == "__main__":
                 elif name == "tof_depth":
                     tof_depth_colorized = colorize_depth(frame)
                     cv2.imshow(name, tof_depth_colorized)
-                elif name in ["left", "right_rgb"]:
+                elif name in ["left", "right"]:
                     cv2.imshow(name, frame)
                 else:
                     frame = msg.getCvFrame()

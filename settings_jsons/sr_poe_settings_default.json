@@ -10,8 +10,8 @@
     "extendedDisparity": true,
     "subpixelDisparity": true,
     "subpixelValue": 5,
-    "highAccuracy": false,
-    "highDensity": false,
+    "profilePreset" : "DEFAULT",
+    "use_filter_settings" : false,
 
     "output_settings": {
         "left": false,
