@@ -14,3 +14,12 @@ example usage:
 ```bash
  python capture_scripts/sr_poe_capture_multiple_fsync.py /home/katka/PycharmProjects/capture-viewer/settings_jsons/sr_poe_settings_default.json view --devices 14442C1091F5D9E700 14442C10F10AC8D600
 ```
+
+
+This universal script works for OAKs stereo and OAK-D-SR-POE
+
+without devices it will just connect the first available device
+
+```bash
+python capture_scripts/oak_capture_universal.py default 3_cameras --devices 19443010A15BA12E00 1944301081DE992E00 194430104100A22E00
+```

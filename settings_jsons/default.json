@@ -15,10 +15,11 @@
         "right": true,
         "left_raw": false,
         "right_raw": false,
-        "rgb": false,
+        "rgb": true,
         "rgb_png": false,
-        "depth": true,
-        "disparity": true
+        "depth": false,
+        "disparity": false,
+        "sync": true
     },
     "LRcheck": true,
     "extendedDisparity": false,

@@ -55,10 +55,10 @@ def initialize_capture(root_path, device, settings_path, view_name):
     return out_dir
 
 
-def finalise_capture(start_time, end_time, num_captures):
+def finalise_capture(start_time, end_time, num_captures, streams):
     print("Capture took " + str(end_time - start_time) + " seconds.")
-    print(f"CAPTURE FINISHED with: {num_captures} captures")
-    print(f"Capture was {round(num_captures / (end_time - start_time), 2)} FPS")
+    print(f"Saved {num_captures} frames combined from all streams")
+    print(f"Capture was {round((num_captures/len(streams)) / (end_time - start_time), 2)} FPS")
 
 def parseArguments():
     # PARSE ARGUMENTS

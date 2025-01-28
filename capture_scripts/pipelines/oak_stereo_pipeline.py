@@ -121,7 +121,7 @@ def get_pipeline(settings):
         stereo.disparity.link(sync.inputs["disparity"])
         max_disparity = stereo.initialConfig.getMaxDisparity()
     if output_settings["rgb"] or output_settings["rgb_png"]:
-        color.isp.link(sync.inputs["isp"])
+        color.isp.link(sync.inputs["rgb"])
     if output_settings["depth"]:
         stereo.depth.link(sync.inputs["depth"])
         stereo.syncedLeft.link(sync.inputs["left"])
@@ -147,8 +147,9 @@ def get_pipeline(settings):
     # controlIn.out.link(monoLeft.inputControl)
 
     pipeline_output = {
-        'pipeline': pipeline,
-        'max_disparity': max_disparity,
+        'pipeline': pipeline
     }
+
+    if output_settings["disparity"]: pipeline_output["disparity"] = max_disparity
 
     return pipeline_output
