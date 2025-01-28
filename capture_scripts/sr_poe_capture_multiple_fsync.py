@@ -6,14 +6,13 @@ import contextlib
 import cv2
 import json
 import os
-
-from matplotlib.pyplot import autoscale
+import argparse
 
 print(dai.__version__)
 
 # This can be customized to pass multiple parameters
 from pipelines.oak_tof_pipeline import get_pipeline
-from utils.capture_universal import colorize_depth, parseArguments, initialize_capture
+from utils.capture_universal import colorize_depth, initialize_capture
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 root_path = os.path.join(os.path.dirname(script_dir), 'DATA')
@@ -25,6 +24,31 @@ def count_output_streams(output_streams):
         if output_streams[item]:
             stream_names.append(item)
     return stream_names
+
+def parseArguments():
+    # PARSE ARGUMENTS
+    parser = argparse.ArgumentParser()
+    # Mandatory arguments
+    parser.add_argument("settings_file_path", help="Path to settings JSON")
+    parser.add_argument("view_name", help="What part of the scene the camera is looking at")
+    parser.add_argument("--autostart", default=-1, type=int, help='Automatically start capturing after given number of frames (-1 to disable)')
+    parser.add_argument("--devices", dest="mxids", nargs="+", help="MXIDS of devices to connect to")
+
+    args = parser.parse_args()
+    settings_path = args.settings_file_path
+    view_name = args.view_name
+
+    # SETTINGS loading
+    if not os.path.exists(settings_path):
+        settings_path_1 = f"settings_jsons/{settings_path}.json"
+        settings_path_2 = f"settings_jsons/{settings_path}"
+        if os.path.exists(settings_path_1):
+            settings_path = settings_path_1
+        elif os.path.exists(settings_path_2):
+            settings_path = settings_path_2
+        else: raise FileNotFoundError(f"Settings file '{settings_path}' does not exist.")
+
+    return settings_path, view_name, args.mxids, args.autostart
 
 def worker(mxid, stack, devices, settings, num, shared_devices):
     openvino_version = dai.OpenVINO.Version.VERSION_2021_4
@@ -65,9 +89,12 @@ import time
 cvColorMap = cv2.applyColorMap(np.arange(256, dtype=np.uint8), cv2.COLORMAP_JET)
 cvColorMap[0] = [0, 0, 0]
 
-# https://docs.python.org/3/library/contextlib.html#contextlib.ExitStack
-mxids = ['14442C1091F5D9E700', '14442C10F10AC8D600']
-# mxids = ['14442C1091F5D9E700']
+settings_path, view_name, mxids, autostart = parseArguments()
+
+# mxids = ['14442C1091F5D9E700', '14442C10F10AC8D600']
+# settings_path = '/home/katka/PycharmProjects/capture-viewer/settings_jsons/sr_poe_settings_default.json'
+# autostart = -1
+# view_name = "name"
 
 with contextlib.ExitStack() as stack:
     for attempt in range(10):  # try to connect to the correct cameras
@@ -87,12 +114,6 @@ with contextlib.ExitStack() as stack:
     output_folders = {}
     num_captures = {}
     threads = []
-
-    # settings_path, view_name, device_info, autostart = parseArguments()
-
-    settings_path = '/home/katka/PycharmProjects/capture-viewer/settings_jsons/sr_poe_settings_default.json'
-    autostart = -1
-    view_name = "name"
 
     with open(settings_path) as settings_file:
         settings = json.load(settings_file)
@@ -147,7 +168,6 @@ with contextlib.ExitStack() as stack:
                         np.save(f'{output_folders[mxid]}/{name}_{timestamp}.npy', frame)
                         num_captures[mxid] += 1
 
-                    # visuzalize frames
                     if name == "tof_amplitude":
                         depth_vis = (frame * 255 / frame.max()).astype(np.uint8)
                         depth_vis = cv2.applyColorMap(depth_vis, cv2.COLORMAP_JET)
@@ -183,21 +203,21 @@ with contextlib.ExitStack() as stack:
                         np.save(f'{output_folders[mxid]}/{name}_{timestamp}.npy', frame)
                         num_captures[mxid] += 1
                     if name == "tof_depth":
-                        # depthImg: dai.ImgFrame = q[name].get()
-                        # depth = depthImg.getFrame()
                         max_depth = 5 * 1500 # 100MHz modulation freq.
-                        depth_colorized = np.interp(frame, (0, max_depth), (0, 255)).astype(np.uint8)
-                        depth_colorized = cv2.applyColorMap(depth_colorized, cvColorMap)
-                        # timestamp = depthImg.getTimestamp().total_seconds()
+                        depth_colorized = colorize_depth(frame, min_depth=0, max_depth=max_depth)
                         depth_colorized = cv2.putText(depth_colorized, f"{timestamp} ms", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-                        cv2.imshow(mxid + " tof", depth_colorized)
-                    if name in ["left", "right"]:
-                        # left: dai.ImgFrame = q[name].get()
-                        # frame = left.getCvFrame()
-                        # Print exposreexpure time and sensitivity to frame
-                        # timestamp = left.getTimestamp().total_seconds()
+                        cv2.imshow(f"{mxid} {name}", depth_colorized)
+                    elif name in ["left", "right"]:
                         frame = cv2.putText(frame, f"{timestamp} ms", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
                         cv2.imshow(mxid + " " + name, frame)
+                    elif name == "tof_amplitude":
+                        amplitude_colorized = colorize_depth(frame, min_depth=0, max_depth=frame.max())
+                        amplitude_colorized = cv2.putText(amplitude_colorized, f"{timestamp} ms", (10, 30),
+                                                      cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                        cv2.imshow(f"{mxid} {name}", amplitude_colorized)
+                    elif name == "tof_intensity":
+                        cv2.imshow(f"{mxid} {name}", frame)
+
 
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'): break
