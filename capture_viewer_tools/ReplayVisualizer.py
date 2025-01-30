@@ -54,7 +54,7 @@ class ReplayVisualizer:
             'original_json_label' : tk.Label(),
         }
 
-    def create_layout(self):
+    def create_layout_old(self):
         def show_pointcloud():
             if self.pcl_path is None: return False
             script_directory = os.path.dirname(os.path.abspath(__file__))
@@ -118,7 +118,50 @@ class ReplayVisualizer:
         self.image_labels['difference_img_label'] = difference_img_label
         self.image_labels['original_json_label'] = original_json_label
         self.image_labels['generated_json_label'] = generated_json_label
-    def refresh_display(self, label=None):
+
+    def create_layout(self):
+        def show_pointcloud():
+            if self.pcl_path is None: return False
+            script_directory = os.path.dirname(os.path.abspath(__file__))
+            visualize_pointcloud_path = os.path.join(script_directory, 'visualize_pointcloud.py')
+            subprocess.Popen(['python', visualize_pointcloud_path, self.pcl_path, str(self.config_json)])  # o3d.visualization.draw_geometries([pointcloud])
+            time.sleep(1)
+
+        generated_depth_text_label = tk.Label(self.window, text="Generated Depth", font=("Arial", 12, "bold"))
+        generated_depth_text_label.grid(row=0, column=1, padx=10, pady=(10, 0), sticky="nsew")
+
+        generated_img_label = tk.Label(self.window)
+        generated_img_label.grid(row=1, column=1, padx=10, pady=10)
+
+        # JSON data for each depth image
+        original_settings = self.view_info["metadata"]["settings"]
+        generated_settings = self.view_info["metadata"].get("config2settings", {})
+        original_json_str = json.dumps(original_settings, indent=4)
+        generated_json_str = json.dumps(generated_settings, indent=4)
+
+        # Generated Settings Label (dynamically updated)
+        generated_json_label = tk.Label(
+            self.window,
+            text=generated_json_str,
+            bg="white",
+            fg="black",
+            font=("Courier", 8),
+            justify="left",
+            anchor="nw"
+        )
+        generated_json_label.grid(row=2, column=1, padx=10, pady=10, sticky="nsew")
+
+        # Assign the wrapper function to the button command
+        settings_button = tk.Button(self.window, text="Settings", command=self.open_settings_get_config)
+        settings_button.grid(row=1, column=2)
+        # Assign the wrapper function to the button command
+        pointcloud_button = tk.Button(self.window, text="Pointcloud", command=show_pointcloud)
+        pointcloud_button.grid(row=1, column=2, pady=(50, 0))
+
+        self.image_labels['generated_img_label'] = generated_img_label
+        self.image_labels['generated_json_label'] = generated_json_label
+
+    def refresh_display_old(self, label=None):
         print("Refresh display:", label)
         if self.generated_depth is None:
             colorized_generated_depth = create_placeholder_frame(self.scaled_original_size, label)
@@ -126,13 +169,17 @@ class ReplayVisualizer:
             range_min, range_max = 0, 0
         else:
             _, range_min, range_max = colorize_depth(self.generated_depth, type="depth", label=0)
-            if self.generated_depth.shape != self.depth.shape:  # decimation filter downsamples, this upsamples
-                if self.depth.shape != self.generated_depth.shape:
-                    height, width = self.depth.shape
-                    self.generated_depth = cv2.resize(self.generated_depth, (width, height),
-                                                      interpolation=cv2.INTER_NEAREST)
-            depth_difference = np.abs(self.depth - self.generated_depth)
-            colorized_difference, _, _ = colorize_depth(depth_difference, type="difference", label=0)
+            try:
+                if self.generated_depth.shape != self.depth.shape:  # decimation filter downsamples, this upsamples
+                    if self.depth.shape != self.generated_depth.shape:
+                        height, width = self.depth.shape
+                        self.generated_depth = cv2.resize(self.generated_depth, (width, height),
+                                                          interpolation=cv2.INTER_NEAREST)
+                depth_difference = np.abs(self.depth - self.generated_depth)
+                colorized_difference, _, _ = colorize_depth(depth_difference, type="difference", label=0)
+            except ValueError:
+                colorized_difference = np.zeros_like(self.generated_depth)
+                print("Depth shape problems, not calculating difference")
 
         # Update images
         # update original depth
@@ -169,6 +216,25 @@ class ReplayVisualizer:
         generated_settings = self.view_info["metadata"].get("config2settings", {})
         generated_json_str = json.dumps(generated_settings, indent=4)
         self.image_labels['generated_json_label'].configure(text=generated_json_str)
+
+    def refresh_display(self, label=None):
+        print("Refresh display:", label)
+        if self.generated_depth is None:
+            colorized_generated_depth = create_placeholder_frame(self.scaled_original_size, label)
+        else:
+            colorized_generated_depth, range_min, range_max = colorize_depth(self.generated_depth, type="depth", label=0)
+        # update generated depth
+        resized_generated_depth = cv2.resize(colorized_generated_depth, self.scaled_original_size,
+                                             interpolation=cv2.INTER_AREA)
+        im_generated = ImageTk.PhotoImage(image=Image.fromarray(resized_generated_depth))
+        self.image_labels['generated_img_label'].configure(image=im_generated)
+        self.image_labels['generated_img_label'].image = im_generated
+
+        # Update settings labels
+        generated_settings = self.view_info["metadata"].get("config2settings", {})
+        generated_json_str = json.dumps(generated_settings, indent=4)
+        self.image_labels['generated_json_label'].configure(text=generated_json_str)
+
     def get_output_folder(self):
         def compare_json(file_path, json_data):
             """
@@ -223,7 +289,7 @@ class ReplayVisualizer:
                         break
         return self.already_generated, self.output_folder
 
-    def generate_save_depth_replay(self, output_folder=None):
+    def generate_save_depth_replay_one_frame(self, output_folder=None):
         print("Generating NEW outputs...")
         if output_folder is not None:
             output_folder = output_folder
@@ -237,6 +303,18 @@ class ReplayVisualizer:
         color = self.current_view["isp"]
         config = self.config_json
         calib = self.view_info["calib"]
+
+        if left is None or right is None:
+            print("No left or right frames provided, closing replay")
+            return
+
+        if calib is None:
+            print("No calibration provided, closing replay")
+            return
+
+        if color is None:
+            print("No color specified")
+            color = left
 
         # old version which doesnt work for decimation filter
         # replayed = next(
@@ -287,6 +365,94 @@ class ReplayVisualizer:
         np.save(os.path.join(output_folder, f"depth_{timestep}.npy"), self.generated_depth)
         cv2.imwrite(os.path.join(output_folder, f"depth_{timestep}.png"), self.generated_depth)
         o3d.io.write_point_cloud(os.path.join(output_folder, f"pcl_{timestep}.ply"), pcd)
+
+        with open(os.path.join(output_folder, f'config.json'), 'w') as f:
+            json.dump(config, f, indent=4)
+
+        print("GENERATED")
+        return output_folder
+
+    def generate_save_depth_replay(self, output_folder=None):
+        def load_all_frames(data, timestamps):
+            frames = {}
+            for timestamp in timestamps:
+                frames[timestamp] = {}
+                images = data[timestamp]
+                image_path = images['left']
+                frames[timestamp]['left'] = np.load(image_path)
+                image_path = images['right']
+                frames[timestamp]['right'] = np.load(image_path)
+                if 'isp' not in images:
+                    continue
+                image_path = images['isp']
+                frames[timestamp]['isp'] = np.load(image_path)
+            return frames
+
+        def process_pointcloud(pcl, depth, color=None):
+            pcl[:, 0] = -pcl[:, 0]  # switch because it goes wrong from the camera
+            pcl = rotate_pointcloud(pcl, 180, axis="y")
+
+            pcd = o3d.geometry.PointCloud()
+            pcd.points = o3d.utility.Vector3dVector(pcl)
+
+            if color is not None and config['stereo.setDepthAlign'] == "dai.CameraBoardSocket.CAM_A":
+                # Resize `isp_frame` to match the number of points
+                isp_height, isp_width, _ = color.shape
+                # Calculate the target dimensions
+                target_height = depth.shape[0]
+                target_width = depth.shape[1]
+
+                # Resize and reshape the ISP frame
+                aligned_isp_frame = cv2.resize(color, (target_width, target_height))
+                aligned_isp_frame = cv2.cvtColor(aligned_isp_frame, cv2.COLOR_BGR2RGB)
+                aligned_colors = aligned_isp_frame.reshape(-1, 3)
+
+                pcd.colors = o3d.utility.Vector3dVector(aligned_colors / 255.0)  # Normalize to [0, 1]
+            return pcd
+
+        if output_folder is not None:
+            output_folder = output_folder
+        else:
+            date_time = datetime.now().strftime("%Y%m%d%H%M%S")
+            output_folder = os.path.join(self.output_dir, date_time)
+            os.makedirs(output_folder, exist_ok=False)
+
+        print("Generating NEW outputs for the whole folder")
+        print("Lading data for generation")
+        timestamps = self.view_info['timestamps']
+        data = self.view_info['data']
+        config = self.config_json
+        calib = self.view_info["calib"]
+        if calib is None: raise ValueError("No calibration provided")
+
+        batch_size = 40
+
+        for batch in range(0, len(timestamps), batch_size):
+            frames = load_all_frames(data, timestamps[batch:batch + batch_size])
+            print("Processing by batches:", len(frames))
+
+            # sending first frame twice because it used to cause some error when using decimation filter
+            batch_frames = ([(frames[timestamps[batch]]["left"], frames[timestamps[batch]]["right"], frames[timestamps[batch]].get("isp", frames[timestamps[batch]]["left"]))] +
+                            [(frames[t]["left"], frames[t]["right"], frames[t].get("isp", frames[t]["left"]))
+                            for t in timestamps[batch:batch + batch_size]])
+            replayed = tuple(replay(
+                tuple(batch_frames),
+                outputs={'depth', 'pcl'},
+                calib=calib,
+                stereo_config=json.dumps(config)
+            ))
+
+            for i in range(1, len(batch_frames)): # dropping first frame as incorrectly processed
+                depth = replayed[i]['depth']
+                pcl = replayed[i]['pcl']
+                timestamp = timestamps[batch + i - 1] # i starts at one for batch frames to skip double but there is no double for frames
+                pcl = process_pointcloud(pcl, depth, frames[timestamp].get("isp", None))
+
+                timestamp = timestamp.split(".npy")[0]
+                np.save(os.path.join(output_folder, f"depth_{timestamp}.npy"), depth)
+                colorized_depth, _, _ = colorize_depth(depth, "depth", label=False, min_val=0, max_val=7000)
+                cv2.imwrite(os.path.join(output_folder, f"depth_{timestamp}.png"), colorized_depth)
+                o3d.io.write_point_cloud(os.path.join(output_folder, f"pcl_{timestamp}.ply"), pcl)
 
         with open(os.path.join(output_folder, f'config.json'), 'w') as f:
             json.dump(config, f, indent=4)
