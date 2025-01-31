@@ -21,9 +21,21 @@ from depth.replay_depth import replay
 
 class ReplayVisualizer:
     def __init__(self, root, view_info, current_view):
-        self.window = tk.Toplevel(root)
-        self.window.title("Depth Visualization")
-        self.window.geometry("2200x1200")
+        self.toplLevel = tk.Toplevel(root)
+        self.toplLevel.title("Depth Visualization")
+        self.toplLevel.geometry("2200x1200")
+
+        self.main_frame = tk.Frame(self.toplLevel)
+        self.main_frame.pack(fill="both", expand=True)
+
+        self.generated_depth_frame = tk.Frame(self.main_frame)
+        self.generated_depth_frame.grid(row=0, column=0, padx=5, pady=5, sticky='nsew')
+
+        self.settings_frame_custom = tk.Frame(self.main_frame)
+        self.settings_frame_custom.grid(row=1, column=0, padx=5, pady=5, sticky='nsew')
+
+        self.settings_frame = tk.Frame(self.main_frame)
+        self.settings_frame.grid(row=1, column=1, padx=5, pady=5, sticky='nsew')
 
         max_image_width = 640
         max_image_height = 400
@@ -62,18 +74,18 @@ class ReplayVisualizer:
             subprocess.Popen(['python', visualize_pointcloud_path, self.pcl_path, str(self.config_json)])  # o3d.visualization.draw_geometries([pointcloud])
             time.sleep(1)
 
-        capture_depth_text_label = tk.Label(self.window, text="Capture Depth", font=("Arial", 12, "bold"))
+        capture_depth_text_label = tk.Label(self.main_frame, text="Capture Depth", font=("Arial", 12, "bold"))
         capture_depth_text_label.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="nsew")
-        generated_depth_text_label = tk.Label(self.window, text="Generated Depth", font=("Arial", 12, "bold"))
+        generated_depth_text_label = tk.Label(self.main_frame, text="Generated Depth", font=("Arial", 12, "bold"))
         generated_depth_text_label.grid(row=0, column=1, padx=10, pady=(10, 0), sticky="nsew")
-        difference_depth_text_label = tk.Label(self.window, text="Difference", font=("Arial", 12, "bold"))
+        difference_depth_text_label = tk.Label(self.main_frame, text="Difference", font=("Arial", 12, "bold"))
         difference_depth_text_label.grid(row=0, column=3, padx=10, pady=(10, 0), sticky="nsew")
 
-        original_img_label = tk.Label(self.window)
+        original_img_label = tk.Label(self.main_frame)
         original_img_label.grid(row=1, column=0, padx=10, pady=10)
-        generated_img_label = tk.Label(self.window)
+        generated_img_label = tk.Label(self.main_frame)
         generated_img_label.grid(row=1, column=1, padx=10, pady=10)
-        difference_img_label = tk.Label(self.window)
+        difference_img_label = tk.Label(self.main_frame)
         difference_img_label.grid(row=1, column=3, padx=10, pady=10)
 
         # JSON data for each depth image
@@ -84,7 +96,7 @@ class ReplayVisualizer:
 
         # Display Original Settings
         original_json_label = tk.Label(
-            self.window,
+            self.main_frame,
             text=original_json_str,
             bg="white",
             fg="black",
@@ -96,7 +108,7 @@ class ReplayVisualizer:
 
         # Generated Settings Label (dynamically updated)
         generated_json_label = tk.Label(
-            self.window,
+            self.main_frame,
             text=generated_json_str,
             bg="white",
             fg="black",
@@ -107,10 +119,10 @@ class ReplayVisualizer:
         generated_json_label.grid(row=2, column=1, padx=10, pady=10, sticky="nsew")
 
         # Assign the wrapper function to the button command
-        settings_button = tk.Button(self.window, text="Settings", command=self.open_settings_get_config)
+        settings_button = tk.Button(self.main_frame, text="Settings", command=self.open_settings_get_config)
         settings_button.grid(row=1, column=2)
         # Assign the wrapper function to the button command
-        pointcloud_button = tk.Button(self.window, text="Pointcloud", command=show_pointcloud)
+        pointcloud_button = tk.Button(self.main_frame, text="Pointcloud", command=show_pointcloud)
         pointcloud_button.grid(row=1, column=2, pady=(50, 0))
 
         self.image_labels['generated_img_label'] = generated_img_label
@@ -127,10 +139,10 @@ class ReplayVisualizer:
             subprocess.Popen(['python', visualize_pointcloud_path, self.pcl_path, str(self.config_json)])  # o3d.visualization.draw_geometries([pointcloud])
             time.sleep(1)
 
-        generated_depth_text_label = tk.Label(self.window, text="Generated Depth", font=("Arial", 12, "bold"))
+        generated_depth_text_label = tk.Label(self.generated_depth_frame, text="Generated Depth", font=("Arial", 12, "bold"))
         generated_depth_text_label.grid(row=0, column=1, padx=10, pady=(10, 0), sticky="nsew")
 
-        generated_img_label = tk.Label(self.window)
+        generated_img_label = tk.Label(self.generated_depth_frame)
         generated_img_label.grid(row=1, column=1, padx=10, pady=10)
 
         # JSON data for each depth image
@@ -141,7 +153,7 @@ class ReplayVisualizer:
 
         # Generated Settings Label (dynamically updated)
         generated_json_label = tk.Label(
-            self.window,
+            self.settings_frame,
             text=generated_json_str,
             bg="white",
             fg="black",
@@ -152,10 +164,10 @@ class ReplayVisualizer:
         generated_json_label.grid(row=2, column=1, padx=10, pady=10, sticky="nsew")
 
         # Assign the wrapper function to the button command
-        settings_button = tk.Button(self.window, text="Settings", command=self.open_settings_get_config)
+        settings_button = tk.Button(self.generated_depth_frame, text="Settings", command=self.open_settings_get_config)
         settings_button.grid(row=1, column=2)
         # Assign the wrapper function to the button command
-        pointcloud_button = tk.Button(self.window, text="Pointcloud", command=show_pointcloud)
+        pointcloud_button = tk.Button(self.generated_depth_frame, text="Pointcloud", command=show_pointcloud)
         pointcloud_button.grid(row=1, column=2, pady=(50, 0))
 
         self.image_labels['generated_img_label'] = generated_img_label
@@ -463,7 +475,7 @@ class ReplayVisualizer:
 
     def load_or_generate(self):
         self.refresh_display(label="Loading...")
-        self.window.update_idletasks()
+        self.main_frame.update_idletasks()
         current_timestamp = self.view_info['timestamps'][self.view_info['current_index']]
         already_generated, self.output_folder = self.get_output_folder()
         if not already_generated:
@@ -473,7 +485,7 @@ class ReplayVisualizer:
         self.pcl_path = os.path.join(self.output_folder, f"pcl_{current_timestamp.split('.npy')[0]}.ply")
         self.refresh_display(label="Updated")
         self.settings_received = False  # Reset after processing
-        self.window.update_idletasks()
+        self.main_frame.update_idletasks()
 
     def open_settings_get_config(self):
         def config_add_depthai(config_json):
@@ -488,7 +500,7 @@ class ReplayVisualizer:
             return new_config
 
         config_json = {}
-        sucess = open_replay_settings_screen(config_json, original_config=self.view_info['metadata']['settings'])  # Call open_popup and capture the returned JSON
+        sucess = open_replay_settings_screen(self.settings_frame_custom, config_json, original_config=self.view_info['metadata']['settings'])  # Call open_popup and capture the returned JSON
         print("\nSelected config_json:", config_json)
         # config_json = str(config_json)
         if not sucess:

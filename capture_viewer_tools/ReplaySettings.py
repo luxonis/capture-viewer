@@ -80,7 +80,7 @@ def get_filter_order_back(order_string):
     return result
 
 
-def open_replay_settings_screen(config, original_config=None):
+def open_replay_settings_screen(frame, config, original_config=None):
     global last_config
     def update_label(var, label, form="int"):
         """Update the label when slider is moved."""
@@ -192,9 +192,6 @@ def open_replay_settings_screen(config, original_config=None):
         config = tkinter_settings_to_config(config)
         last_config = config
 
-        popup_window.destroy()
-        popup_window1.destroy()
-
 
     if last_config is None and original_config is not None:
         current_config = settings2config(original_config)
@@ -205,9 +202,11 @@ def open_replay_settings_screen(config, original_config=None):
 
     # -------------------------------------------------------- INITIAL SETTINGS ------------------------------------------------
     # Create the pop-up window
-    popup_window1 = tk.Toplevel()
-    popup_window1.title("Replay settings")
-    popup_window1.geometry("1000x900")
+    # popup_window1 = tk.Toplevel()
+    # popup_window1.title("Replay settings")
+    # popup_window1.geometry("1000x900")
+
+    popup_window1 = frame
 
     # Create a canvas and a scrollbar
     canvas = tk.Canvas(popup_window1)
