@@ -29,6 +29,9 @@ default_config = {
     'cfg.postProcessing.spatialFilter.numIterations': 1,
     'cfg.postProcessing.spatialFilter.alpha': 0.5,
     'cfg.postProcessing.spatialFilter.delta': 3,
+    'cfg.postProcessing.temporalFilter.enable': False,
+    'cfg.postProcessing.temporalFilter.alpha': 0.5,
+    'cfg.postProcessing.temporalFilter.delta': 3,
     'cfg.postProcessing.thresholdFilter.enable': False,
     'cfg.postProcessing.thresholdFilter.minRange': 0,
     'cfg.postProcessing.thresholdFilter.maxRange': 65535,
@@ -85,107 +88,112 @@ def open_replay_settings_screen(config, original_config=None):
             label.config(text=str(int(var.get())))
         elif form == "float":
             label.config(text=str(round(float(var.get()), 1)))
-    def on_generate():
+    def on_generate(config):
         global last_config
+        def tkinter_settings_to_config(config):
+            if not custom_settings_val.get():
+                config['stereo.setDepthAlign'] = depth_align.get()
+                if profile_preset.get() != 'None':
+                    config['stereo.setDefaultProfilePreset'] = profile_preset.get()
 
-        if not custom_settings_val.get():
+                popup_window.destroy()
+                popup_window1.destroy()
+                return config
+
+            if filtering_order_enable.get(): # needs to be the first item for the config to not be initialised in case of wrong filtering order
+                if not check_valid_filtering_order([decimation_order.get(), median_order.get(), speckle_order.get(), spatial_order.get(), temporal_order.get()]):
+                    warning()
+                    return config
+                else:
+                    config['cfg.postProcessing.filteringOrder'] = get_filter_order(decimation_order.get(), median_order.get(), speckle_order.get(), spatial_order.get(), temporal_order.get())
+
             config['stereo.setDepthAlign'] = depth_align.get()
             if profile_preset.get() != 'None':
                 config['stereo.setDefaultProfilePreset'] = profile_preset.get()
+            config['stereo.setRectification'] = rectificationBox_val.get()
+            config['stereo.setLeftRightCheck'] = LRBox_val.get()
 
-            popup_window.destroy()
-            popup_window1.destroy()
-            last_config = config
+            config['stereo.setExtendedDisparity'] = extendedBox_val.get()
+            config['stereo.setSubpixel'] = subpixelBox_val.get()
+
+            if subpixelBox_val.get():
+                config['stereo.setSubpixelFractionalBits'] = fractional_bits_combo.get()
+
+
+            # FILTERS
+
+            if median_filter_enable.get():
+                config['stereo.initialConfig.setMedianFilter'] = median_val.get()
+            else:
+                config['stereo.initialConfig.setMedianFilter'] = "MedianFilter.MEDIAN_OFF"
+
+            # Bilateral filter
+            # todo - [1944301021AA992E00] [1.2.2] [9.439] [StereoDepth(2)] [warning] Bilateral filter is deprecated!
+            # config['cfg.postProcessing.bilateralSigmaValue'] = bilateral_sigma_val.get()
+            # if bilateral_filter_enable.get():
+            #     # is this all settings?
+            #     pass
+
+            # Brightness filter
+            if brightness_filter_enable.get():  # todo can we disable brightness filter?
+                config['cfg.postProcessing.brightnessFilter.maxBrightness'] = max_brightness_slider.get()
+                config['cfg.postProcessing.brightnessFilter.minBrightness'] = min_brightness_slider.get()
+
+            # Speckle filter
+            config['cfg.postProcessing.speckleFilter.enable'] = speckle_filter_enable.get()
+            if speckle_filter_enable.get():
+                config['cfg.postProcessing.speckleFilter.speckleRange'] = speckle_range_slider.get()
+                config['cfg.postProcessing.speckleFilter.differenceThreshold'] = speckle_difference_threshold.get()
+
+            # Spacial filter
+            config['cfg.postProcessing.spatialFilter.enable'] = spatial_filter_enable.get()
+            if spatial_filter_enable.get():
+                config['cfg.postProcessing.spatialFilter.holeFillingRadius'] = hole_filling_radius_slider.get()
+                config['cfg.postProcessing.spatialFilter.numIterations'] = num_iterations_slider.get()
+                config['cfg.postProcessing.spatialFilter.alpha'] = alpha_slider.get()
+                config['cfg.postProcessing.spatialFilter.delta'] = delta_slider.get()
+
+            # Temporal filter
+            config['cfg.postProcessing.temporalFilter.enable'] = temporal_filter_enable.get()
+            if temporal_filter_enable.get():
+                config['cfg.postProcessing.temporalFilter.alpha'] = temporal_alpha_slider.get()
+                config['cfg.postProcessing.temporalFilter.delta'] = temporal_delta_slider.get()
+
+            # Threshold filter
+            if threshold_filter_enable.get():  # todo same as brightness filter
+                config['cfg.postProcessing.thresholdFilter.minRange'] = min_range_val.get()
+                config['cfg.postProcessing.thresholdFilter.maxRange'] = max_range_val.get()
+
+            # Decimation filter
+            config['cfg.postProcessing.decimationFilter.decimationFactor'] = decimation_factor_val.get()
+            if decimation_filter_enable.get():  # todo decimation filter has no attribute enable
+                config['cfg.postProcessing.decimationFilter.decimationFactor'] = decimation_factor_val.get()
+                config['cfg.postProcessing.decimationFilter.decimationMode'] = handle_dict(decimation_mode_val.get(), decimation_set_dict)  # leave this is correct
+
+
+            # ADVANCED SETTINGS
+            if advanced_settings_enable.get():
+                config["cfg.censusTransform.kernelSize"] = handle_dict(CT_kernel_val.get(), CT_kernel_dict)
+                config["cfg.censusTransform.enableMeanMode"] = mean_mode_enable.get()
+                config["cfg.censusTransform.threshold"] = CT_threshold_val.get()
+
+                config["cfg.costAggregation.divisionFactor"] = division_factor_val.get()
+                config["cfg.costAggregation.horizontalPenaltyCostP1"] = horizontal_penalty_p1_val.get()
+                config["cfg.costAggregation.horizontalPenaltyCostP2"] = horizontal_penalty_p2_val.get()
+                config["cfg.costAggregation.verticalPenaltyCostP1"] = vertical_penalty_p1_val.get()
+                config["cfg.costAggregation.verticalPenaltyCostP2"] = vertical_penalty_p2_val.get()
+
+                config["cfg.costMatching.confidenceThreshold"] = confidence_threshold_val.get()
+                config["cfg.costMatching.linearEquationParameters.alpha"] = CM_alpha_val.get()
+                config["cfg.costMatching.linearEquationParameters.beta"] = CM_beta_val.get()
+                config["cfg.costMatching.linearEquationParameters.threshold"] = matching_threshold_val.get()
             return config
 
-        if filtering_order_enable.get(): # needs to be the first item for the config to not be initialised in case of wrong filtering order
-            if not check_valid_filtering_order([decimation_order.get(), median_order.get(), speckle_order.get(), spatial_order.get(), temporal_order.get()]):
-                warning()
-                return config
-            else:
-                config['cfg.postProcessing.filteringOrder'] = get_filter_order(decimation_order.get(), median_order.get(), speckle_order.get(), spatial_order.get(), temporal_order.get())
-
-        config['stereo.setDepthAlign'] = depth_align.get()
-        if profile_preset.get() != 'None':
-            config['stereo.setDefaultProfilePreset'] = profile_preset.get()
-        config['stereo.setRectification'] = rectificationBox_val.get()
-        config['stereo.setLeftRightCheck'] = LRBox_val.get()
-
-        config['stereo.setExtendedDisparity'] = extendedBox_val.get()
-        config['stereo.setSubpixel'] = subpixelBox_val.get()
-
-        if subpixelBox_val.get():
-            config['stereo.setSubpixelFractionalBits'] = fractional_bits_combo.get()
-
-
-
-        # FILTERS
-        # Note: temporal filter disabled due to the nature of data (not continuous recording)
-
-        if median_filter_enable.get():
-            config['stereo.initialConfig.setMedianFilter'] = median_val.get()
-        else:
-            config['stereo.initialConfig.setMedianFilter'] = "MedianFilter.MEDIAN_OFF"
-
-        # Bilateral filter
-        # todo - [1944301021AA992E00] [1.2.2] [9.439] [StereoDepth(2)] [warning] Bilateral filter is deprecated!
-        # config['cfg.postProcessing.bilateralSigmaValue'] = bilateral_sigma_val.get()
-        # if bilateral_filter_enable.get():
-        #     # is this all settings?
-        #     pass
-
-        # Brightness filter
-        if brightness_filter_enable.get():  # todo can we disable brightness filter?
-            config['cfg.postProcessing.brightnessFilter.maxBrightness'] = max_brightness_slider.get()
-            config['cfg.postProcessing.brightnessFilter.minBrightness'] = min_brightness_slider.get()
-
-        # Speckle filter
-        config['cfg.postProcessing.speckleFilter.enable'] = speckle_filter_enable.get()
-        if speckle_filter_enable.get():
-            config['cfg.postProcessing.speckleFilter.speckleRange'] = speckle_range_slider.get()
-            config['cfg.postProcessing.speckleFilter.differenceThreshold'] = speckle_difference_threshold.get()
-
-        # Spacial filter
-        config['cfg.postProcessing.spatialFilter.enable'] = spatial_filter_enable.get()
-        if spatial_filter_enable.get():
-            config['cfg.postProcessing.spatialFilter.holeFillingRadius'] = hole_filling_radius_slider.get()
-            config['cfg.postProcessing.spatialFilter.numIterations'] = num_iterations_slider.get()
-            config['cfg.postProcessing.spatialFilter.alpha'] = alpha_slider.get()
-            config['cfg.postProcessing.spatialFilter.delta'] = delta_slider.get()
-
-        # Threshold filter
-        if threshold_filter_enable.get():  # todo same as brightness filter
-            config['cfg.postProcessing.thresholdFilter.minRange'] = min_range_val.get()
-            config['cfg.postProcessing.thresholdFilter.maxRange'] = max_range_val.get()
-
-        # Decimation filter
-        config['cfg.postProcessing.decimationFilter.decimationFactor'] = decimation_factor_val.get()
-        if decimation_filter_enable.get():  # todo decimation filter has no attribute enable
-            config['cfg.postProcessing.decimationFilter.decimationFactor'] = decimation_factor_val.get()
-            config['cfg.postProcessing.decimationFilter.decimationMode'] = handle_dict(decimation_mode_val.get(), decimation_set_dict)  # leave this is correct
-
-
-        # ADVANCED SETTINGS
-        if advanced_settings_enable.get():
-            config["cfg.censusTransform.kernelSize"] = handle_dict(CT_kernel_val.get(), CT_kernel_dict)
-            config["cfg.censusTransform.enableMeanMode"] = mean_mode_enable.get()
-            config["cfg.censusTransform.threshold"] = CT_threshold_val.get()
-
-            config["cfg.costAggregation.divisionFactor"] = division_factor_val.get()
-            config["cfg.costAggregation.horizontalPenaltyCostP1"] = horizontal_penalty_p1_val.get()
-            config["cfg.costAggregation.horizontalPenaltyCostP2"] = horizontal_penalty_p2_val.get()
-            config["cfg.costAggregation.verticalPenaltyCostP1"] = vertical_penalty_p1_val.get()
-            config["cfg.costAggregation.verticalPenaltyCostP2"] = vertical_penalty_p2_val.get()
-
-            config["cfg.costMatching.confidenceThreshold"] = confidence_threshold_val.get()
-            config["cfg.costMatching.linearEquationParameters.alpha"] = CM_alpha_val.get()
-            config["cfg.costMatching.linearEquationParameters.beta"] = CM_beta_val.get()
-            config["cfg.costMatching.linearEquationParameters.threshold"] = matching_threshold_val.get()
+        config = tkinter_settings_to_config(config)
+        last_config = config
 
         popup_window.destroy()
         popup_window1.destroy()
-        last_config = config
-        return config
 
 
     if last_config is None and original_config is not None:
@@ -290,6 +298,12 @@ def open_replay_settings_screen(config, original_config=None):
     delta_slider = tk.IntVar(value=current_config.get('cfg.postProcessing.spatialFilter.delta',
                                                       default_config['cfg.postProcessing.spatialFilter.delta']))
 
+    temporal_filter_enable = tk.BooleanVar(value=current_config.get('cfg.postProcessing.temporalFilter.enable', False))
+    temporal_alpha_slider = tk.DoubleVar(value=current_config.get('cfg.postProcessing.temporalFilter.alpha',
+                                                         default_config['cfg.postProcessing.temporalFilter.alpha']))
+    temporal_delta_slider = tk.IntVar(value=current_config.get('cfg.postProcessing.temporalFilter.delta',
+                                                      default_config['cfg.postProcessing.temporalFilter.delta']))
+
     threshold_filter_enable = tk.BooleanVar(value=(True if 'cfg.postProcessing.thresholdFilter.minRange' in current_config else False))
     min_range_val = tk.IntVar(value=current_config.get('cfg.postProcessing.thresholdFilter.minRange',
                                                        default_config['cfg.postProcessing.thresholdFilter.minRange']))
@@ -345,6 +359,7 @@ def open_replay_settings_screen(config, original_config=None):
             toggle_frame_settings(median_filter_enable, median_frame)
             toggle_frame_settings(speckle_filter_enable, speckle_frame)
             toggle_frame_settings(spatial_filter_enable, spatial_frame)
+            toggle_frame_settings(temporal_filter_enable, temporal_frame)
             toggle_frame_settings(threshold_filter_enable, threshold_frame)
             # toggle_frame_settings(bilateral_filter_enable, bilateral_frame)
             toggle_frame_settings(brightness_filter_enable, brightness_frame)
@@ -541,11 +556,37 @@ def open_replay_settings_screen(config, original_config=None):
 
 
     # Temporal Filter Frame
+
+    # # Temporal filter
+    # config['cfg.postProcessing.temporalFilter.enable'] = temporal_filter_enable.get()
+    # if spatial_filter_enable.get():
+    #     config['cfg.postProcessing.temporalFilter.alpha'] = temporal_alpha_slider.get()
+    #     config['cfg.postProcessing.temporalFilter.delta'] = temporal_delta_slider.get()
+
+    ttk.Label(custom_settings_frame, text="Temporal Filter Enable").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
+    temporal_filter_checkbox = ttk.Checkbutton(custom_settings_frame, variable=temporal_filter_enable, command=lambda: toggle_frame_settings(temporal_filter_enable, temporal_frame))
+    temporal_filter_checkbox.grid(row=current_row, column=1, padx=10, pady=10, sticky="e")
+    current_row += 1
+
+    # Spatial Filter Frame
     temporal_frame = ttk.LabelFrame(custom_settings_frame, text="Temporal Filter", padding=(10, 10))
     temporal_frame.grid(row=current_row, column=0, columnspan=6, padx=10, pady=10, sticky="ew")
 
     # Temporal Filter Enable
-    ttk.Label(temporal_frame, text="Temporal filter not available due to the nature of data").grid(row=0, column=0, padx=10, pady=10, sticky="w")
+    ttk.Label(temporal_frame, text="Alpha").grid(row=2, column=0, padx=10, pady=10, sticky="w")
+    temporal_alpha_label = ttk.Label(temporal_frame, text=str(temporal_alpha_slider.get()))
+    temporal_alpha_label.grid(row=2, column=2, padx=10, pady=10, sticky="w")
+    ttk.Scale(temporal_frame, from_=0, to=1, variable=temporal_alpha_slider, orient="horizontal",
+              command=lambda x: update_label(temporal_alpha_slider, temporal_alpha_label, form="float")).grid(row=2, column=1, padx=10,
+                                                                                            pady=10,
+                                                                                            sticky="e")
+
+    ttk.Label(temporal_frame, text="Delta").grid(row=2, column=3, padx=10, pady=10, sticky="w")
+    temporal_delta_label = ttk.Label(temporal_frame, text=str(temporal_delta_slider.get()))
+    delta_spinbox = ttk.Spinbox(temporal_frame, from_=0, to=255, textvariable=temporal_delta_slider,
+                                command=lambda: update_label(temporal_delta_slider, temporal_delta_label))
+    delta_spinbox.grid(row=2, column=4, padx=10, pady=10, sticky="e")
+    ttk.Label(temporal_frame, text="(0, 255)").grid(row=2, column=5, padx=10, pady=10, sticky="w")
 
     current_row += 1
 
@@ -820,8 +861,13 @@ def open_replay_settings_screen(config, original_config=None):
 
     # Add a "GENERATE" button at the bottom
     generate_button = tk.Button(popup_window, text="GENERATE", bg="green2", activebackground="green4",
-                                command=on_generate)
+                                command=lambda: on_generate(config))
     generate_button.grid(row=current_row, column=0, columnspan=2, pady=20)
+
+    # Add a "GENERATE" button at the bottom
+    generate_button = tk.Button(popup_window, text="GENERATE", bg="blue2", activebackground="blue4",
+                                command=lambda: on_generate(config))  # todo
+    generate_button.grid(row=current_row, column=1, columnspan=2, pady=20)
     current_row += 1
     # ------------------------------------------------------------------------------------------------------------------------------
 
