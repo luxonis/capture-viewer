@@ -31,6 +31,8 @@ class ReplayVisualizer:
         self.main_frame = tk.Frame(self.toplLevel)
         self.main_frame.grid(row=0, column=0, sticky="nsew")
 
+        self.generated_json_text = None
+
         max_image_width = 840
         max_image_height = 400
         self.scaled_original_size = calculate_scaled_dimensions(view_info['depth_size'], max_image_width, max_image_height)
@@ -793,7 +795,7 @@ class ReplayVisualizer:
         self.settings_frame_custom.grid_rowconfigure(0, weight=1)
         self.settings_frame_custom.grid_columnconfigure(0, weight=1, minsize=850)
 
-        # ----
+        # ---- CANVAS FOR SETTINGS
 
         self.canvas = tk.Canvas(self.settings_frame_custom)
         self.canvas.grid(row=0, column=0, sticky="nsew")
@@ -809,7 +811,45 @@ class ReplayVisualizer:
 
         self.canvas.config(scrollregion=self.canvas.bbox("all"))
 
-        # Bind mouse scrolling to scroll the canvas based on the platform
+
+        # --- CAVAS FOR CONFIG
+
+        self.config_frame = tk.Frame(self.main_frame)
+        self.config_frame.grid(row=3, column=0, padx=5, pady=5, sticky='nsew')
+
+        # Create canvas with scrollbar
+        self.canvas2 = tk.Canvas(self.config_frame)
+        self.canvas2.grid(row=0, column=0, sticky="nsew")
+        self.scrollbar2 = tk.Scrollbar(self.config_frame, orient="vertical", command=self.canvas2.yview)
+        self.scrollbar2.grid(row=0, column=1, sticky="ns")
+
+        self.canvas2.configure(yscrollcommand=self.scrollbar2.set)
+
+        # Create a content frame inside the canvas
+        self.content_frame2 = tk.Frame(self.canvas2)
+        self.canvas2.create_window((0, 0), window=self.content_frame2, anchor="nw")
+        self.content_frame2.update_idletasks()
+
+        # Configure scrolling area
+        self.canvas2.config(scrollregion=self.canvas2.bbox("all"))
+
+        # JSON data for each depth image (example)
+        generated_settings = self.view_info["metadata"].get("config2settings", {})
+        generated_json_str = json.dumps(generated_settings, indent=4)
+
+        # Create a Text widget to display the JSON data
+        self.generated_json_text = tk.Text(self.content_frame2,
+                                      bg="white",
+                                      fg="black",
+                                      font=("Courier", 8),
+                                      wrap="none",
+                                      height=20,  # Adjust based on your needs
+                                      width=80)  # Adjust width as necessary
+        self.generated_json_text.insert(tk.END, generated_json_str)
+        self.generated_json_text.config(state=tk.DISABLED)  # Disable editing
+        self.generated_json_text.grid(row=2, column=1, padx=10, pady=10, sticky="nsew")
+
+        # --- BINDING FOR SCROLLING
         if platform.system() == "Linux":
             self.settings_frame_custom.bind("<Button-4>", self.on_mouse_wheel_up)
             self.settings_frame_custom.bind("<Button-5>", self.on_mouse_wheel_down)
@@ -833,36 +873,12 @@ class ReplayVisualizer:
 
 
         # ----
-
-        # self.create_settings_layout(frame=self.settings_frame_custom, original_config=self.view_info['metadata']['settings'])
-
-        self.settings_frame = tk.Frame(self.main_frame)
-        self.settings_frame.grid(row=3, column=0, padx=5, pady=5, sticky='nsew')
-
-        # JSON data for each depth image
-        original_settings = self.view_info["metadata"]["settings"]
-        generated_settings = self.view_info["metadata"].get("config2settings", {})
-        original_json_str = json.dumps(original_settings, indent=4)
-        generated_json_str = json.dumps(generated_settings, indent=4)
-
-        # Generated Settings Label (dynamically updated)
-        generated_json_label = tk.Label(
-            self.settings_frame,
-            text=generated_json_str,
-            bg="white",
-            fg="black",
-            font=("Courier", 8),
-            justify="left",
-            anchor="nw"
-        )
-        generated_json_label.grid(row=2, column=1, padx=10, pady=10, sticky="nsew")
-
         # Assign the wrapper function to the button command
         pointcloud_button = tk.Button(self.generated_depth_frame, text="Pointcloud", command=show_pointcloud)
         pointcloud_button.grid(row=1, column=2, pady=(50, 0))
 
         self.image_labels['generated_img_label'] = generated_img_label
-        self.image_labels['generated_json_label'] = generated_json_label
+        self.image_labels['generated_json_label'] = self.generated_json_text
 
     def refresh_display(self, label=None):
         print("Refresh display:", label)
@@ -878,7 +894,11 @@ class ReplayVisualizer:
         self.image_labels['generated_img_label'].image = im_generated
 
         # Update settings labels
-        self.image_labels['generated_json_label'].configure(text=json.dumps(self.config_json, indent=4))
+        updated_json_str = json.dumps(self.config_json, indent=4)
+        self.generated_json_text.config(state=tk.NORMAL)  # Enable editing temporarily
+        self.generated_json_text.delete('1.0', tk.END)  # Clear the existing text
+        self.generated_json_text.insert(tk.END, updated_json_str)  # Insert updated JSON
+        self.generated_json_text.config(state=tk.DISABLED)  # Disable editing again
 
     def get_output_folder(self):
         def compare_json(file_path, json_data):
