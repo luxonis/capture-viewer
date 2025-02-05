@@ -12,6 +12,8 @@ import subprocess
 import time
 import platform
 
+from traitlets.config.sphinxdoc import write_doc
+
 from capture_viewer_tools.capture_tools import (colorize_depth, calculate_scaled_dimensions,
                                                 format_json_for_replay, create_placeholder_frame)
 from capture_viewer_tools.convertor_capture2replay_json import config2settings
@@ -181,8 +183,8 @@ class ReplayVisualizer:
                     config['cfg.postProcessing.thresholdFilter.maxRange'] = max_range_val.get()
 
                 # Decimation filter
-                config['cfg.postProcessing.decimationFilter.decimationFactor'] = decimation_factor_val.get()
-                if decimation_filter_enable.get():  # todo decimation filter has no attribute enable
+                config['cfg.postProcessing.decimationFilter.decimationFactor'] = 1  # by default do not decimate
+                if decimation_filter_enable.get():
                     config['cfg.postProcessing.decimationFilter.decimationFactor'] = decimation_factor_val.get()
                     config['cfg.postProcessing.decimationFilter.decimationMode'] = handle_dict(
                         decimation_mode_val.get(), decimation_set_dict)  # leave this is correct
@@ -747,7 +749,7 @@ class ReplayVisualizer:
 
     # Scroll handler function
     def on_mouse_wheel(self, event):
-        print(event.widget)
+        # print(event.widget)
         if event.delta > 0:
             self.canvas.yview_scroll(-1, "units")  # Scroll up
         elif event.delta < 0:
@@ -794,37 +796,40 @@ class ReplayVisualizer:
         # ----
 
         self.canvas = tk.Canvas(self.settings_frame_custom)
+        self.canvas.grid(row=0, column=0, sticky="nsew")
         self.scrollbar = tk.Scrollbar(self.settings_frame_custom, orient="vertical", command=self.canvas.yview)
+        self.scrollbar.grid(row=0, column=1, sticky="ns")
+
         self.canvas.configure(yscrollcommand=self.scrollbar.set)
+
+        self.content_frame = tk.Frame(self.canvas)
+        self.layout_settings(frame=self.content_frame, original_config=None)
+        self.canvas.create_window((0, 0), window=self.content_frame, anchor="nw")
+        self.content_frame.update_idletasks()
+
+        self.canvas.config(scrollregion=self.canvas.bbox("all"))
 
         # Bind mouse scrolling to scroll the canvas based on the platform
         if platform.system() == "Linux":
-            # On Linux, use Button-4 (up) and Button-5 (down)
-            self.canvas.bind_all("<Button-4>", self.on_mouse_wheel_up)  # Scroll up
-            self.canvas.bind_all("<Button-5>", self.on_mouse_wheel_down)  # Scroll down  #
+            self.settings_frame_custom.bind("<Button-4>", self.on_mouse_wheel_up)
+            self.settings_frame_custom.bind("<Button-5>", self.on_mouse_wheel_down)
+
+            def bind_recursively(frame):
+                for widget in frame.winfo_children():
+                    if isinstance(widget, ttk.Spinbox) or isinstance(widget, ttk.Combobox):
+                        widget.bind("<Button-4>", 'break')
+                        widget.bind("<Button-5>", 'break')
+                        continue
+                    widget.bind("<Button-4>", self.on_mouse_wheel_up)
+                    widget.bind("<Button-5>", self.on_mouse_wheel_down)
+                    bind_recursively(widget)
+
+            bind_recursively(self.settings_frame_custom)
+
         else:
-            # On other systems, use MouseWheel (Windows/macOS)
             self.canvas.bind_all("<MouseWheel>", self.on_mouse_wheel)
 
-        # Make sure the canvas can accept focus and capture events
         self.canvas.focus_set()
-
-        # Create a frame to hold the content inside the canvas
-        self.content_frame = tk.Frame(self.canvas)
-
-        # Add widgets or content layout to content_frame
-        self.layout_settings(frame=self.content_frame, original_config=self.view_info['metadata']['settings'])
-
-        # Pack canvas and scrollbar inside settings_frame_custom
-        self.canvas.grid(row=0, column=0, sticky="nsew")
-        self.scrollbar.grid(row=0, column=1, sticky="ns")
-
-        # Place the content_frame inside the canvas
-        self.canvas.create_window((0, 0), window=self.content_frame, anchor="nw")
-
-        # Update the canvas scroll region when the content size changes
-        self.content_frame.update_idletasks()
-        self.canvas.config(scrollregion=self.canvas.bbox("all"))
 
 
         # ----
@@ -853,71 +858,11 @@ class ReplayVisualizer:
         generated_json_label.grid(row=2, column=1, padx=10, pady=10, sticky="nsew")
 
         # Assign the wrapper function to the button command
-        # settings_button = tk.Button(self.generated_depth_frame, text="Settings", command=self.open_settings_get_config)
-        # settings_button.grid(row=1, column=2)
-
-        # Assign the wrapper function to the button command
         pointcloud_button = tk.Button(self.generated_depth_frame, text="Pointcloud", command=show_pointcloud)
         pointcloud_button.grid(row=1, column=2, pady=(50, 0))
 
         self.image_labels['generated_img_label'] = generated_img_label
         self.image_labels['generated_json_label'] = generated_json_label
-
-    def refresh_display_old(self, label=None):
-        print("Refresh display:", label)
-        if self.generated_depth is None:
-            colorized_generated_depth = create_placeholder_frame(self.scaled_original_size, label)
-            colorized_difference = None
-            range_min, range_max = 0, 0
-        else:
-            _, range_min, range_max = colorize_depth(self.generated_depth, type="depth", label=0)
-            try:
-                if self.generated_depth.shape != self.depth.shape:  # decimation filter downsamples, this upsamples
-                    if self.depth.shape != self.generated_depth.shape:
-                        height, width = self.depth.shape
-                        self.generated_depth = cv2.resize(self.generated_depth, (width, height),
-                                                          interpolation=cv2.INTER_NEAREST)
-                depth_difference = np.abs(self.depth - self.generated_depth)
-                colorized_difference, _, _ = colorize_depth(depth_difference, type="difference", label=0)
-            except ValueError:
-                colorized_difference = np.zeros_like(self.generated_depth)
-                print("Depth shape problems, not calculating difference")
-
-        # Update images
-        # update original depth
-        if self.generated_depth is not None:
-            _, range_min_original, range_max_original = colorize_depth(self.depth, type="depth", label=0)
-            range_min = min(range_min_original, range_min)
-            range_max = max(range_max_original, range_max)
-
-            colorized_generated_depth, _, _ = colorize_depth(self.generated_depth, type="depth", label=0, min_val=range_min, max_val=range_max)
-            colorized_depth, _, _ = colorize_depth(self.depth, type="depth", label=0, min_val=range_min, max_val=range_max)
-        else:
-            colorized_depth, range_min, range_max = colorize_depth(self.depth, type="depth", label=0)
-
-        resized_depth = cv2.resize(colorized_depth, self.scaled_original_size,
-                                             interpolation=cv2.INTER_AREA)
-        im_original = ImageTk.PhotoImage(image=Image.fromarray(resized_depth))
-        self.image_labels['original_img_label'].configure(image=im_original)
-        self.image_labels['original_img_label'].image = im_original
-
-        # update generated depth
-        resized_generated_depth = cv2.resize(colorized_generated_depth, self.scaled_original_size,
-                                             interpolation=cv2.INTER_AREA)
-        im_generated = ImageTk.PhotoImage(image=Image.fromarray(resized_generated_depth))
-        self.image_labels['generated_img_label'].configure(image=im_generated)
-        self.image_labels['generated_img_label'].image = im_generated
-
-        if self.generated_depth is not None:
-            resized_difference_depth = cv2.resize(colorized_difference, self.scaled_original_size, interpolation=cv2.INTER_AREA)
-            im_difference = ImageTk.PhotoImage(image=Image.fromarray(resized_difference_depth))
-            self.image_labels['difference_img_label'].configure(image=im_difference)
-            self.image_labels['difference_img_label'].image = im_difference
-
-        # Update settings labels
-        generated_settings = self.view_info["metadata"].get("config2settings", {})
-        generated_json_str = json.dumps(generated_settings, indent=4)
-        self.image_labels['generated_json_label'].configure(text=generated_json_str)
 
     def refresh_display(self, label=None):
         print("Refresh display:", label)
