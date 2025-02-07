@@ -112,6 +112,12 @@ def visualize_frame(name, frame, timestamp):
         cv2.imshow(f"{mxid} {name}", depth_vis)
 
 
+print("This script is to be replaced by oak_capture_universal.py, run that instead")
+print("This script is left in the repo for debugging purposes")
+print("Exiting script")
+exit(0)
+
+
 import numpy as np
 import time
 cvColorMap = cv2.applyColorMap(np.arange(256, dtype=np.uint8), cv2.COLORMAP_JET)

@@ -31,7 +31,8 @@ def parseArguments():
     parser = argparse.ArgumentParser()
     # Mandatory arguments
     parser.add_argument("settings_file_path", help="Path to settings JSON")
-    parser.add_argument("view_name", help="What part of the scene the camera is looking at")
+    parser.add_argument("view_name", help="Name of the capture")
+    parser.add_argument("--output", default=root_path, help="Custom output folder")
     parser.add_argument("--autostart", default=-1, type=int, help='Automatically start capturing after given number of frames (-1 to disable)')
     parser.add_argument("--devices", default=[], dest="mxids", nargs="+", help="MXIDS of devices to connect to")
 
@@ -119,8 +120,16 @@ def visualize_frame(name, frame, timestamp):
 
 def attempt_connection(mxids, attempts=10):
     if len(mxids) == 0:
-        mxids = [dai.Device.getAllAvailableDevices()[0].mxid]  # connect the first one discovered
-        return mxids
+        for i in range(attempts):
+            devices = dai.Device.getAllAvailableDevices()
+            if len(devices) > 0:
+                mxids = [dai.Device.getAllAvailableDevices()[0].mxid]  # connect the first one discovered
+                print(f"Found device, MxID: {mxids[0]}")
+                return mxids
+            else:
+                print(f"Waiting for devices to become available..., currently available devices: 0")
+                time.sleep(5)
+        raise ValueError("No devices found")
     for attempt in range(attempts):  # try to connect to the correct cameras
         count = 0
         for device in dai.Device.getAllAvailableDevices():

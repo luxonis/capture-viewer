@@ -16,7 +16,8 @@ root_path = os.path.join(os.path.dirname(script_dir), 'DATA')
 
 
 if __name__ == "__main__":
-    print("This script is not fully compatible with all settings, use sr_poe_multiple_fsync.py, but specify only one device for the same functionality")
+    print("This script is not fully compatible with all settings, use oak_capture_universal.py, but specify only one device for the same functionality")
+    print("This script is left in the repo for debugging purposes")
     print("Exiting script")
     exit(0)
     settings_path, view_name, device_info, autostart = parseArguments()
