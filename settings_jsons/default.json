@@ -12,13 +12,14 @@
     "sensIso": 800,
     "output_settings": {
         "left": true,
-        "right": true,
-        "left_raw": false,
-        "right_raw": false,
-        "rgb": false,
+        "right": false,
+        "left_raw": true,
+        "right_raw": true,
+        "rgb": true,
         "rgb_png": false,
-        "depth": true,
-        "disparity": true
+        "depth": false,
+        "disparity": false,
+        "sync": false
     },
     "LRcheck": true,
     "extendedDisparity": false,
@@ -48,6 +49,6 @@
         "median_filter": false,
         "median_size": "KERNEL_3x3"
     },
-    "FPS": 30,
+    "FPS": 40,
     "num_captures": 20
 }

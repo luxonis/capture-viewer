@@ -1,0 +1,44 @@
+{
+    "ir": false,
+    "ir_value": 1,
+    "flood_light": false,
+    "flood_light_intensity": 1,
+    "stereoResolution": "THE_800_P",
+
+    "alignSocket": "REC_RIGHT",
+    "LRcheck": true,
+    "extendedDisparity": true,
+    "subpixelDisparity": true,
+    "subpixelValue": 5,
+    "profilePreset" : "DEFAULT",
+    "use_filter_settings" : false,
+
+    "output_settings": {
+        "left": false,
+        "right": true,
+        "left_raw": false,
+        "right_raw": false,
+        "tof": true,
+        "tof_depth": true,
+        "tof_intensity": false,
+        "tof_amplitude": false,
+        "rgb": false,
+        "rgb_png": false,
+        "depth": false,
+        "disparity": false,
+        "sync": false
+    },
+
+    "customTofConfig": false,
+    "tofConfig": {
+        "enableFPPNCorrection": true,
+        "enableOpticalCorrection": true,
+        "enableWiggleCorrection": true,
+        "enableTemperatureCorrection": true,
+        "phaseUnwrappingLevel": 4
+    },
+    "medianFilter": "dai.MedianFilter.MEDIAN_OFF",
+
+    "FPS": 30,
+    "num_captures": 20
+}
