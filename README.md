@@ -24,21 +24,7 @@ pip install -r requirements.txt
 
 ### 1. Capturing Data
 
-To capture data from an OAK camera, use the following command:
-
-```bash
-python capture_scripts/oak_capture.py /path/to/settings.json capture_name
-```
-You can select `default` isntead of `/path/to/settings.json` to use the settings in default json. 
-You can also specify your own settings JSON file by replacing `/path/to/settings.json`.
-
-Optionally, you can set: 
-- `--device-ip` to connect to a specific device (also accepts MXID of the divice)
-- `--autostart` to start the capture automatically after a selected number of frames (e.g. set to 100 means it 
-will drop the first 100 frames, useful for camera autoexposure to stabilize before capture)
-
-
-After pressing `S` the script will automatically save predefined number of frames to a folder named `DATA`. 
+[See GUIDE](capture/README.md)
 
 
 ### 2. Viewing Data - Running the Capture Viewer
@@ -57,92 +43,6 @@ python capture_viewer.py -p /path/to/DATA
 
 Where DATA is the folder containing all the capture sessions. It will direct you to a session selection, where you can 
 visualize individual sessions.
-
----
-
-## Settings Options for Captures
-
-For capture, you can configure various parameters. Below is an example settings configuration:
-
-```json
-{
-    "ir": true,
-    "ir_value": 1,
-    "flood_light": false,
-    "flood_light_intensity": 1,
-    "stereoResolution": "THE_800_P",
-    "rgbResolution": "THE_1080_P",
-    "stereoAlign": true,
-    "alignSocket": "COLOR",
-    "autoexposure": true,
-    "expTime": 200,
-    "sensIso": 800,
-    "output_settings": {
-        "left": true,
-        "right": true,
-        "left_raw": false,
-        "right_raw": false,
-        "rgb": false,
-        "rgb_png": false,
-        "depth": true,
-        "disparity": true
-    },
-    "LRcheck": true,
-    "extendedDisparity": false,
-    "subpixelDisparity": true,
-    "subpixelValue": 3,
-    "profilePreset": "ROBOTICS",
-    "use_filter_settings": false,
-    "filters": {
-        "threshold_filter": false,
-        "lower_threshold_filter": 1000,
-        "upper_threshold_filter": 5000,
-        "decimation_filter": false,
-        "decimation_factor": 1,
-        "decimation_mode" : "PIXEL_SKIPPING",
-        "spacial_filter": false,
-        "spatial_alfa": 0.5,
-        "spatial_delta": 3,
-        "spatial_num_iterations": 1,
-        "spatial_hole_filling_radius": 1,
-        "temporal_filter": false,
-        "temporal_alfa": 0.5,
-        "temporal_delta": 3,
-        "speckle_filter": false,
-        "speckle_range": 200,
-        "speckle_difference_threshold": 2,
-
-        "median_filter": false,
-        "median_size": "KERNEL_3x3"
-    },
-    "FPS": 30,
-    "num_captures": 20
-}
-
-
-```
-
-This settings need to be configured before the capture start. To change the settings, simply 
-edit parameters in the json and restart the capture script.
-
-- `ir` : IR dot projector, available on PRO models.
-- `flood_light` : IR floodlight, available on PRO models.
-- If `autoexposure` is set to false, `expTime` and `sensIso` will be used.
-- `extendedDisparity` : extendedDisparity
-- `subpixelDisparity`: subpixelDisparity with the selected `subpixelValue`
-- `profilePreset`: select a Profile Preset such as `DEFAULT`, `HIGH_DETAIL`, `FACE` or `ROBOTICS` based on your needs. 
-Profiles `HIGH_ACCURACY` and `HIGH_DENSITY` are also available but will be removed in future versions/
-- `output_settings` : select what streams you'd like to visualize. Some stream combinations might not be valid 
-(such as choosing depth stream but not selecting left and right)
-- `use_filter_settings`: **if set to false, none of the following filters will be used**. Set to true to use custom filter settings.
-  - `filters`: self-explanatory
-- `FPS`: will be applied to mono camera streams as well as the color camera
-- `num_captures` : the number of depth frames which will be saved before the capture ending
-
-These are the basic information about the capture. Settings for the capture can be edited and re-applied using the **Replay** feature 
-in the capture viewer. 
-
-**The REPLAY feature offers additional settings.**
 
 ---
 
