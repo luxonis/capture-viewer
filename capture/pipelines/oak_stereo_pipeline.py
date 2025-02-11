@@ -139,8 +139,6 @@ def get_pipeline(settings):
         sync.out.link(xoutGrp.input)
 
     else:
-        print("NO SYNC")
-        print(output_settings)
         xout_depth = create_xout_node("depth")
         xout_disparity = create_xout_node("disparity")
         xout_left = create_xout_node("left")
