@@ -187,7 +187,6 @@ if __name__ == "__main__":
         while not exception_queue.empty():
             mxid, error_message = exception_queue.get()
             logging.error(f"Error occurred in worker for MXID {mxid}: {error_message}")
-            # Raise exception or handle as necessary
             if mxid not in failed_mxids: failed_mxids.append(mxid)
         if len(failed_mxids) == len(mxids):
             raise Exception(f"ALL worker threads failed")
