@@ -10,7 +10,7 @@ Arguments:
 - **settings** - choose `default`, `default_tof` or add path to your own [settings.json](#settings).
 - **view_name** - the name of capture that will be saved in metadata file
 - **--output** (optional) - path to custom output folder, where the output of capture will be created. By default, it will be saved in DATA folder in capture-viewer
-- **--autostart** (optional) - number of frames the script will droped before automatically starting the capture
+- **--autostart** (optional) - number of seconds after which the capture automatically starts
   - If you did not select **--autostart** you can start the capture by pressing `S`. The script will automatically save predefined number of frames to a folder named `DATA`. 
 - **--devices** (optional) - the mxids of devices to connnect to. If left blank, it will connect to the first available device.
 

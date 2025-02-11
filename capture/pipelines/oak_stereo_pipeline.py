@@ -112,34 +112,50 @@ def get_pipeline(settings):
         monoLeft.out.link(stereo.left)
         monoRight.out.link(stereo.right)
 
+    if output_settings["sync"]:
+        # Sync node
+        sync = pipeline.create(dai.node.Sync)
+        sync.setSyncThreshold(timedelta(milliseconds=50))
 
-    # PASSING THROUGH THE SYNC NODE
-    sync = pipeline.create(dai.node.Sync)
-    sync.setSyncThreshold(timedelta(milliseconds=50))
+        if output_settings["depth"]: stereo.depth.link(sync.inputs["depth"])
+        if output_settings["disparity"]: stereo.disparity.link(sync.inputs["disparity"])
 
-    if output_settings["disparity"]:
-        stereo.disparity.link(sync.inputs["disparity"])
-        max_disparity = stereo.initialConfig.getMaxDisparity()
-    if output_settings["rgb"] or output_settings["rgb_png"]:
-        color.isp.link(sync.inputs["rgb"])
-    if output_settings["depth"]:
-        stereo.depth.link(sync.inputs["depth"])
-        stereo.syncedLeft.link(sync.inputs["left"])
-        stereo.syncedRight.link(sync.inputs["right"])
+        if output_settings["depth"] or output_settings["disparity"]:
+            stereo.syncedLeft.link(sync.inputs["left"])
+            stereo.syncedRight.link(sync.inputs["right"])
+        else:
+            if output_settings["left"]: monoLeft.out.link(sync.inputs["left"])
+            if output_settings["right"]: monoRight.out.link(sync.inputs["right"])
+
+
+        if output_settings["rgb"] or output_settings["rgb_png"]: color.isp.link(sync.inputs["rgb"])
+
+        if output_settings["left_raw"]: monoLeft.raw.link(sync.inputs["left_raw"])
+        if output_settings["right_raw"]:  monoRight.raw.link(sync.inputs["right_raw"])
+
+        # Xout
+        xoutGrp = pipeline.create(dai.node.XLinkOut)
+        xoutGrp.setStreamName("xout")
+        sync.out.link(xoutGrp.input)
+
     else:
-        if output_settings["left"]:
-            monoLeft.out.link(sync.inputs["left"])
-        if output_settings["right"]:
-            monoRight.out.link(sync.inputs["right"])
-    if output_settings["left_raw"]:
-        monoLeft.raw.link(sync.inputs["left_raw"])
-    if output_settings["right_raw"]:
-        monoRight.raw.link(sync.inputs["right_raw"])
+        print("NO SYNC")
+        print(output_settings)
+        xout_depth = create_xout_node("depth")
+        xout_disparity = create_xout_node("disparity")
+        xout_left = create_xout_node("left")
+        xout_right = create_xout_node("right")
+        xout_color = create_xout_node("rgb")
+        xout_left_raw = create_xout_node("left_raw")
+        xout_right_raw = create_xout_node("right_raw")
 
-    # XOUT
-    xoutGrp = pipeline.create(dai.node.XLinkOut)
-    xoutGrp.setStreamName("xout")
-    sync.out.link(xoutGrp.input)
+        if output_settings["depth"]: stereo.depth.link(xout_depth.input)
+        if output_settings["disparity"]: stereo.disparity.link(xout_disparity.input)
+        if output_settings["left"]: monoLeft.out.link(xout_left.input)
+        if output_settings["right"]: monoRight.out.link(xout_right.input)
+        if output_settings["rgb"]: color.isp.link(xout_color.input)
+        if output_settings["left_raw"]: monoLeft.raw.link(xout_left_raw.input)
+        if output_settings["right_raw"]: monoRight.raw.link(xout_right_raw.input)
 
     # controlIn = pipeline.create(dai.node.XLinkIn)
     # controlIn.setStreamName('control')
@@ -150,6 +166,6 @@ def get_pipeline(settings):
         'pipeline': pipeline
     }
 
-    if output_settings["disparity"]: pipeline_output["disparity"] = max_disparity
+    if output_settings["disparity"]: pipeline_output["disparity"] = stereo.initialConfig.getMaxDisparity()
 
     return pipeline_output
