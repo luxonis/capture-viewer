@@ -28,40 +28,24 @@ class ReplayVisualizer:
         self.toplLevel.title("REPLAY")
         self.toplLevel.geometry("2200x1200")
 
-        self.main_frame = tk.Frame(self.toplLevel)
-        self.main_frame.grid(row=0, column=0, sticky="nsew")
-
-        self.generated_json_text = None
-
         max_image_width = 840
         max_image_height = 400
         self.scaled_original_size = calculate_scaled_dimensions(view_info['depth_size'], max_image_width, max_image_height)
-        # self.scaled_original_size = view_info['depth_size']
 
         self.view_info = view_info
         self.current_view = current_view
 
-        self.depth = current_view['depth']
         self.generated_depth = None
         self.pcl_path = None
+
         self.config_json = None
         self.last_config = None
 
-        self.settings_received = False
-
-        self.output_dir = view_info["capture_folder"] + "/replay_outputs"
+        self.output_dir = os.path.join(view_info["capture_folder"], "replay_outputs")
         if not os.path.exists(self.output_dir): os.makedirs(self.output_dir)
 
         self.output_folder = None
-        self.already_generated = False
-
-        self.image_labels = {
-            'generated_img_label': tk.Label(),
-            'original_img_label': tk.Label(),
-            'difference_img_label' : tk.Label(),
-            'generated_json_label' : tk.Label(),
-            'original_json_label' : tk.Label(),
-        }
+        self.depth_in_replay_outputs = False
 
         self.layout_values = {}  # button_key: value
 
@@ -85,6 +69,81 @@ class ReplayVisualizer:
         else:
             current_config = default_config
         return current_config
+
+    def initialize_button_values(self, current_config):
+        # ----------------------------------- Initialize the UI elements with default values from current_config -----------------------------------
+        # Initialize tkinter variables, falling back to default_config if a key is missing in current_config
+        self.layout_values['depth_align'] = tk.StringVar(value=current_config.get('stereo.setDepthAlign', default_config['stereo.setDepthAlign']))
+        self.layout_values['profile_preset'] = tk.StringVar(value=current_config.get('stereo.setDefaultProfilePreset', default_config['stereo.setDefaultProfilePreset']))
+
+        self.layout_values['custom_settings_val'] = tk.BooleanVar(value=False)
+
+        self.layout_values['rectificationBox_val'] = tk.BooleanVar(value=current_config.get('stereo.setRectification', True))  # Default to True if not found
+        self.layout_values['LRBox_val'] = tk.BooleanVar(value=current_config.get('stereo.setLeftRightCheck', default_config['stereo.setLeftRightCheck']))
+        self.layout_values['extendedBox_val'] = tk.BooleanVar(value=current_config.get('stereo.setExtendedDisparity', default_config['stereo.setExtendedDisparity']))
+        self.layout_values['subpixelBox_val'] = tk.BooleanVar(value=current_config.get('stereo.setSubpixel', default_config['stereo.setSubpixel']))
+        self.layout_values['fractional_bits_val'] = tk.IntVar(value=current_config.get('stereo.setSubpixelFractionalBits', default_config['stereo.setSubpixelFractionalBits']))
+
+        # FILTERS -----------------------------------------------------------------------------------
+        self.layout_values['filtering_order_enable'] = tk.BooleanVar(value=(True if 'cfg.postProcessing.filteringOrder' in current_config else False))
+        if 'cfg.postProcessing.filteringOrder' in current_config:
+            self.layout_values['initial_filter_order'] = get_filter_order_back(current_config['cfg.postProcessing.filteringOrder'])
+        else:
+            self.layout_values['initial_filter_order'] = get_filter_order_back(default_config['cfg.postProcessing.filteringOrder'])
+
+        self.layout_values['decimation_order'] = tk.IntVar(value=self.layout_values['initial_filter_order'][0])
+        self.layout_values['median_order'] = tk.IntVar(value=self.layout_values['initial_filter_order'][1])
+        self.layout_values['speckle_order'] = tk.IntVar(value=self.layout_values['initial_filter_order'][2])
+        self.layout_values['spatial_order'] = tk.IntVar(value=self.layout_values['initial_filter_order'][3])
+        self.layout_values['temporal_order'] = tk.IntVar(value=self.layout_values['initial_filter_order'][4])
+
+        self.layout_values['median_filter_enable'] = tk.BooleanVar(value=(current_config.get('stereo.initialConfig.setMedianFilter', "MedianFilter.MEDIAN_OFF") != "MedianFilter.MEDIAN_OFF"))
+        self.layout_values['median_val'] = tk.StringVar(value=current_config.get('stereo.initialConfig.setMedianFilter', default_config['stereo.initialConfig.setMedianFilter']))
+
+        # bilateral_filter_enable = tk.BooleanVar(value=current_config.get('cfg.postProcessing.bilateralFilter.enable', False))
+        # bilateral_sigma_val = tk.IntVar(value=current_config.get('cfg.postProcessing.bilateralSigmaValue', default_config['cfg.postProcessing.bilateralSigmaValue']))
+
+        self.layout_values['brightness_filter_enable'] = tk.BooleanVar(value=current_config.get('cfg.postProcessing.brightnessFilter.enable', False))
+        self.layout_values['min_brightness_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.brightnessFilter.minBrightness', default_config['cfg.postProcessing.brightnessFilter.minBrightness']))
+        self.layout_values['max_brightness_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.brightnessFilter.maxBrightness', default_config['cfg.postProcessing.brightnessFilter.maxBrightness']))
+
+        self.layout_values['speckle_filter_enable'] = tk.BooleanVar(value=current_config.get('cfg.postProcessing.speckleFilter.enable', False))
+        self.layout_values['speckle_range_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.speckleFilter.speckleRange', default_config['cfg.postProcessing.speckleFilter.speckleRange']))
+        self.layout_values['speckle_difference_threshold'] = tk.IntVar(value=current_config.get('cfg.postProcessing.speckleFilter.differenceThreshold', default_config['cfg.postProcessing.speckleFilter.differenceThreshold']))
+
+        self.layout_values['spatial_filter_enable'] = tk.BooleanVar(value=current_config.get('cfg.postProcessing.spatialFilter.enable', False))
+        self.layout_values['hole_filling_radius_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.spatialFilter.holeFillingRadius', default_config['cfg.postProcessing.spatialFilter.holeFillingRadius']))
+        self.layout_values['num_iterations_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.spatialFilter.numIterations', default_config['cfg.postProcessing.spatialFilter.numIterations']))
+        self.layout_values['alpha_slider'] = tk.DoubleVar(value=current_config.get('cfg.postProcessing.spatialFilter.alpha', default_config['cfg.postProcessing.spatialFilter.alpha']))
+        self.layout_values['delta_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.spatialFilter.delta', default_config['cfg.postProcessing.spatialFilter.delta']))
+
+        self.layout_values['temporal_filter_enable'] = tk.BooleanVar(value=current_config.get('cfg.postProcessing.temporalFilter.enable', False))
+        self.layout_values['temporal_alpha_slider'] = tk.DoubleVar(value=current_config.get('cfg.postProcessing.temporalFilter.alpha', default_config['cfg.postProcessing.temporalFilter.alpha']))
+        self.layout_values['temporal_delta_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.temporalFilter.delta', default_config['cfg.postProcessing.temporalFilter.delta']))
+
+        self.layout_values['threshold_filter_enable'] = tk.BooleanVar(value=(True if 'cfg.postProcessing.thresholdFilter.minRange' in current_config else False))
+        self.layout_values['min_range_val'] = tk.IntVar(value=current_config.get('cfg.postProcessing.thresholdFilter.minRange', default_config['cfg.postProcessing.thresholdFilter.minRange']))
+        self.layout_values['max_range_val'] = tk.IntVar(value=current_config.get('cfg.postProcessing.thresholdFilter.maxRange', default_config['cfg.postProcessing.thresholdFilter.maxRange']))
+
+        self.layout_values['decimation_filter_enable'] = tk.BooleanVar(value=(True if 'cfg.postProcessing.decimationFilter.decimationFactor' in current_config else False))
+        self.layout_values['decimation_factor_val'] = tk.IntVar(value=current_config.get('cfg.postProcessing.decimationFilter.decimationFactor', default_config['cfg.postProcessing.decimationFilter.decimationFactor']))
+        self.layout_values['decimation_mode_val'] = tk.StringVar(
+            value=handle_dict(current_config.get('cfg.postProcessing.decimationFilter.decimationMode', default_config['cfg.postProcessing.decimationFilter.decimationMode']), decimation_set_dict, reverse=True))
+
+        # ------------------------------------------------------ ADVANCED STEREO SETTINGS -------------------------------------------------------
+        self.layout_values['advanced_settings_enable'] = tk.BooleanVar(value=False)
+        self.layout_values['mean_mode_enable'] = tk.BooleanVar(value=True)
+        self.layout_values['CT_kernel_val'] = tk.StringVar(value='KERNEL_AUTO')
+        self.layout_values['CT_threshold_val'] = tk.IntVar(value=0)
+        self.layout_values['division_factor_val'] = tk.IntVar(value=1)
+        self.layout_values['horizontal_penalty_p1_val'] = tk.IntVar(value=250)
+        self.layout_values['horizontal_penalty_p2_val'] = tk.IntVar(value=500)
+        self.layout_values['vertical_penalty_p1_val'] = tk.IntVar(value=250)
+        self.layout_values['vertical_penalty_p2_val'] = tk.IntVar(value=500)
+        self.layout_values['confidence_threshold_val'] = tk.IntVar(value=245)
+        self.layout_values['CM_alpha_val'] = tk.IntVar(value=0)
+        self.layout_values['CM_beta_val'] = tk.IntVar(value=2)
+        self.layout_values['matching_threshold_val'] = tk.IntVar(value=127)
 
     def convert_current_button_values_to_config(self):
         config = {}
@@ -185,27 +244,26 @@ class ReplayVisualizer:
 
         return config
 
-    def create_settings_layout(self, frame, current_config):
+
+    def on_generate_button_keydown(self):
+        print("GENERATE")
+        self.last_config = self.config_json
+        self.config_json = self.convert_current_button_values_to_config()
+
+        print(self.config_json)
+
+        self.config_json = self.add_depthai_to_config(self.config_json)
+
+        self.generated_depth = None
+        self.load_or_generate()
+
+    def create_settings_layout(self, frame):
         def update_label(var, label, form="int"):
             if label is None: return
             if form == "int":
                 label.config(text=str(int(var.get())))
             elif form == "float":
                 label.config(text=str(round(float(var.get()), 1)))
-
-        def on_generate(config):
-            print("GENERATE")
-            self.config_json = self.convert_current_button_values_to_config()
-            self.last_config = config
-
-            print(self.config_json)
-
-            self.config_json = self.add_depthai_to_config(self.config_json)
-
-            self.generated_depth = None
-            self.load_or_generate()
-
-
 
         def toggle_custom_frame_settings():
             toggle_frame_settings(self.layout_values['custom_settings_val'], custom_settings_frame)
@@ -246,81 +304,6 @@ class ReplayVisualizer:
             frame.state(['!disabled'] if state else ['disabled'])
 
         popup_window = frame
-        
-        def initialize_button_values(current_config):
-            # ----------------------------------- Initialize the UI elements with default values from current_config -----------------------------------
-            # Initialize tkinter variables, falling back to default_config if a key is missing in current_config
-            self.layout_values['depth_align'] = tk.StringVar(value=current_config.get('stereo.setDepthAlign', default_config['stereo.setDepthAlign']))
-            self.layout_values['profile_preset'] = tk.StringVar(value=current_config.get('stereo.setDefaultProfilePreset', default_config['stereo.setDefaultProfilePreset']))
-    
-            self.layout_values['custom_settings_val'] = tk.BooleanVar(value=False)
-    
-            self.layout_values['rectificationBox_val'] = tk.BooleanVar(value=current_config.get('stereo.setRectification', True))  # Default to True if not found
-            self.layout_values['LRBox_val'] = tk.BooleanVar(value=current_config.get('stereo.setLeftRightCheck', default_config['stereo.setLeftRightCheck']))
-            self.layout_values['extendedBox_val'] = tk.BooleanVar(value=current_config.get('stereo.setExtendedDisparity', default_config['stereo.setExtendedDisparity']))
-            self.layout_values['subpixelBox_val'] = tk.BooleanVar(value=current_config.get('stereo.setSubpixel', default_config['stereo.setSubpixel']))
-            self.layout_values['fractional_bits_val'] = tk.IntVar(value=current_config.get('stereo.setSubpixelFractionalBits', default_config['stereo.setSubpixelFractionalBits']))
-    
-            # FILTERS -----------------------------------------------------------------------------------
-            self.layout_values['filtering_order_enable'] = tk.BooleanVar(value=(True if 'cfg.postProcessing.filteringOrder' in current_config else False))
-            if 'cfg.postProcessing.filteringOrder' in current_config: self.layout_values['initial_filter_order'] = get_filter_order_back(current_config['cfg.postProcessing.filteringOrder'])
-            else: self.layout_values['initial_filter_order'] = get_filter_order_back(default_config['cfg.postProcessing.filteringOrder'])
-    
-            self.layout_values['decimation_order'] = tk.IntVar(value=self.layout_values['initial_filter_order'][0])
-            self.layout_values['median_order'] = tk.IntVar(value=self.layout_values['initial_filter_order'][1])
-            self.layout_values['speckle_order'] = tk.IntVar(value=self.layout_values['initial_filter_order'][2])
-            self.layout_values['spatial_order'] = tk.IntVar(value=self.layout_values['initial_filter_order'][3])
-            self.layout_values['temporal_order'] = tk.IntVar(value=self.layout_values['initial_filter_order'][4])
-    
-            self.layout_values['median_filter_enable'] = tk.BooleanVar(value=(current_config.get('stereo.initialConfig.setMedianFilter', "MedianFilter.MEDIAN_OFF") != "MedianFilter.MEDIAN_OFF"))
-            self.layout_values['median_val'] = tk.StringVar(value=current_config.get('stereo.initialConfig.setMedianFilter', default_config['stereo.initialConfig.setMedianFilter']))
-    
-            # bilateral_filter_enable = tk.BooleanVar(value=current_config.get('cfg.postProcessing.bilateralFilter.enable', False))
-            # bilateral_sigma_val = tk.IntVar(value=current_config.get('cfg.postProcessing.bilateralSigmaValue', default_config['cfg.postProcessing.bilateralSigmaValue']))
-    
-            self.layout_values['brightness_filter_enable'] = tk.BooleanVar(value=current_config.get('cfg.postProcessing.brightnessFilter.enable', False))
-            self.layout_values['min_brightness_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.brightnessFilter.minBrightness', default_config['cfg.postProcessing.brightnessFilter.minBrightness']))
-            self.layout_values['max_brightness_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.brightnessFilter.maxBrightness', default_config['cfg.postProcessing.brightnessFilter.maxBrightness']))
-    
-            self.layout_values['speckle_filter_enable'] = tk.BooleanVar(value=current_config.get('cfg.postProcessing.speckleFilter.enable', False))
-            self.layout_values['speckle_range_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.speckleFilter.speckleRange', default_config['cfg.postProcessing.speckleFilter.speckleRange']))
-            self.layout_values['speckle_difference_threshold'] = tk.IntVar(value=current_config.get('cfg.postProcessing.speckleFilter.differenceThreshold', default_config['cfg.postProcessing.speckleFilter.differenceThreshold']))
-    
-            self.layout_values['spatial_filter_enable'] = tk.BooleanVar(value=current_config.get('cfg.postProcessing.spatialFilter.enable', False))
-            self.layout_values['hole_filling_radius_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.spatialFilter.holeFillingRadius', default_config['cfg.postProcessing.spatialFilter.holeFillingRadius']))
-            self.layout_values['num_iterations_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.spatialFilter.numIterations', default_config['cfg.postProcessing.spatialFilter.numIterations']))
-            self.layout_values['alpha_slider'] = tk.DoubleVar(value=current_config.get('cfg.postProcessing.spatialFilter.alpha', default_config['cfg.postProcessing.spatialFilter.alpha']))
-            self.layout_values['delta_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.spatialFilter.delta', default_config['cfg.postProcessing.spatialFilter.delta']))
-    
-            self.layout_values['temporal_filter_enable'] = tk.BooleanVar(value=current_config.get('cfg.postProcessing.temporalFilter.enable', False))
-            self.layout_values['temporal_alpha_slider'] = tk.DoubleVar(value=current_config.get('cfg.postProcessing.temporalFilter.alpha', default_config['cfg.postProcessing.temporalFilter.alpha']))
-            self.layout_values['temporal_delta_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.temporalFilter.delta', default_config['cfg.postProcessing.temporalFilter.delta']))
-    
-            self.layout_values['threshold_filter_enable'] = tk.BooleanVar(value=(True if 'cfg.postProcessing.thresholdFilter.minRange' in current_config else False))
-            self.layout_values['min_range_val'] = tk.IntVar(value=current_config.get('cfg.postProcessing.thresholdFilter.minRange', default_config['cfg.postProcessing.thresholdFilter.minRange']))
-            self.layout_values['max_range_val'] = tk.IntVar(value=current_config.get('cfg.postProcessing.thresholdFilter.maxRange', default_config['cfg.postProcessing.thresholdFilter.maxRange']))
-    
-            self.layout_values['decimation_filter_enable'] = tk.BooleanVar(value=(True if 'cfg.postProcessing.decimationFilter.decimationFactor' in current_config else False))
-            self.layout_values['decimation_factor_val'] = tk.IntVar(value=current_config.get('cfg.postProcessing.decimationFilter.decimationFactor', default_config['cfg.postProcessing.decimationFilter.decimationFactor']))
-            self.layout_values['decimation_mode_val'] = tk.StringVar(value=handle_dict(current_config.get('cfg.postProcessing.decimationFilter.decimationMode', default_config['cfg.postProcessing.decimationFilter.decimationMode']), decimation_set_dict, reverse=True))
-
-            # ------------------------------------------------------ ADVANCED STEREO SETTINGS -------------------------------------------------------
-            self.layout_values['advanced_settings_enable'] = tk.BooleanVar(value=False)
-            self.layout_values['mean_mode_enable'] = tk.BooleanVar(value=True)
-            self.layout_values['CT_kernel_val'] = tk.StringVar(value='KERNEL_AUTO')
-            self.layout_values['CT_threshold_val'] = tk.IntVar(value=0)
-            self.layout_values['division_factor_val'] = tk.IntVar(value=1)
-            self.layout_values['horizontal_penalty_p1_val'] = tk.IntVar(value=250)
-            self.layout_values['horizontal_penalty_p2_val'] = tk.IntVar(value=500)
-            self.layout_values['vertical_penalty_p1_val'] = tk.IntVar(value=250)
-            self.layout_values['vertical_penalty_p2_val'] = tk.IntVar(value=500)
-            self.layout_values['confidence_threshold_val'] = tk.IntVar(value=245)
-            self.layout_values['CM_alpha_val'] = tk.IntVar(value=0)
-            self.layout_values['CM_beta_val'] = tk.IntVar(value=2)
-            self.layout_values['matching_threshold_val'] = tk.IntVar(value=127)
-
-
-        initialize_button_values(current_config)
 
         # ----------------------------------------------------------------- BUTTONS -------------------------------------------------------------
 
@@ -735,11 +718,11 @@ class ReplayVisualizer:
         # ------------------------------------------------------------------------------------------------------------------------------
 
         # Add a "GENERATE" button at the bottom
-        generate_button = tk.Button(popup_window, text="GENERATE", bg="green2", activebackground="green4", command=lambda: on_generate(self.config_json))
+        generate_button = tk.Button(popup_window, text="GENERATE", bg="green2", activebackground="green4", command=lambda: self.on_generate_button_keydown())
         generate_button.grid(row=current_row, column=0, columnspan=2, pady=20)
 
         # Add a "GENERATE" button at the bottom
-        generate_button = tk.Button(popup_window, text="GENERATE", bg="blue2", activebackground="blue4", command=lambda: on_generate(self.config_json))  # todo
+        generate_button = tk.Button(popup_window, text="GENERATE", bg="blue2", activebackground="blue4", command=lambda: self.on_generate_button_keydown())  # todo
         generate_button.grid(row=current_row, column=1, columnspan=2, pady=20)
         current_row += 1
         # ------------------------------------------------------------------------------------------------------------------------------
@@ -749,8 +732,6 @@ class ReplayVisualizer:
 
         # popup_window.grab_set()  # Make the window modal (disable interaction with the main window)
         # popup_window.wait_window()  # Wait for the popup window to be destroyed
-
-
 
 
     def on_mouse_wheel(self, event):
@@ -766,22 +747,52 @@ class ReplayVisualizer:
         # print("down", event.widget)
         self.canvas.yview_scroll(1, "units")
 
-    def create_layout(self):
-        def show_pointcloud():
-            if self.pcl_path is None: return False
-            script_directory = os.path.dirname(os.path.abspath(__file__))
-            visualize_pointcloud_path = os.path.join(script_directory, 'visualize_pointcloud.py')
-            subprocess.Popen(['python', visualize_pointcloud_path, self.pcl_path, str(self.config_json)])  # o3d.visualization.draw_geometries([pointcloud])
-            time.sleep(1)
+    def bind_scrolling(self):
+        # --- BINDING FOR SCROLLING
+        if platform.system() == "Linux":
+            self.settings_frame_custom.bind("<Button-4>", self.on_mouse_wheel_up)
+            self.settings_frame_custom.bind("<Button-5>", self.on_mouse_wheel_down)
 
-        generated_depth_text_label = tk.Label(self.main_frame, text="Generated Depth", font=("Arial", 12, "bold"))
-        generated_depth_text_label.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="nsew")
+            def bind_recursively(frame):
+                for widget in frame.winfo_children():
+                    if isinstance(widget, ttk.Spinbox) or isinstance(widget, ttk.Combobox):
+                        widget.bind("<Button-4>", 'break')
+                        widget.bind("<Button-5>", 'break')
+                        continue
+                    widget.bind("<Button-4>", self.on_mouse_wheel_up)
+                    widget.bind("<Button-5>", self.on_mouse_wheel_down)
+                    bind_recursively(widget)
+
+            bind_recursively(self.settings_frame_custom)
+
+        else:
+            self.canvas.bind_all("<MouseWheel>", self.on_mouse_wheel)
+
+        self.canvas.focus_set()
+
+    def show_pointcloud(self):
+        if self.pcl_path is None: return False
+        script_directory = os.path.dirname(os.path.abspath(__file__))
+        visualize_pointcloud_path = os.path.join(script_directory, 'visualize_pointcloud.py')
+        subprocess.Popen(['python', visualize_pointcloud_path, self.pcl_path, str(self.config_json)])  # o3d.visualization.draw_geometries([pointcloud])
+        time.sleep(1)
+
+    def create_layout(self):
+        self.main_frame = tk.Frame(self.toplLevel)
+        self.main_frame.grid(row=0, column=0, sticky="nsew")
 
         self.generated_depth_frame = tk.Frame(self.main_frame)
         self.generated_depth_frame.grid(row=1, column=0, padx=5, pady=5, sticky='nsew')
 
-        generated_img_label = tk.Label(self.generated_depth_frame, text="Generated Depth HERE", font=("Arial", 12, "bold"))
-        generated_img_label.grid(row=1, column=1, padx=10, pady=10)
+        generated_depth_text_label = tk.Label(self.generated_depth_frame, text="Generated Depth", font=("Arial", 12, "bold"))
+        generated_depth_text_label.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="nsew")
+
+        self.generated_depth_image = tk.Label(self.generated_depth_frame, image=None)
+        self.generated_depth_image.image = None
+        self.generated_depth_image.grid(row=1, column=0, padx=10, pady=10)
+
+        pointcloud_button = tk.Button(self.generated_depth_frame, text="Pointcloud", command=self.show_pointcloud)
+        pointcloud_button.grid(row=1, column=2, pady=(50, 0))
 
         # Configure grid weights to allow for proper expansion
         self.main_frame.grid_rowconfigure(0, weight=0)  # Row for the label (no need to expand)
@@ -797,7 +808,6 @@ class ReplayVisualizer:
         self.settings_frame_custom.grid_columnconfigure(0, weight=1, minsize=850)
 
         # ---- CANVAS FOR SETTINGS
-
         self.canvas = tk.Canvas(self.settings_frame_custom)
         self.canvas.grid(row=0, column=0, sticky="nsew")
         self.scrollbar = tk.Scrollbar(self.settings_frame_custom, orient="vertical", command=self.canvas.yview)
@@ -807,15 +817,14 @@ class ReplayVisualizer:
 
         self.content_frame = tk.Frame(self.canvas)
         current_config = self.get_current_config(original_config=None)
-        self.create_settings_layout(self.content_frame, current_config)
+        self.initialize_button_values(current_config)
+        self.create_settings_layout(self.content_frame)
         self.canvas.create_window((0, 0), window=self.content_frame, anchor="nw")
         self.content_frame.update_idletasks()
 
         self.canvas.config(scrollregion=self.canvas.bbox("all"))
 
-
         # --- CAVAS FOR CONFIG
-
         self.config_frame = tk.Frame(self.main_frame)
         self.config_frame.grid(row=3, column=0, padx=5, pady=5, sticky='nsew')
 
@@ -851,36 +860,8 @@ class ReplayVisualizer:
         self.generated_json_text.config(state=tk.DISABLED)  # Disable editing
         self.generated_json_text.grid(row=2, column=1, padx=10, pady=10, sticky="nsew")
 
-        # --- BINDING FOR SCROLLING
-        if platform.system() == "Linux":
-            self.settings_frame_custom.bind("<Button-4>", self.on_mouse_wheel_up)
-            self.settings_frame_custom.bind("<Button-5>", self.on_mouse_wheel_down)
+        self.bind_scrolling()
 
-            def bind_recursively(frame):
-                for widget in frame.winfo_children():
-                    if isinstance(widget, ttk.Spinbox) or isinstance(widget, ttk.Combobox):
-                        widget.bind("<Button-4>", 'break')
-                        widget.bind("<Button-5>", 'break')
-                        continue
-                    widget.bind("<Button-4>", self.on_mouse_wheel_up)
-                    widget.bind("<Button-5>", self.on_mouse_wheel_down)
-                    bind_recursively(widget)
-
-            bind_recursively(self.settings_frame_custom)
-
-        else:
-            self.canvas.bind_all("<MouseWheel>", self.on_mouse_wheel)
-
-        self.canvas.focus_set()
-
-
-        # ----
-        # Assign the wrapper function to the button command
-        pointcloud_button = tk.Button(self.generated_depth_frame, text="Pointcloud", command=show_pointcloud)
-        pointcloud_button.grid(row=1, column=2, pady=(50, 0))
-
-        self.image_labels['generated_img_label'] = generated_img_label
-        self.image_labels['generated_json_label'] = self.generated_json_text
 
     def refresh_display(self, label=None):
         print("Refresh display:", label)
@@ -891,9 +872,11 @@ class ReplayVisualizer:
         # update generated depth
         resized_generated_depth = cv2.resize(colorized_generated_depth, self.scaled_original_size,
                                              interpolation=cv2.INTER_AREA)
-        im_generated = ImageTk.PhotoImage(image=Image.fromarray(resized_generated_depth))
-        self.image_labels['generated_img_label'].configure(image=im_generated)
-        self.image_labels['generated_img_label'].image = im_generated
+
+        tk_image = ImageTk.PhotoImage(image=Image.fromarray(resized_generated_depth))
+
+        self.generated_depth_image.configure(image=tk_image)
+        self.generated_depth_image.image = tk_image
 
         # Update settings labels
         updated_json_str = json.dumps(self.config_json, indent=4)
@@ -902,7 +885,7 @@ class ReplayVisualizer:
         self.generated_json_text.insert(tk.END, updated_json_str)  # Insert updated JSON
         self.generated_json_text.config(state=tk.DISABLED)  # Disable editing again
 
-    def get_output_folder(self):
+    def get_and_create_output_folder(self):
         def compare_json(file_path, json_data):
             """
             Compare the content of a JSON file with a given JSON data object.
@@ -936,8 +919,8 @@ class ReplayVisualizer:
             depth_files = glob.glob(depth_pattern)
             return bool(depth_files)
 
-        self.already_generated = False
-        self.output_folder = None
+        self.depth_in_replay_outputs = False
+        output_folder = None
         current_timestamp = self.view_info['timestamps'][self.view_info['current_index']]
         for dir_path in os.listdir(self.output_dir):
             dir_path = os.path.join(self.output_dir, dir_path)
@@ -945,16 +928,21 @@ class ReplayVisualizer:
                 continue
             if os.path.exists(os.path.join(dir_path, "config.json")):
                 if compare_json(os.path.join(dir_path, "config.json"), format_json_for_replay(str(self.config_json))):
-                    self.output_folder = dir_path
+                    output_folder = dir_path
                     # Check if files with the current timestamp exist in the folder
                     if check_folder_for_timestamp(dir_path, current_timestamp):
-                        self.already_generated = True
+                        self.depth_in_replay_outputs = True
                         print(f"PREVIOUSLY GENERATED: {dir_path}")
                         break
                     else:
                         print("Folder exists but timestamp not generated")
                         break
-        return self.already_generated, self.output_folder
+        if not self.depth_in_replay_outputs:
+            date_time = datetime.now().strftime("%Y%m%d%H%M%S")
+            output_folder = os.path.join(self.output_dir, date_time)
+            os.makedirs(output_folder, exist_ok=False)
+        return output_folder
+
 
     def generate_save_depth_replay_one_frame(self, output_folder=None):
         print("Generating NEW outputs...")
@@ -1039,7 +1027,7 @@ class ReplayVisualizer:
         print("GENERATED")
         return output_folder
 
-    def generate_save_depth_replay(self, output_folder=None):
+    def generate_and_save_depth_replay(self):
         def load_all_frames(data, timestamps):
             frames = {}
             for timestamp in timestamps:
@@ -1077,13 +1065,6 @@ class ReplayVisualizer:
                 pcd.colors = o3d.utility.Vector3dVector(aligned_colors / 255.0)  # Normalize to [0, 1]
             return pcd
 
-        if output_folder is not None:
-            output_folder = output_folder
-        else:
-            date_time = datetime.now().strftime("%Y%m%d%H%M%S")
-            output_folder = os.path.join(self.output_dir, date_time)
-            os.makedirs(output_folder, exist_ok=False)
-
         print("Generating NEW outputs for the whole folder")
         print("Lading data for generation")
         timestamps = self.view_info['timestamps']
@@ -1092,7 +1073,7 @@ class ReplayVisualizer:
         calib = self.view_info["calib"]
         if calib is None: raise ValueError("No calibration provided")
 
-        batch_size = 40
+        batch_size = 100
 
         for batch in range(0, len(timestamps), batch_size):
             frames = load_all_frames(data, timestamps[batch:batch + batch_size])
@@ -1116,30 +1097,32 @@ class ReplayVisualizer:
                 pcl = process_pointcloud(pcl, depth, frames[timestamp].get("isp", None))
 
                 timestamp = timestamp.split(".npy")[0]
-                np.save(os.path.join(output_folder, f"depth_{timestamp}.npy"), depth)
+                np.save(os.path.join(self.output_folder, f"depth_{timestamp}.npy"), depth)
                 colorized_depth, _, _ = colorize_depth(depth, "depth", label=False, min_val=0, max_val=7000)
-                cv2.imwrite(os.path.join(output_folder, f"depth_{timestamp}.png"), colorized_depth)
-                o3d.io.write_point_cloud(os.path.join(output_folder, f"pcl_{timestamp}.ply"), pcl)
+                cv2.imwrite(os.path.join(self.output_folder, f"depth_{timestamp}.png"), colorized_depth)
+                o3d.io.write_point_cloud(os.path.join(self.output_folder, f"pcl_{timestamp}.ply"), pcl)
 
-        with open(os.path.join(output_folder, f'config.json'), 'w') as f:
+        with open(os.path.join(self.output_folder, f'config.json'), 'w') as f:
             json.dump(config, f, indent=4)
 
         print("GENERATED")
-        return output_folder
 
 
     def load_or_generate(self):
         self.refresh_display(label="Loading...")
         self.main_frame.update_idletasks()
+
+        self.output_folder = self.get_and_create_output_folder()
+
+        if not self.depth_in_replay_outputs:
+            self.generate_and_save_depth_replay()
+
         current_timestamp = self.view_info['timestamps'][self.view_info['current_index']]
-        already_generated, self.output_folder = self.get_output_folder()
-        if not already_generated:
-            self.output_folder = self.generate_save_depth_replay(output_folder=self.output_folder)
         print(f"LOADING TIMESTEP: {current_timestamp}")
         self.generated_depth = np.load(os.path.join(self.output_folder, f"depth_{current_timestamp}"))
         self.pcl_path = os.path.join(self.output_folder, f"pcl_{current_timestamp.split('.npy')[0]}.ply")
         self.refresh_display(label="Updated")
-        self.settings_received = False  # Reset after processing
+
         self.main_frame.update_idletasks()
 
 if __name__ == '__main__':
