@@ -28,6 +28,7 @@ def count_output_streams(output_streams):
             stream_names.append(item)
     return stream_names
 
+
 def parseArguments():
     # PARSE ARGUMENTS
     parser = argparse.ArgumentParser()
@@ -35,12 +36,15 @@ def parseArguments():
     parser.add_argument("settings_file_path", help="Path to settings JSON")
     parser.add_argument("view_name", help="Name of the capture")
     parser.add_argument("--output", default=root_path, help="Custom output folder")
-    parser.add_argument("--autostart", default=-1, type=int, help='Automatically start capturing after given number of seconds (-1 to disable)')
-    parser.add_argument("--devices", default=[], dest="mxids", nargs="+", help="MXIDS of devices to connect to")
+    parser.add_argument("--autostart", default=-1, type=int,
+                        help='Automatically start capturing after given number of seconds (-1 to disable)')
+    parser.add_argument("--devices", default=[], dest="mxids", nargs="+",
+                        help="MXIDS or IP addresses of devices to connect to")
 
     args = parser.parse_args()
     settings_path = args.settings_file_path
     view_name = args.view_name
+    devices = args.mxids
 
     # SETTINGS loading
     if not os.path.exists(settings_path):
@@ -50,9 +54,18 @@ def parseArguments():
             settings_path = settings_path_1
         elif os.path.exists(settings_path_2):
             settings_path = settings_path_2
-        else: raise FileNotFoundError(f"Settings file '{settings_path}' does not exist.")
+        else:
+            raise FileNotFoundError(f"Settings file '{settings_path}' does not exist.")
 
-    return settings_path, view_name, args.mxids, args.autostart
+    # Regex patterns for IP addresses and MXIDs
+    ip_pattern = re.compile(r"^(?:\d{1,3}\.){3}\d{1,3}$")
+
+    if all(ip_pattern.match(device) for device in devices):
+        is_ip = True
+    else:
+        is_ip = False
+
+    return settings_path, view_name, devices, args.autostart, is_ip
 
 def worker(mxid, stack, devices, settings, num, shared_devices, exception_queue):
     try:
@@ -140,6 +153,7 @@ def attempt_connection(mxids, attempts=10):
                 print(f"Waiting for devices to become available..., currently available devices: 0")
                 time.sleep(5)
         raise ValueError("No devices found")
+
     for attempt in range(attempts):  # try to connect to the correct cameras
         count = 0
         for device in dai.Device.getAllAvailableDevices():
@@ -153,7 +167,8 @@ def attempt_connection(mxids, attempts=10):
             return mxids
 
 if __name__ == "__main__":
-    settings_path, view_name, mxids, autostart = parseArguments()
+    settings_path, view_name, mxids, autostart,is_ip = parseArguments()
+
 
     # mxids = ['14442C1091F5D9E700', '14442C10F10AC8D600']
     # mxids = ['1944301031664E1300']
@@ -164,7 +179,8 @@ if __name__ == "__main__":
     # view_name = "name"
 
     with contextlib.ExitStack() as stack:
-        mxids = attempt_connection(mxids)
+        if not is_ip:
+            mxids = attempt_connection(mxids)
 
         devices, shared_devices, output_folders = {}, {}, {}
         num_captures = {mxid: 0 for mxid in mxids}
