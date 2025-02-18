@@ -24,7 +24,7 @@
         "tof_amplitude": true,
         "rgb": false,
         "rgb_png": false,
-        "depth": false,
+        "depth": true,
         "disparity": false,
         "sync": true
     },
@@ -39,6 +39,7 @@
     },
     "medianFilter": "dai.MedianFilter.MEDIAN_OFF",
 
-    "FPS": 30,
+    "FPS": 10,
+    "tof_FPS": 30,
     "num_captures": 100
 }

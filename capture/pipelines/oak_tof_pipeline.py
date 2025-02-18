@@ -9,7 +9,7 @@ from .oak_stereo_pipeline import set_stereo_node
 
 def set_tof_node(pipeline, settings):
     tof = pipeline.create(dai.node.ToF)
-    # tof.setNumShaves(4)
+    tof.setNumShaves(3)
 
     # ToF configuration
     tofConfig = tof.initialConfig.get()
@@ -23,8 +23,11 @@ def set_tof_node(pipeline, settings):
 
     cam_tof = pipeline.create(dai.node.Camera)
     cam_tof.setBoardSocket(TOF_SOCKET)
-    cam_tof.setFps(settings["FPS"])
-
+    if settings["tof_FPS"] is not None:
+        cam_tof.setFps(settings["tof_FPS"])
+    else:
+        cam_tof.setFps(settings["FPS"])
+    cam_tof.properties.numFramesPoolRaw = 5
     return tof, cam_tof
 
 def get_pipeline(settings, frame_syn_num=-1):
