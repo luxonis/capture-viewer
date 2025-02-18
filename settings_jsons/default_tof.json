@@ -19,14 +19,14 @@
         "left_raw": false,
         "right_raw": false,
         "tof": true,
-        "tof_depth": true,
+        "tof_depth": false,
         "tof_intensity": true,
         "tof_amplitude": true,
         "rgb": false,
         "rgb_png": false,
-        "depth": true,
+        "depth": false,
         "disparity": false,
-        "sync": true
+        "sync": false
     },
 
     "customTofConfig": false,
@@ -39,7 +39,8 @@
     },
     "medianFilter": "dai.MedianFilter.MEDIAN_OFF",
 
-    "FPS": 10,
+    "FPS": 30,
     "tof_FPS": 30,
-    "num_captures": 100
+    "num_captures": 100,
+    "windows_to_show": ["left"]
 }

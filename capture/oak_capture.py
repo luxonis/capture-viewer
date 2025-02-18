@@ -11,20 +11,27 @@ import argparse
 import numpy as np
 import time
 import re
-
+import multiprocessing
 from utils.capture_universal import colorize_depth, initialize_capture, finalise_capture
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 root_path = os.path.join(os.path.dirname(script_dir), 'DATA')
 
+
 def count_output_streams(output_streams):
+    """
+    Counts how many streams are *actually* enabled for saving
+    (excluding 'sync' and 'rgb_png' which aren't direct image streams).
+    """
     stream_names = []
     for item in output_streams.keys():
-        if item in ["tof","sync","rgb_png"]:
+        # Exclude 'sync' and 'rgb_png' because they're special cases
+        if item in ["tof", "sync", "rgb_png"]:
             continue
         if output_streams[item]:
             stream_names.append(item)
     return stream_names
+
 
 def parseArguments():
     parser = argparse.ArgumentParser()
@@ -37,6 +44,8 @@ def parseArguments():
     settings_path = args.settings_file_path
     view_name = args.view_name
     devices = args.mxids
+
+    # If user passed a file name without .json, try to find it
     if not os.path.exists(settings_path):
         settings_path_1 = f"settings_jsons/{settings_path}.json"
         settings_path_2 = f"settings_jsons/{settings_path}"
@@ -46,32 +55,48 @@ def parseArguments():
             settings_path = settings_path_2
         else:
             raise FileNotFoundError(settings_path)
+
+    # Check if devices are IP addresses
     ip_pattern = re.compile(r"^(?:\d{1,3}\.){3}\d{1,3}$")
     if all(ip_pattern.match(device) for device in devices):
         is_ip = True
     else:
         is_ip = False
+
     return settings_path, view_name, devices, args.autostart, is_ip
 
+
 def worker(mxid, stack, devices, settings, num, shared_devices, exception_queue):
+    """
+    Each thread attempts to open a device with ID = `mxid` and starts a pipeline
+    based on whether it's a standard stereo or ToF device.
+    """
     try:
         openvino_version = dai.OpenVINO.Version.VERSION_2021_4
         usb2_mode = False
         device_info = dai.DeviceInfo(mxid)
         device = stack.enter_context(dai.Device(openvino_version, device_info, usb2_mode))
         shared_devices[mxid] = device
+
+        # Build pipeline
         if device.getDeviceName() == "OAK-D-SR-POE":
             from pipelines.oak_tof_pipeline import get_pipeline
             pipeline_output = get_pipeline(settings, num)
         else:
             from pipelines.oak_stereo_pipeline import get_pipeline
             pipeline_output = get_pipeline(settings)
+
         device.startPipeline(pipeline_output["pipeline"])
+
+        # If we are using 'sync' messages, just attach one queue
         if settings['output_settings']['sync']:
             devices[mxid] = {'sync': device.getOutputQueue(name="xout")}
         else:
+            # Otherwise, create individual queues
             devices[mxid] = {}
             output_settings = settings['output_settings']
+
+            # Tof streams
             if output_settings.get("tof", False):
                 if output_settings.get("tof_raw", False):
                     devices[mxid]['tof_raw'] = device.getOutputQueue(name="tof_raw")
@@ -81,6 +106,8 @@ def worker(mxid, stack, devices, settings, num, shared_devices, exception_queue)
                     devices[mxid]['tof_intensity'] = device.getOutputQueue(name="tof_intensity")
                 if output_settings.get("tof_amplitude", False):
                     devices[mxid]['tof_amplitude'] = device.getOutputQueue(name="tof_amplitude")
+
+            # Stereo / RGB streams
             if output_settings["depth"]:
                 devices[mxid]['depth'] = device.getOutputQueue(name="depth")
             if output_settings["disparity"]:
@@ -95,9 +122,11 @@ def worker(mxid, stack, devices, settings, num, shared_devices, exception_queue)
                 devices[mxid]['right_raw'] = device.getOutputQueue(name="right_raw")
             if output_settings["rgb"]:
                 devices[mxid]['rgb'] = device.getOutputQueue(name="rgb")
+
     except Exception as e:
         exception_queue.put((mxid, str(e)))
         raise
+
 
 ###
 # FPS logic setup
@@ -111,11 +140,13 @@ def worker(mxid, stack, devices, settings, num, shared_devices, exception_queue)
 # }
 fps_counters = {}
 
+
 def get_fps(mxid, stream_name):
     """
     Returns the current FPS for a specific (mxid, stream_name).
     """
     return fps_counters.get((mxid, stream_name), {}).get("fps", 0.0)
+
 
 def update_fps(mxid, stream_name):
     """
@@ -134,22 +165,26 @@ def update_fps(mxid, stream_name):
     data["frame_count"] += 1
     current_time = time.time()
     elapsed = current_time - data["last_time"]
-    # Update FPS every 1 second (you can adjust this interval as needed)
+    # Update FPS every 1 second
     if elapsed >= 1.0:
         data["fps"] = data["frame_count"] / elapsed
         data["frame_count"] = 0
         data["last_time"] = current_time
 
-def visualize_frame(mxid, name, frame, timestamp, fps_value):
+
+def visualize_frame(mxid, name, frame, timestamp, fps_value, windows_to_show):
     """
-    Show frames in an OpenCV window and overlay timestamp + fps.
+    Show frames in an OpenCV window and overlay timestamp + fps,
+    but only if `name` is in `windows_to_show`.
     """
+    if name not in windows_to_show:
+        return  # Skip displaying this stream
+
     if name == "tof_depth":
         max_depth = 5 * 1500
         depth_colorized = colorize_depth(frame, min_depth=0, max_depth=max_depth)
         cv2.putText(depth_colorized, f"{timestamp} ms", (10, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-        # **Add FPS overlay**
         cv2.putText(depth_colorized, f"FPS: {fps_value:.2f}", (10, 70),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
         cv2.imshow(f"{mxid} {name}", depth_colorized)
@@ -157,18 +192,16 @@ def visualize_frame(mxid, name, frame, timestamp, fps_value):
     elif name in ["left", "right", "rgb"]:
         cv2.putText(frame, f"{timestamp} ms", (10, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-        # **Add FPS overlay**
         cv2.putText(frame, f"FPS: {fps_value:.2f}", (10, 70),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
         cv2.imshow(f"{mxid} {name}", frame)
 
     elif name == "tof_amplitude":
+        # Scale amplitude to 0-255 for visualization
         depth_vis = (frame * 255 / frame.max()).astype(np.uint8)
         depth_vis = cv2.applyColorMap(depth_vis, cv2.COLORMAP_JET)
-        # You can add timestamp if desired:
         cv2.putText(depth_vis, f"{timestamp} ms", (10, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-        # **Add FPS overlay**
         cv2.putText(depth_vis, f"FPS: {fps_value:.2f}", (10, 70),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
         cv2.imshow(f"{mxid} {name}", depth_vis)
@@ -176,7 +209,6 @@ def visualize_frame(mxid, name, frame, timestamp, fps_value):
     elif name == "tof_intensity":
         cv2.putText(frame, f"{timestamp} ms", (10, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-        # **Add FPS overlay**
         cv2.putText(frame, f"FPS: {fps_value:.2f}", (10, 70),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
         cv2.imshow(f"{mxid} {name}", frame)
@@ -185,7 +217,6 @@ def visualize_frame(mxid, name, frame, timestamp, fps_value):
         depth_vis = colorize_depth(frame)
         cv2.putText(depth_vis, f"{timestamp} ms", (10, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-        # **Add FPS overlay**
         cv2.putText(depth_vis, f"FPS: {fps_value:.2f}", (10, 70),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
         cv2.imshow(f"{mxid} {name}", depth_vis)
@@ -194,32 +225,42 @@ def visualize_frame(mxid, name, frame, timestamp, fps_value):
         depth_vis = colorize_depth(frame, min_depth=0, max_depth=frame.max())
         cv2.putText(depth_vis, f"{timestamp} ms", (10, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-        # **Add FPS overlay**
         cv2.putText(depth_vis, f"FPS: {fps_value:.2f}", (10, 70),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
         cv2.imshow(f"{mxid} {name}", depth_vis)
 
+
 def attempt_connection(mxids, attempts=10):
+    """
+    If no MXIDs are provided, wait up to `attempts` times to discover a device.
+    Otherwise, verify that the requested devices are discoverable.
+    """
     if len(mxids) == 0:
-        for i in range(attempts):
+        for _ in range(attempts):
             devices = dai.Device.getAllAvailableDevices()
             if len(devices) > 0:
-                mxids = [dai.Device.getAllAvailableDevices()[0].mxid]
+                mxids = [devices[0].mxid]
                 return mxids
             else:
                 time.sleep(5)
         raise ValueError("No devices found")
+
+    # If user-specified MXIDs, wait until all are discovered or we give up
     for attempt in range(attempts):
-        count = 0
-        for device in dai.Device.getAllAvailableDevices():
-            if device.mxid in mxids:
-                count += 1
-        if count < len(mxids):
+        count_found = sum(
+            1 for dev_info in dai.Device.getAllAvailableDevices()
+            if dev_info.mxid in mxids
+        )
+        if count_found < len(mxids):
             time.sleep(5)
         else:
             return mxids
 
+
 def saver_thread_func(q):
+    """
+    Thread that handles saving frames to disk in the background.
+    """
     while True:
         item = q.get()
         if item is None:
@@ -227,21 +268,28 @@ def saver_thread_func(q):
         path, data = item
         np.save(path, data)
 
+
 if __name__ == "__main__":
+    # Parse arguments and read settings
     settings_path, view_name, mxids, autostart, is_ip = parseArguments()
     if not is_ip:
         mxids = attempt_connection(mxids)
+
     devices, shared_devices, output_folders = {}, {}, {}
     num_captures = {mxid: 0 for mxid in mxids}
     threads = []
     exception_queue = queue.Queue()
+
+    # Load JSON settings
     with open(settings_path) as settings_file:
         settings = json.load(settings_file)
 
+    # Prepare a separate thread for saving frames
     save_queue = queue.Queue()
-    saver_thread = threading.Thread(target=saver_thread_func, args=(save_queue,), daemon=True)
+    saver_thread = multiprocessing.Process(target=saver_thread_func, args=(save_queue,), daemon=True)
     saver_thread.start()
 
+    # Create device worker threads
     with contextlib.ExitStack() as stack:
         for i, mxid in enumerate(mxids):
             thread = threading.Thread(
@@ -254,35 +302,44 @@ if __name__ == "__main__":
         for t in threads:
             t.join()
 
+        # Check if any threads failed
         failed_mxids = []
         while not exception_queue.empty():
             mxid, error_message = exception_queue.get()
-            logging.error(error_message)
+            logging.error(f"Device {mxid} failed with error: {error_message}")
             if mxid not in failed_mxids:
                 failed_mxids.append(mxid)
 
         if len(failed_mxids) == len(mxids):
-            raise Exception("ALL worker threads failed")
+            raise Exception("ALL worker threads failed. No devices are available.")
 
-        # Configure device-level settings (IR lasers, floodlight, etc.)
+        # Turn on IR lasers or floodlight if requested
         for mxid in mxids:
             device = shared_devices[mxid]
-            if settings["ir"]:
-                device.setIrLaserDotProjectorIntensity(settings["ir_value"])
-            if settings["flood_light"]:
-                device.setIrFloodLightIntensity(settings["flood_light_intensity"])
+            if settings.get("ir", False):
+                device.setIrLaserDotProjectorIntensity(settings.get("ir_value", 0))
+            if settings.get("flood_light", False):
+                device.setIrFloodLightIntensity(settings.get("flood_light_intensity", 0))
 
+        # Set up capture logic
         save = False
         capture_ended = False
+
+        # Count how many streams we are *saving* (not necessarily how many we are displaying)
         streams = count_output_streams(settings['output_settings'])
         final_num_captures = settings['num_captures'] * len(streams)
 
+        # windows_to_show is a new user-defined list in the JSON
+        windows_to_show = settings.get("windows_to_show", [])
+
+        # If autostart is used, define the time at which capturing starts
         initial_time = time.time()
         initialize_capture_time = initial_time + autostart
 
         while True:
             # Auto-start logic
             if not save and autostart > -1 and time.time() > initialize_capture_time:
+                # Start saving
                 for mxid in shared_devices.keys():
                     device = shared_devices[mxid]
                     out_dir = initialize_capture(root_path, device, settings_path, view_name)
@@ -290,29 +347,31 @@ if __name__ == "__main__":
                 save = True
                 start_time = time.time()
 
-            # Read frames
+            # Read frames from each device
             for mxid, q in devices.items():
                 if settings['output_settings']['sync']:
+                    # If we have a synced queue
                     if not q['sync'].has():
                         continue
-                    msgGrp = q['sync'].get()
-
+                    msgGrp = q['sync'].get()  # This is a list of (name, ImgFrame)
                     for name, msg in msgGrp:
                         timestamp = int(msg.getTimestamp().total_seconds() * 1000)
                         frame = msg.getCvFrame()
 
-                        # **Update FPS counters**
+                        # Update FPS
                         update_fps(mxid, name)
                         fps_val = get_fps(mxid, name)
 
+                        # If saving, enqueue for saving
                         if save:
                             save_queue.put((f'{output_folders[mxid]}/{name}_{timestamp}.npy', frame))
                             num_captures[mxid] += 1
 
-                        # **Pass FPS to visualize_frame**
-                        visualize_frame(mxid, name, frame, timestamp, fps_val)
+                        # Display (only if in windows_to_show)
+                        visualize_frame(mxid, name, frame, timestamp, fps_val, windows_to_show)
 
                 else:
+                    # If we have individual queues
                     for name in q.keys():
                         if not q[name].has():
                             continue
@@ -320,23 +379,28 @@ if __name__ == "__main__":
                         cvFrame = frame.getCvFrame()
                         timestamp = int(frame.getTimestamp().total_seconds() * 1000)
 
-                        # **Update FPS counters**
+                        # Update FPS
                         update_fps(mxid, name)
                         fps_val = get_fps(mxid, name)
 
+                        # If saving, enqueue for saving
                         if save:
                             save_queue.put((f'{output_folders[mxid]}/{name}_{timestamp}.npy', cvFrame))
                             num_captures[mxid] += 1
 
-                        # **Pass FPS to visualize_frame**
-                        visualize_frame(mxid, name, cvFrame, timestamp, fps_val)
+                        # Display (only if in windows_to_show)
+                        visualize_frame(mxid, name, cvFrame, timestamp, fps_val, windows_to_show)
 
+            # Key handling
             key = cv2.waitKey(1) & 0xFF
             if key == ord('q'):
+                # Quit
                 break
             elif key == ord("s"):
+                # Toggle saving
                 save = not save
                 if save:
+                    # If turning 'on' saving
                     for mxid in shared_devices.keys():
                         device = shared_devices[mxid]
                         out_dir = initialize_capture(root_path, device, settings_path, view_name)
@@ -344,12 +408,13 @@ if __name__ == "__main__":
                     save = True
                     start_time = time.time()
                 else:
+                    # If turning 'off' saving
                     end_time = time.time()
                     for mxid in shared_devices.keys():
                         finalise_capture(start_time, end_time, num_captures[mxid], streams)
                     capture_ended, save = True, False
 
-            # Check if we reached the required number of captures
+            # Check if we've captured enough frames
             for mxid in shared_devices.keys():
                 if num_captures[mxid] >= final_num_captures:
                     end_time = time.time()
@@ -359,6 +424,8 @@ if __name__ == "__main__":
             if capture_ended:
                 break
 
+    # Stop the saver thread
     save_queue.put(None)
     saver_thread.join()
+
     cv2.destroyAllWindows()
