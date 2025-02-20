@@ -36,9 +36,20 @@ class ReplayVisualizer:
         self.current_view = current_view
 
         self.generated_depth = None
+        self.generated_depth1 = None
+        self.generated_depth2 = None
+
         self.pcl_path = None
+        self.pcl_path1 = None
+        self.pcl_path2 = None
+
+        self.generated_depth_image1 = None
+        self.generated_depth_image2 = None
 
         self.config_json = None
+        self.config_json1 = None
+        self.config_json2 = None
+
         self.last_config = None
 
         self.output_dir = os.path.join(view_info["capture_folder"], "replay_outputs")
@@ -47,7 +58,8 @@ class ReplayVisualizer:
         self.output_folder = None
         self.depth_in_replay_outputs = False
 
-        self.layout_values = {}  # button_key: value
+        self.button_values1 = {"frame_number" : 1}  # button_key: value
+        self.button_values2 = {"frame_number" : 2}  # button_key: value
 
     def add_depthai_to_config(self, config_json):
         """ adding dai. at the beginning of strings so they can be validated as depthai objects in replay"""
@@ -61,7 +73,7 @@ class ReplayVisualizer:
             else: new_config[key] = config_value
         return new_config
 
-    def get_current_config(self, original_config):
+    def get_initial_config(self, original_config):
         if self.last_config is None and original_config is not None:
             current_config = settings2config(original_config)
         elif self.last_config is not None:
@@ -70,114 +82,114 @@ class ReplayVisualizer:
             current_config = default_config
         return current_config
 
-    def initialize_button_values(self, current_config):
+    def inicialize_button_values(self, current_config, button_values):
         # ----------------------------------- Initialize the UI elements with default values from current_config -----------------------------------
         # Initialize tkinter variables, falling back to default_config if a key is missing in current_config
-        self.layout_values['depth_align'] = tk.StringVar(value=current_config.get('stereo.setDepthAlign', default_config['stereo.setDepthAlign']))
-        self.layout_values['profile_preset'] = tk.StringVar(value=current_config.get('stereo.setDefaultProfilePreset', default_config['stereo.setDefaultProfilePreset']))
+        button_values['depth_align'] = tk.StringVar(value=current_config.get('stereo.setDepthAlign', default_config['stereo.setDepthAlign']))
+        button_values['profile_preset'] = tk.StringVar(value=current_config.get('stereo.setDefaultProfilePreset', default_config['stereo.setDefaultProfilePreset']))
 
-        self.layout_values['custom_settings_val'] = tk.BooleanVar(value=False)
+        button_values['custom_settings_val'] = tk.BooleanVar(value=False)
 
-        self.layout_values['rectificationBox_val'] = tk.BooleanVar(value=current_config.get('stereo.setRectification', True))  # Default to True if not found
-        self.layout_values['LRBox_val'] = tk.BooleanVar(value=current_config.get('stereo.setLeftRightCheck', default_config['stereo.setLeftRightCheck']))
-        self.layout_values['extendedBox_val'] = tk.BooleanVar(value=current_config.get('stereo.setExtendedDisparity', default_config['stereo.setExtendedDisparity']))
-        self.layout_values['subpixelBox_val'] = tk.BooleanVar(value=current_config.get('stereo.setSubpixel', default_config['stereo.setSubpixel']))
-        self.layout_values['fractional_bits_val'] = tk.IntVar(value=current_config.get('stereo.setSubpixelFractionalBits', default_config['stereo.setSubpixelFractionalBits']))
+        button_values['rectificationBox_val'] = tk.BooleanVar(value=current_config.get('stereo.setRectification', True))  # Default to True if not found
+        button_values['LRBox_val'] = tk.BooleanVar(value=current_config.get('stereo.setLeftRightCheck', default_config['stereo.setLeftRightCheck']))
+        button_values['extendedBox_val'] = tk.BooleanVar(value=current_config.get('stereo.setExtendedDisparity', default_config['stereo.setExtendedDisparity']))
+        button_values['subpixelBox_val'] = tk.BooleanVar(value=current_config.get('stereo.setSubpixel', default_config['stereo.setSubpixel']))
+        button_values['fractional_bits_val'] = tk.IntVar(value=current_config.get('stereo.setSubpixelFractionalBits', default_config['stereo.setSubpixelFractionalBits']))
 
         # FILTERS -----------------------------------------------------------------------------------
-        self.layout_values['filtering_order_enable'] = tk.BooleanVar(value=(True if 'cfg.postProcessing.filteringOrder' in current_config else False))
+        button_values['filtering_order_enable'] = tk.BooleanVar(value=(True if 'cfg.postProcessing.filteringOrder' in current_config else False))
         if 'cfg.postProcessing.filteringOrder' in current_config:
-            self.layout_values['initial_filter_order'] = get_filter_order_back(current_config['cfg.postProcessing.filteringOrder'])
+            button_values['initial_filter_order'] = get_filter_order_back(current_config['cfg.postProcessing.filteringOrder'])
         else:
-            self.layout_values['initial_filter_order'] = get_filter_order_back(default_config['cfg.postProcessing.filteringOrder'])
+            button_values['initial_filter_order'] = get_filter_order_back(default_config['cfg.postProcessing.filteringOrder'])
 
-        self.layout_values['decimation_order'] = tk.IntVar(value=self.layout_values['initial_filter_order'][0])
-        self.layout_values['median_order'] = tk.IntVar(value=self.layout_values['initial_filter_order'][1])
-        self.layout_values['speckle_order'] = tk.IntVar(value=self.layout_values['initial_filter_order'][2])
-        self.layout_values['spatial_order'] = tk.IntVar(value=self.layout_values['initial_filter_order'][3])
-        self.layout_values['temporal_order'] = tk.IntVar(value=self.layout_values['initial_filter_order'][4])
+        button_values['decimation_order'] = tk.IntVar(value=button_values['initial_filter_order'][0])
+        button_values['median_order'] = tk.IntVar(value=button_values['initial_filter_order'][1])
+        button_values['speckle_order'] = tk.IntVar(value=button_values['initial_filter_order'][2])
+        button_values['spatial_order'] = tk.IntVar(value=button_values['initial_filter_order'][3])
+        button_values['temporal_order'] = tk.IntVar(value=button_values['initial_filter_order'][4])
 
-        self.layout_values['median_filter_enable'] = tk.BooleanVar(value=(current_config.get('stereo.initialConfig.setMedianFilter', "MedianFilter.MEDIAN_OFF") != "MedianFilter.MEDIAN_OFF"))
-        self.layout_values['median_val'] = tk.StringVar(value=current_config.get('stereo.initialConfig.setMedianFilter', default_config['stereo.initialConfig.setMedianFilter']))
+        button_values['median_filter_enable'] = tk.BooleanVar(value=(current_config.get('stereo.initialConfig.setMedianFilter', "MedianFilter.MEDIAN_OFF") != "MedianFilter.MEDIAN_OFF"))
+        button_values['median_val'] = tk.StringVar(value=current_config.get('stereo.initialConfig.setMedianFilter', default_config['stereo.initialConfig.setMedianFilter']))
 
         # bilateral_filter_enable = tk.BooleanVar(value=current_config.get('cfg.postProcessing.bilateralFilter.enable', False))
         # bilateral_sigma_val = tk.IntVar(value=current_config.get('cfg.postProcessing.bilateralSigmaValue', default_config['cfg.postProcessing.bilateralSigmaValue']))
 
-        self.layout_values['brightness_filter_enable'] = tk.BooleanVar(value=current_config.get('cfg.postProcessing.brightnessFilter.enable', False))
-        self.layout_values['min_brightness_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.brightnessFilter.minBrightness', default_config['cfg.postProcessing.brightnessFilter.minBrightness']))
-        self.layout_values['max_brightness_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.brightnessFilter.maxBrightness', default_config['cfg.postProcessing.brightnessFilter.maxBrightness']))
+        button_values['brightness_filter_enable'] = tk.BooleanVar(value=current_config.get('cfg.postProcessing.brightnessFilter.enable', False))
+        button_values['min_brightness_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.brightnessFilter.minBrightness', default_config['cfg.postProcessing.brightnessFilter.minBrightness']))
+        button_values['max_brightness_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.brightnessFilter.maxBrightness', default_config['cfg.postProcessing.brightnessFilter.maxBrightness']))
 
-        self.layout_values['speckle_filter_enable'] = tk.BooleanVar(value=current_config.get('cfg.postProcessing.speckleFilter.enable', False))
-        self.layout_values['speckle_range_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.speckleFilter.speckleRange', default_config['cfg.postProcessing.speckleFilter.speckleRange']))
-        self.layout_values['speckle_difference_threshold'] = tk.IntVar(value=current_config.get('cfg.postProcessing.speckleFilter.differenceThreshold', default_config['cfg.postProcessing.speckleFilter.differenceThreshold']))
+        button_values['speckle_filter_enable'] = tk.BooleanVar(value=current_config.get('cfg.postProcessing.speckleFilter.enable', False))
+        button_values['speckle_range_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.speckleFilter.speckleRange', default_config['cfg.postProcessing.speckleFilter.speckleRange']))
+        button_values['speckle_difference_threshold'] = tk.IntVar(value=current_config.get('cfg.postProcessing.speckleFilter.differenceThreshold', default_config['cfg.postProcessing.speckleFilter.differenceThreshold']))
 
-        self.layout_values['spatial_filter_enable'] = tk.BooleanVar(value=current_config.get('cfg.postProcessing.spatialFilter.enable', False))
-        self.layout_values['hole_filling_radius_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.spatialFilter.holeFillingRadius', default_config['cfg.postProcessing.spatialFilter.holeFillingRadius']))
-        self.layout_values['num_iterations_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.spatialFilter.numIterations', default_config['cfg.postProcessing.spatialFilter.numIterations']))
-        self.layout_values['alpha_slider'] = tk.DoubleVar(value=current_config.get('cfg.postProcessing.spatialFilter.alpha', default_config['cfg.postProcessing.spatialFilter.alpha']))
-        self.layout_values['delta_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.spatialFilter.delta', default_config['cfg.postProcessing.spatialFilter.delta']))
+        button_values['spatial_filter_enable'] = tk.BooleanVar(value=current_config.get('cfg.postProcessing.spatialFilter.enable', False))
+        button_values['hole_filling_radius_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.spatialFilter.holeFillingRadius', default_config['cfg.postProcessing.spatialFilter.holeFillingRadius']))
+        button_values['num_iterations_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.spatialFilter.numIterations', default_config['cfg.postProcessing.spatialFilter.numIterations']))
+        button_values['alpha_slider'] = tk.DoubleVar(value=current_config.get('cfg.postProcessing.spatialFilter.alpha', default_config['cfg.postProcessing.spatialFilter.alpha']))
+        button_values['delta_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.spatialFilter.delta', default_config['cfg.postProcessing.spatialFilter.delta']))
 
-        self.layout_values['temporal_filter_enable'] = tk.BooleanVar(value=current_config.get('cfg.postProcessing.temporalFilter.enable', False))
-        self.layout_values['temporal_alpha_slider'] = tk.DoubleVar(value=current_config.get('cfg.postProcessing.temporalFilter.alpha', default_config['cfg.postProcessing.temporalFilter.alpha']))
-        self.layout_values['temporal_delta_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.temporalFilter.delta', default_config['cfg.postProcessing.temporalFilter.delta']))
+        button_values['temporal_filter_enable'] = tk.BooleanVar(value=current_config.get('cfg.postProcessing.temporalFilter.enable', False))
+        button_values['temporal_alpha_slider'] = tk.DoubleVar(value=current_config.get('cfg.postProcessing.temporalFilter.alpha', default_config['cfg.postProcessing.temporalFilter.alpha']))
+        button_values['temporal_delta_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.temporalFilter.delta', default_config['cfg.postProcessing.temporalFilter.delta']))
 
-        self.layout_values['threshold_filter_enable'] = tk.BooleanVar(value=(True if 'cfg.postProcessing.thresholdFilter.minRange' in current_config else False))
-        self.layout_values['min_range_val'] = tk.IntVar(value=current_config.get('cfg.postProcessing.thresholdFilter.minRange', default_config['cfg.postProcessing.thresholdFilter.minRange']))
-        self.layout_values['max_range_val'] = tk.IntVar(value=current_config.get('cfg.postProcessing.thresholdFilter.maxRange', default_config['cfg.postProcessing.thresholdFilter.maxRange']))
+        button_values['threshold_filter_enable'] = tk.BooleanVar(value=(True if 'cfg.postProcessing.thresholdFilter.minRange' in current_config else False))
+        button_values['min_range_val'] = tk.IntVar(value=current_config.get('cfg.postProcessing.thresholdFilter.minRange', default_config['cfg.postProcessing.thresholdFilter.minRange']))
+        button_values['max_range_val'] = tk.IntVar(value=current_config.get('cfg.postProcessing.thresholdFilter.maxRange', default_config['cfg.postProcessing.thresholdFilter.maxRange']))
 
-        self.layout_values['decimation_filter_enable'] = tk.BooleanVar(value=(True if 'cfg.postProcessing.decimationFilter.decimationFactor' in current_config else False))
-        self.layout_values['decimation_factor_val'] = tk.IntVar(value=current_config.get('cfg.postProcessing.decimationFilter.decimationFactor', default_config['cfg.postProcessing.decimationFilter.decimationFactor']))
-        self.layout_values['decimation_mode_val'] = tk.StringVar(
+        button_values['decimation_filter_enable'] = tk.BooleanVar(value=(True if 'cfg.postProcessing.decimationFilter.decimationFactor' in current_config else False))
+        button_values['decimation_factor_val'] = tk.IntVar(value=current_config.get('cfg.postProcessing.decimationFilter.decimationFactor', default_config['cfg.postProcessing.decimationFilter.decimationFactor']))
+        button_values['decimation_mode_val'] = tk.StringVar(
             value=handle_dict(current_config.get('cfg.postProcessing.decimationFilter.decimationMode', default_config['cfg.postProcessing.decimationFilter.decimationMode']), decimation_set_dict, reverse=True))
 
         # ------------------------------------------------------ ADVANCED STEREO SETTINGS -------------------------------------------------------
-        self.layout_values['advanced_settings_enable'] = tk.BooleanVar(value=False)
-        self.layout_values['mean_mode_enable'] = tk.BooleanVar(value=True)
-        self.layout_values['CT_kernel_val'] = tk.StringVar(value='KERNEL_AUTO')
-        self.layout_values['CT_threshold_val'] = tk.IntVar(value=0)
-        self.layout_values['division_factor_val'] = tk.IntVar(value=1)
-        self.layout_values['horizontal_penalty_p1_val'] = tk.IntVar(value=250)
-        self.layout_values['horizontal_penalty_p2_val'] = tk.IntVar(value=500)
-        self.layout_values['vertical_penalty_p1_val'] = tk.IntVar(value=250)
-        self.layout_values['vertical_penalty_p2_val'] = tk.IntVar(value=500)
-        self.layout_values['confidence_threshold_val'] = tk.IntVar(value=245)
-        self.layout_values['CM_alpha_val'] = tk.IntVar(value=0)
-        self.layout_values['CM_beta_val'] = tk.IntVar(value=2)
-        self.layout_values['matching_threshold_val'] = tk.IntVar(value=127)
+        button_values['advanced_settings_enable'] = tk.BooleanVar(value=False)
+        button_values['mean_mode_enable'] = tk.BooleanVar(value=True)
+        button_values['CT_kernel_val'] = tk.StringVar(value='KERNEL_AUTO')
+        button_values['CT_threshold_val'] = tk.IntVar(value=0)
+        button_values['division_factor_val'] = tk.IntVar(value=1)
+        button_values['horizontal_penalty_p1_val'] = tk.IntVar(value=250)
+        button_values['horizontal_penalty_p2_val'] = tk.IntVar(value=500)
+        button_values['vertical_penalty_p1_val'] = tk.IntVar(value=250)
+        button_values['vertical_penalty_p2_val'] = tk.IntVar(value=500)
+        button_values['confidence_threshold_val'] = tk.IntVar(value=245)
+        button_values['CM_alpha_val'] = tk.IntVar(value=0)
+        button_values['CM_beta_val'] = tk.IntVar(value=2)
+        button_values['matching_threshold_val'] = tk.IntVar(value=127)
 
-    def convert_current_button_values_to_config(self):
+    def convert_current_button_values_to_config(self, button_values):
         config = {}
-        config['stereo.setDepthAlign'] = self.layout_values['depth_align'].get()
-        if self.layout_values['profile_preset'].get() != 'None':
-            config['stereo.setDefaultProfilePreset'] = self.layout_values['profile_preset'].get()
+        config['stereo.setDepthAlign'] = button_values['depth_align'].get()
+        if button_values['profile_preset'].get() != 'None':
+            config['stereo.setDefaultProfilePreset'] = button_values['profile_preset'].get()
 
-        if self.layout_values['custom_settings_val'].get():
-            if self.layout_values['filtering_order_enable'].get():  # needs to be the first item for the config to not be initialised in case of wrong filtering order
+        if button_values['custom_settings_val'].get():
+            if button_values['filtering_order_enable'].get():  # needs to be the first item for the config to not be initialised in case of wrong filtering order
                 if not check_valid_filtering_order(
-                        [self.layout_values['decimation_order'].get(), self.layout_values['median_order'].get(), self.layout_values['speckle_order'].get(), self.layout_values['spatial_order'].get(),
-                         self.layout_values['temporal_order'].get()]):
+                        [button_values['decimation_order'].get(), button_values['median_order'].get(), button_values['speckle_order'].get(), button_values['spatial_order'].get(),
+                         button_values['temporal_order'].get()]):
                     warning()
                     return config
                 else:
-                    config['cfg.postProcessing.filteringOrder'] = get_filter_order(self.layout_values['decimation_order'].get(),
-                                                                                   self.layout_values['median_order'].get(),
-                                                                                   self.layout_values['speckle_order'].get(),
-                                                                                   self.layout_values['spatial_order'].get(),
-                                                                                   self.layout_values['temporal_order'].get())
+                    config['cfg.postProcessing.filteringOrder'] = get_filter_order(button_values['decimation_order'].get(),
+                                                                                   button_values['median_order'].get(),
+                                                                                   button_values['speckle_order'].get(),
+                                                                                   button_values['spatial_order'].get(),
+                                                                                   button_values['temporal_order'].get())
 
-            config['stereo.setRectification'] = self.layout_values['rectificationBox_val'].get()
-            config['stereo.setLeftRightCheck'] = self.layout_values['LRBox_val'].get()
+            config['stereo.setRectification'] = button_values['rectificationBox_val'].get()
+            config['stereo.setLeftRightCheck'] = button_values['LRBox_val'].get()
 
-            config['stereo.setExtendedDisparity'] = self.layout_values['extendedBox_val'].get()
-            config['stereo.setSubpixel'] = self.layout_values['subpixelBox_val'].get()
+            config['stereo.setExtendedDisparity'] = button_values['extendedBox_val'].get()
+            config['stereo.setSubpixel'] = button_values['subpixelBox_val'].get()
 
-            if self.layout_values['subpixelBox_val'].get():
-                config['stereo.setSubpixelFractionalBits'] = self.layout_values['fractional_bits_val'].get()
+            if button_values['subpixelBox_val'].get():
+                config['stereo.setSubpixelFractionalBits'] = button_values['fractional_bits_val'].get()
 
             # FILTERS
 
-            if self.layout_values['median_filter_enable'].get():
-                config['stereo.initialConfig.setMedianFilter'] = self.layout_values['median_val'].get()
+            if button_values['median_filter_enable'].get():
+                config['stereo.initialConfig.setMedianFilter'] = button_values['median_val'].get()
             else:
                 config['stereo.initialConfig.setMedianFilter'] = "MedianFilter.MEDIAN_OFF"
 
@@ -189,75 +201,97 @@ class ReplayVisualizer:
             #     pass
 
             # Brightness filter
-            if self.layout_values['brightness_filter_enable'].get():  # todo can we disable brightness filter?
-                config['cfg.postProcessing.brightnessFilter.maxBrightness'] = self.layout_values['max_brightness_slider'].get()
-                config['cfg.postProcessing.brightnessFilter.minBrightness'] = self.layout_values['min_brightness_slider'].get()
+            if button_values['brightness_filter_enable'].get():  # todo can we disable brightness filter?
+                config['cfg.postProcessing.brightnessFilter.maxBrightness'] = button_values['max_brightness_slider'].get()
+                config['cfg.postProcessing.brightnessFilter.minBrightness'] = button_values['min_brightness_slider'].get()
 
             # Speckle filter
-            config['cfg.postProcessing.speckleFilter.enable'] = self.layout_values['speckle_filter_enable'].get()
-            if self.layout_values['speckle_filter_enable'].get():
-                config['cfg.postProcessing.speckleFilter.speckleRange'] = self.layout_values['speckle_range_slider'].get()
+            config['cfg.postProcessing.speckleFilter.enable'] = button_values['speckle_filter_enable'].get()
+            if button_values['speckle_filter_enable'].get():
+                config['cfg.postProcessing.speckleFilter.speckleRange'] = button_values['speckle_range_slider'].get()
                 config[
-                    'cfg.postProcessing.speckleFilter.differenceThreshold'] = self.layout_values['speckle_difference_threshold'].get()
+                    'cfg.postProcessing.speckleFilter.differenceThreshold'] = button_values['speckle_difference_threshold'].get()
 
             # Spacial filter
-            config['cfg.postProcessing.spatialFilter.enable'] = self.layout_values['spatial_filter_enable'].get()
-            if self.layout_values['spatial_filter_enable'].get():
-                config['cfg.postProcessing.spatialFilter.holeFillingRadius'] = self.layout_values['hole_filling_radius_slider'].get()
-                config['cfg.postProcessing.spatialFilter.numIterations'] = self.layout_values['num_iterations_slider'].get()
-                config['cfg.postProcessing.spatialFilter.alpha'] = self.layout_values['alpha_slider'].get()
-                config['cfg.postProcessing.spatialFilter.delta'] = self.layout_values['delta_slider'].get()
+            config['cfg.postProcessing.spatialFilter.enable'] = button_values['spatial_filter_enable'].get()
+            if button_values['spatial_filter_enable'].get():
+                config['cfg.postProcessing.spatialFilter.holeFillingRadius'] = button_values['hole_filling_radius_slider'].get()
+                config['cfg.postProcessing.spatialFilter.numIterations'] = button_values['num_iterations_slider'].get()
+                config['cfg.postProcessing.spatialFilter.alpha'] = button_values['alpha_slider'].get()
+                config['cfg.postProcessing.spatialFilter.delta'] = button_values['delta_slider'].get()
 
             # Temporal filter
-            config['cfg.postProcessing.temporalFilter.enable'] = self.layout_values['temporal_filter_enable'].get()
-            if self.layout_values['temporal_filter_enable'].get():
-                config['cfg.postProcessing.temporalFilter.alpha'] = self.layout_values['temporal_alpha_slider'].get()
-                config['cfg.postProcessing.temporalFilter.delta'] = self.layout_values['temporal_delta_slider'].get()
+            config['cfg.postProcessing.temporalFilter.enable'] = button_values['temporal_filter_enable'].get()
+            if button_values['temporal_filter_enable'].get():
+                config['cfg.postProcessing.temporalFilter.alpha'] = button_values['temporal_alpha_slider'].get()
+                config['cfg.postProcessing.temporalFilter.delta'] = button_values['temporal_delta_slider'].get()
 
             # Threshold filter
-            if self.layout_values['threshold_filter_enable'].get():  # todo same as brightness filter
-                config['cfg.postProcessing.thresholdFilter.minRange'] = self.layout_values['min_range_val'].get()
-                config['cfg.postProcessing.thresholdFilter.maxRange'] = self.layout_values['max_range_val'].get()
+            if button_values['threshold_filter_enable'].get():  # todo same as brightness filter
+                config['cfg.postProcessing.thresholdFilter.minRange'] = button_values['min_range_val'].get()
+                config['cfg.postProcessing.thresholdFilter.maxRange'] = button_values['max_range_val'].get()
 
             # Decimation filter
             config['cfg.postProcessing.decimationFilter.decimationFactor'] = 1  # by default do not decimate
-            if self.layout_values['decimation_filter_enable'].get():
-                config['cfg.postProcessing.decimationFilter.decimationFactor'] = self.layout_values['decimation_factor_val'].get()
+            if button_values['decimation_filter_enable'].get():
+                config['cfg.postProcessing.decimationFilter.decimationFactor'] = button_values['decimation_factor_val'].get()
                 config['cfg.postProcessing.decimationFilter.decimationMode'] = handle_dict(
-                    self.layout_values['decimation_mode_val'].get(), decimation_set_dict)  # leave this is correct
+                    button_values['decimation_mode_val'].get(), decimation_set_dict)  # leave this is correct
 
-        if self.layout_values['advanced_settings_enable'].get():
-            config["cfg.censusTransform.kernelSize"] = handle_dict(self.layout_values['CT_kernel_val'].get(), CT_kernel_dict)
-            config["cfg.censusTransform.enableMeanMode"] = self.layout_values['mean_mode_enable'].get()
-            config["cfg.censusTransform.threshold"] = self.layout_values['CT_threshold_val'].get()
+        if button_values['advanced_settings_enable'].get():
+            config["cfg.censusTransform.kernelSize"] = handle_dict(button_values['CT_kernel_val'].get(), CT_kernel_dict)
+            config["cfg.censusTransform.enableMeanMode"] = button_values['mean_mode_enable'].get()
+            config["cfg.censusTransform.threshold"] = button_values['CT_threshold_val'].get()
 
-            config["cfg.costAggregation.divisionFactor"] = self.layout_values['division_factor_val'].get()
-            config["cfg.costAggregation.horizontalPenaltyCostP1"] = self.layout_values['horizontal_penalty_p1_val'].get()
-            config["cfg.costAggregation.horizontalPenaltyCostP2"] = self.layout_values['horizontal_penalty_p2_val'].get()
-            config["cfg.costAggregation.verticalPenaltyCostP1"] = self.layout_values['vertical_penalty_p1_val'].get()
-            config["cfg.costAggregation.verticalPenaltyCostP2"] = self.layout_values['vertical_penalty_p2_val'].get()
+            config["cfg.costAggregation.divisionFactor"] = button_values['division_factor_val'].get()
+            config["cfg.costAggregation.horizontalPenaltyCostP1"] = button_values['horizontal_penalty_p1_val'].get()
+            config["cfg.costAggregation.horizontalPenaltyCostP2"] = button_values['horizontal_penalty_p2_val'].get()
+            config["cfg.costAggregation.verticalPenaltyCostP1"] = button_values['vertical_penalty_p1_val'].get()
+            config["cfg.costAggregation.verticalPenaltyCostP2"] = button_values['vertical_penalty_p2_val'].get()
 
-            config["cfg.costMatching.confidenceThreshold"] = self.layout_values['confidence_threshold_val'].get()
-            config["cfg.costMatching.linearEquationParameters.alpha"] = self.layout_values['CM_alpha_val'].get()
-            config["cfg.costMatching.linearEquationParameters.beta"] = self.layout_values['CM_beta_val'].get()
-            config["cfg.costMatching.linearEquationParameters.threshold"] = self.layout_values['matching_threshold_val'].get()
+            config["cfg.costMatching.confidenceThreshold"] = button_values['confidence_threshold_val'].get()
+            config["cfg.costMatching.linearEquationParameters.alpha"] = button_values['CM_alpha_val'].get()
+            config["cfg.costMatching.linearEquationParameters.beta"] = button_values['CM_beta_val'].get()
+            config["cfg.costMatching.linearEquationParameters.threshold"] = button_values['matching_threshold_val'].get()
 
         return config
 
 
-    def on_generate_button_keydown(self):
+    def on_generate_button_keydown(self, button_values):
         print("GENERATE")
+
+        frame_number = button_values['frame_number']
+
         self.last_config = self.config_json
-        self.config_json = self.convert_current_button_values_to_config()
+        self.config_json = self.convert_current_button_values_to_config(button_values)
 
         print(self.config_json)
 
         self.config_json = self.add_depthai_to_config(self.config_json)
 
         self.generated_depth = None
+
+        if frame_number == 1:
+            self.config_json1 = self.config_json
+        elif frame_number == 2:
+            self.config_json2 = self.config_json
+
+
+        self.main_frame.update_idletasks()
+        self.refresh_display(label="Loading...")
         self.load_or_generate()
 
-    def create_settings_layout(self, frame):
+        if frame_number == 1:
+            self.generated_depth1 = self.generated_depth
+            self.pcl_path1 = self.pcl_path
+        elif frame_number == 2:
+            self.generated_depth2 = self.generated_depth
+            self.pcl_path2 = self.pcl_path
+
+        self.refresh_display(label="Updated")
+        self.main_frame.update_idletasks()
+
+    def create_settings_layout(self, frame, button_values):
         def update_label(var, label, form="int"):
             if label is None: return
             if form == "int":
@@ -266,38 +300,32 @@ class ReplayVisualizer:
                 label.config(text=str(round(float(var.get()), 1)))
 
         def toggle_custom_frame_settings():
-            toggle_frame_settings(self.layout_values['custom_settings_val'], custom_settings_frame)
-            if self.layout_values['custom_settings_val'].get():
-                toggle_frame_settings(self.layout_values['decimation_filter_enable'], decimation_frame)
-                toggle_frame_settings(self.layout_values['median_filter_enable'], median_frame)
-                toggle_frame_settings(self.layout_values['speckle_filter_enable'], speckle_frame)
-                toggle_frame_settings(self.layout_values['spatial_filter_enable'], spatial_frame)
-                toggle_frame_settings(self.layout_values['temporal_filter_enable'], temporal_frame)
-                toggle_frame_settings(self.layout_values['threshold_filter_enable'], threshold_frame)
+            toggle_frame_settings(button_values['custom_settings_val'], custom_settings_frame)
+            if button_values['custom_settings_val'].get():
+                toggle_frame_settings(button_values['decimation_filter_enable'], decimation_frame)
+                toggle_frame_settings(button_values['median_filter_enable'], median_frame)
+                toggle_frame_settings(button_values['speckle_filter_enable'], speckle_frame)
+                toggle_frame_settings(button_values['spatial_filter_enable'], spatial_frame)
+                toggle_frame_settings(button_values['temporal_filter_enable'], temporal_frame)
+                toggle_frame_settings(button_values['threshold_filter_enable'], threshold_frame)
                 # toggle_frame_settings(bilateral_filter_enable, bilateral_frame)
-                toggle_frame_settings(self.layout_values['brightness_filter_enable'], brightness_frame)
-                toggle_frame_settings(self.layout_values['filtering_order_enable'], order_frame)
+                toggle_frame_settings(button_values['brightness_filter_enable'], brightness_frame)
+                toggle_frame_settings(button_values['filtering_order_enable'], order_frame)
 
         def toggle_frame_settings(frame_on, frame):
-            # Enable or disable all frames and their widgets based on the checkbox state
-            if frame_on.get():
-                # Enable custom settings and all nested frames/widgets
-                enable_frame_widgets(frame, True)
-            else:
-                # Disable custom settings and all nested frames/widgets
-                enable_frame_widgets(frame, False)
+            if frame_on.get(): enable_frame_widgets_recursively(frame, True)
+            else: enable_frame_widgets_recursively(frame, False)
 
         def toggle_advanced_settings():
-            if self.layout_values['advanced_settings_enable'].get():
-                enable_frame_widgets(advanced_stereo_setting_frame, True)
+            if button_values['advanced_settings_enable'].get():
+                enable_frame_widgets_recursively(advanced_stereo_setting_frame, True)
             else:
-                enable_frame_widgets(advanced_stereo_setting_frame, False)
+                enable_frame_widgets_recursively(advanced_stereo_setting_frame, False)
 
-        def enable_frame_widgets(frame, state):
-            """Recursively enable/disable all widgets in the frame, including nested frames."""
+        def enable_frame_widgets_recursively(frame, state):
             for widget in frame.winfo_children():
-                if isinstance(widget, ttk.LabelFrame):  # If widget is a frame, call the function recursively
-                    enable_frame_widgets(widget, state)
+                if isinstance(widget, ttk.LabelFrame):
+                    enable_frame_widgets_recursively(widget, state)
                     widget.state(['!disabled'] if state else ['disabled'])
                 else:
                     widget.state(['!disabled'] if state else ['disabled'])
@@ -311,11 +339,11 @@ class ReplayVisualizer:
 
         # Add radiobuttons for left/right choice with a label
         ttk.Label(popup_window, text="setDepthAlign").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
-        left_radiobutton = ttk.Radiobutton(popup_window, text="Left", variable=self.layout_values['depth_align'], value="CameraBoardSocket.LEFT")
-        right_radiobutton = ttk.Radiobutton(popup_window, text="Right", variable=self.layout_values['depth_align'], value="CameraBoardSocket.RIGHT")
-        rec_left_radiobutton = ttk.Radiobutton(popup_window, text="Rec Left", variable=self.layout_values['depth_align'], value='StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_LEFT')
-        rec_right_radiobutton = ttk.Radiobutton(popup_window, text="Rec Right", variable=self.layout_values['depth_align'], value='StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_RIGHT')
-        rgb_radiobutton = ttk.Radiobutton(popup_window, text="RGB", variable=self.layout_values['depth_align'], value="CameraBoardSocket.CAM_A")
+        left_radiobutton = ttk.Radiobutton(popup_window, text="Left", variable=button_values['depth_align'], value="CameraBoardSocket.LEFT")
+        right_radiobutton = ttk.Radiobutton(popup_window, text="Right", variable=button_values['depth_align'], value="CameraBoardSocket.RIGHT")
+        rec_left_radiobutton = ttk.Radiobutton(popup_window, text="Rec Left", variable=button_values['depth_align'], value='StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_LEFT')
+        rec_right_radiobutton = ttk.Radiobutton(popup_window, text="Rec Right", variable=button_values['depth_align'], value='StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_RIGHT')
+        rgb_radiobutton = ttk.Radiobutton(popup_window, text="RGB", variable=button_values['depth_align'], value="CameraBoardSocket.CAM_A")
         left_radiobutton.grid(row=current_row, column=1, padx=10, pady=5, sticky="w")
         right_radiobutton.grid(row=current_row, column=2, padx=10, pady=5, sticky="w")
         rec_left_radiobutton.grid(row=current_row, column=3, padx=10, pady=5, sticky="w")
@@ -325,13 +353,13 @@ class ReplayVisualizer:
 
         #
         ttk.Label(popup_window, text="setDefaultProfilePreset").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
-        Hdef_radiobutton = ttk.Radiobutton(popup_window, text="DEFAULT", variable=self.layout_values['profile_preset'], value="node.StereoDepth.PresetMode.DEFAULT")
-        HA_radiobutton = ttk.Radiobutton(popup_window, text="HIGH_ACCURACY", variable=self.layout_values['profile_preset'], value="node.StereoDepth.PresetMode.HIGH_ACCURACY")
-        HD_radiobutton = ttk.Radiobutton(popup_window, text="HIGH_DENSITY", variable=self.layout_values['profile_preset'], value="node.StereoDepth.PresetMode.HIGH_DENSITY")
-        HR_radiobutton = ttk.Radiobutton(popup_window, text="ROBOTICS", variable=self.layout_values['profile_preset'], value="node.StereoDepth.PresetMode.ROBOTICS")
-        HDE_radiobutton = ttk.Radiobutton(popup_window, text="HIGH_DETAIL", variable=self.layout_values['profile_preset'], value="node.StereoDepth.PresetMode.HIGH_DETAIL")
-        HF_radiobutton = ttk.Radiobutton(popup_window, text="FACE", variable=self.layout_values['profile_preset'], value="node.StereoDepth.PresetMode.FACE")
-        HN_radiobutton = ttk.Radiobutton(popup_window, text="None", variable=self.layout_values['profile_preset'], value="None")
+        Hdef_radiobutton = ttk.Radiobutton(popup_window, text="DEFAULT", variable=button_values['profile_preset'], value="node.StereoDepth.PresetMode.DEFAULT")
+        HA_radiobutton = ttk.Radiobutton(popup_window, text="HIGH_ACCURACY", variable=button_values['profile_preset'], value="node.StereoDepth.PresetMode.HIGH_ACCURACY")
+        HD_radiobutton = ttk.Radiobutton(popup_window, text="HIGH_DENSITY", variable=button_values['profile_preset'], value="node.StereoDepth.PresetMode.HIGH_DENSITY")
+        HR_radiobutton = ttk.Radiobutton(popup_window, text="ROBOTICS", variable=button_values['profile_preset'], value="node.StereoDepth.PresetMode.ROBOTICS")
+        HDE_radiobutton = ttk.Radiobutton(popup_window, text="HIGH_DETAIL", variable=button_values['profile_preset'], value="node.StereoDepth.PresetMode.HIGH_DETAIL")
+        HF_radiobutton = ttk.Radiobutton(popup_window, text="FACE", variable=button_values['profile_preset'], value="node.StereoDepth.PresetMode.FACE")
+        HN_radiobutton = ttk.Radiobutton(popup_window, text="None", variable=button_values['profile_preset'], value="None")
         Hdef_radiobutton.grid(row=current_row, column=1, padx=10, pady=5, sticky="w")
         HR_radiobutton.grid(row=current_row, column=2, padx=10, pady=5, sticky="w")
         HDE_radiobutton.grid(row=current_row, column=3, padx=10, pady=5, sticky="w")
@@ -344,7 +372,7 @@ class ReplayVisualizer:
 
         #
         ttk.Label(popup_window, text="Use Custom Settings").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
-        cust_box = ttk.Checkbutton(popup_window, variable=self.layout_values['custom_settings_val'], command=toggle_custom_frame_settings)
+        cust_box = ttk.Checkbutton(popup_window, variable=button_values['custom_settings_val'], command=toggle_custom_frame_settings)
         cust_box.grid(row=current_row, column=1, padx=10, pady=10, sticky="w")
         current_row += 1
 
@@ -353,25 +381,25 @@ class ReplayVisualizer:
 
         # # Add checkbuttons for rectification
         ttk.Label(custom_settings_frame, text="setRectification").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
-        recbox = ttk.Checkbutton(custom_settings_frame, variable=self.layout_values['rectificationBox_val'])
+        recbox = ttk.Checkbutton(custom_settings_frame, variable=button_values['rectificationBox_val'])
         recbox.grid(row=current_row, column=1, padx=10, pady=10,  sticky="w")
         current_row += 1
 
         # LR CHECK
         ttk.Label(custom_settings_frame, text="setLRcheck").grid(row=current_row, column=0, padx=10, pady=10,sticky="w")
-        LRbox = ttk.Checkbutton(custom_settings_frame, variable=self.layout_values['LRBox_val'])
+        LRbox = ttk.Checkbutton(custom_settings_frame, variable=button_values['LRBox_val'])
         LRbox.grid(row=current_row, column=1, padx=10, pady=10,  sticky="w")
         current_row += 1
 
         # EXTENDED DISPARITY
         ttk.Label(custom_settings_frame, text="setExtendedDisparity").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
-        extbox = ttk.Checkbutton(custom_settings_frame, variable=self.layout_values['extendedBox_val'])
+        extbox = ttk.Checkbutton(custom_settings_frame, variable=button_values['extendedBox_val'])
         extbox.grid(row=current_row, column=1, padx=10, pady=10,  sticky="w")
         current_row += 1
 
         # SetSubpixel Label and Checkbox
         ttk.Label(custom_settings_frame, text="setSubpixel").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
-        subbox = ttk.Checkbutton(custom_settings_frame, variable=self.layout_values['subpixelBox_val'])
+        subbox = ttk.Checkbutton(custom_settings_frame, variable=button_values['subpixelBox_val'])
         subbox.grid(row=current_row, column=1, padx=10, pady=10,  sticky="w")
 
 
@@ -391,13 +419,13 @@ class ReplayVisualizer:
 
         # Add subpixelFractionalBits combobox
         ttk.Label(custom_settings_frame, text="subpixelFractionalBits").grid(row=current_row, column=2, padx=10, pady=10, sticky="w")
-        dropdown(custom_settings_frame, current_row, 3, self.layout_values['fractional_bits_val'], [3, 4, 5])
+        dropdown(custom_settings_frame, current_row, 3, button_values['fractional_bits_val'], [3, 4, 5])
 
         current_row += 1
 
         # Decimation Filter Enable
         ttk.Label(custom_settings_frame, text="Decimation Filter Enable").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
-        decimation_filter_checkbox = ttk.Checkbutton(custom_settings_frame, variable=self.layout_values['decimation_filter_enable'], command=lambda: toggle_frame_settings(self.layout_values['decimation_filter_enable'], decimation_frame))
+        decimation_filter_checkbox = ttk.Checkbutton(custom_settings_frame, variable=button_values['decimation_filter_enable'], command=lambda: toggle_frame_settings(button_values['decimation_filter_enable'], decimation_frame))
         decimation_filter_checkbox.grid(row=current_row, column=1, padx=10, pady=10,  sticky="w")
 
         current_row += 1
@@ -410,15 +438,15 @@ class ReplayVisualizer:
         ttk.Label(decimation_frame, text="Factor").grid(row=1, column=0, padx=10, pady=10, sticky="w")
         decimation_factor_label = ttk.Label(decimation_frame)
         decimation_factor_label.grid(row=1, column=2, padx=10, pady=10, sticky="w")
-        dropdown(decimation_frame, 1, 1, self.layout_values['decimation_factor_val'], [1, 2, 3, 4])
+        dropdown(decimation_frame, 1, 1, button_values['decimation_factor_val'], [1, 2, 3, 4])
         ttk.Label(decimation_frame, text="Mode").grid(row=1, column=3, padx=10, pady=10, sticky="w")
-        dropdown(decimation_frame, 1, 4, self.layout_values['decimation_mode_val'], ['NON_ZERO_MEAN','NON_ZERO_MEDIAN','PIXEL_SKIPPING'])
+        dropdown(decimation_frame, 1, 4, button_values['decimation_mode_val'], ['NON_ZERO_MEAN','NON_ZERO_MEDIAN','PIXEL_SKIPPING'])
 
         current_row += 1
 
         # Median Filter
         ttk.Label(custom_settings_frame, text="Median Enable").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
-        median_filter_checkbox = ttk.Checkbutton(custom_settings_frame, variable=self.layout_values['median_filter_enable'], command=lambda: toggle_frame_settings(self.layout_values['median_filter_enable'], median_frame))
+        median_filter_checkbox = ttk.Checkbutton(custom_settings_frame, variable=button_values['median_filter_enable'], command=lambda: toggle_frame_settings(button_values['median_filter_enable'], median_frame))
         median_filter_checkbox.grid(row=current_row, column=1, padx=10, pady=10,  sticky="w")
         current_row += 1
 
@@ -427,9 +455,9 @@ class ReplayVisualizer:
         median_frame.grid(row=current_row, column=0, columnspan=6, padx=10, pady=10, sticky="ew")
 
         ttk.Label(median_frame, text="Median").grid(row=0, column=0, padx=10, pady=10, sticky="w")
-        median_3_button = ttk.Radiobutton(median_frame, text="MEDIAN_3x3", variable=self.layout_values['median_val'], value="MedianFilter.KERNEL_3x3")
-        median_5_button = ttk.Radiobutton(median_frame, text="MEDIAN_5x5", variable=self.layout_values['median_val'], value="MedianFilter.KERNEL_5x5")
-        median_7_button = ttk.Radiobutton(median_frame, text="MEDIAN_7x7", variable=self.layout_values['median_val'], value="MedianFilter.KERNEL_7x7")
+        median_3_button = ttk.Radiobutton(median_frame, text="MEDIAN_3x3", variable=button_values['median_val'], value="MedianFilter.KERNEL_3x3")
+        median_5_button = ttk.Radiobutton(median_frame, text="MEDIAN_5x5", variable=button_values['median_val'], value="MedianFilter.KERNEL_5x5")
+        median_7_button = ttk.Radiobutton(median_frame, text="MEDIAN_7x7", variable=button_values['median_val'], value="MedianFilter.KERNEL_7x7")
         median_3_button.grid(row=0, column=1, padx=10, pady=5, sticky="w")
         median_5_button.grid(row=0, column=2, padx=10, pady=5, sticky="w")
         median_7_button.grid(row=0, column=3, padx=10, pady=5, sticky="w")
@@ -437,7 +465,7 @@ class ReplayVisualizer:
 
         # Speckle Filter Enable
         ttk.Label(custom_settings_frame, text="Speckle Filter Enable").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
-        speckle_filter_checkbox = ttk.Checkbutton(custom_settings_frame, variable=self.layout_values['speckle_filter_enable'], command=lambda: toggle_frame_settings(self.layout_values['speckle_filter_enable'], speckle_frame))
+        speckle_filter_checkbox = ttk.Checkbutton(custom_settings_frame, variable=button_values['speckle_filter_enable'], command=lambda: toggle_frame_settings(button_values['speckle_filter_enable'], speckle_frame))
         speckle_filter_checkbox.grid(row=current_row, column=1, padx=10, pady=10,  sticky="w")
         current_row += 1
 
@@ -447,21 +475,21 @@ class ReplayVisualizer:
 
         # Speckle Range
         ttk.Label(speckle_frame, text="Speckle Range").grid(row=1, column=0, padx=10, pady=10, sticky="w")
-        speckle_range_label = ttk.Label(speckle_frame, text=str(self.layout_values['speckle_range_slider'].get()))
-        spinbox(speckle_frame, 1, 1, self.layout_values['speckle_range_slider'], speckle_range_label, [0, 255])
+        speckle_range_label = ttk.Label(speckle_frame, text=str(button_values['speckle_range_slider'].get()))
+        spinbox(speckle_frame, 1, 1, button_values['speckle_range_slider'], speckle_range_label, [0, 255])
         ttk.Label(speckle_frame, text="(0, 256)").grid(row=1, column=2, padx=10, pady=10, sticky="w")
         current_row += 1
 
         # Speckle Difference Threshold
         ttk.Label(speckle_frame, text="Speckle Difference Threshold").grid(row=2, column=0, padx=10, pady=10, sticky="w")
-        speckle_difference_label = ttk.Label(speckle_frame, text=str(self.layout_values['speckle_difference_threshold'].get()))
-        spinbox(speckle_frame, 2, 1, self.layout_values['speckle_difference_threshold'], speckle_difference_label, [0, 255])
+        speckle_difference_label = ttk.Label(speckle_frame, text=str(button_values['speckle_difference_threshold'].get()))
+        spinbox(speckle_frame, 2, 1, button_values['speckle_difference_threshold'], speckle_difference_label, [0, 255])
         ttk.Label(speckle_frame, text="(0, 256)").grid(row=2, column=2, padx=10, pady=10, sticky="w")
         current_row += 1
 
         # Spatial Filter Enable
         ttk.Label(custom_settings_frame, text="Spatial Filter Enable").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
-        spatial_filter_checkbox = ttk.Checkbutton(custom_settings_frame, variable=self.layout_values['spatial_filter_enable'], command=lambda: toggle_frame_settings(self.layout_values['spatial_filter_enable'], spatial_frame))
+        spatial_filter_checkbox = ttk.Checkbutton(custom_settings_frame, variable=button_values['spatial_filter_enable'], command=lambda: toggle_frame_settings(button_values['spatial_filter_enable'], spatial_frame))
         spatial_filter_checkbox.grid(row=current_row, column=1, padx=10, pady=10,  sticky="w")
         current_row += 1
 
@@ -471,31 +499,31 @@ class ReplayVisualizer:
 
         # Spatial Filter Settings
         ttk.Label(spatial_frame, text="Hole Filling Radius").grid(row=1, column=0, padx=10, pady=10, sticky="w")
-        hole_filling_radius_label = ttk.Label(spatial_frame, text=str(self.layout_values['hole_filling_radius_slider'].get()))
-        spinbox(spatial_frame, 1, 1, self.layout_values['hole_filling_radius_slider'], hole_filling_radius_label, [0, 255])
+        hole_filling_radius_label = ttk.Label(spatial_frame, text=str(button_values['hole_filling_radius_slider'].get()))
+        spinbox(spatial_frame, 1, 1, button_values['hole_filling_radius_slider'], hole_filling_radius_label, [0, 255])
         ttk.Label(spatial_frame, text="(0, 255)").grid(row=1, column=2, padx=10, pady=10, sticky="w")
 
         ttk.Label(spatial_frame, text="Num Iterations").grid(row=1, column=3, padx=10, pady=10, sticky="w")
-        num_iterations_label = ttk.Label(spatial_frame, text=str(self.layout_values['num_iterations_slider'].get()))
+        num_iterations_label = ttk.Label(spatial_frame, text=str(button_values['num_iterations_slider'].get()))
         num_iterations_label.grid(row=1, column=5, padx=10, pady=10, sticky="w")
-        ttk.Scale(spatial_frame, from_=1, to=10, variable=self.layout_values['num_iterations_slider'], orient="horizontal", command=lambda x: update_label(self.layout_values['num_iterations_slider'], num_iterations_label)).grid(row=1, column=4, padx=10, pady=10,  sticky="w")
+        ttk.Scale(spatial_frame, from_=1, to=10, variable=button_values['num_iterations_slider'], orient="horizontal", command=lambda x: update_label(button_values['num_iterations_slider'], num_iterations_label)).grid(row=1, column=4, padx=10, pady=10,  sticky="w")
         current_row += 1
 
         ttk.Label(spatial_frame, text="Alpha").grid(row=2, column=0, padx=10, pady=10, sticky="w")
-        alpha_label = ttk.Label(spatial_frame, text=str(self.layout_values['alpha_slider'].get()))
+        alpha_label = ttk.Label(spatial_frame, text=str(button_values['alpha_slider'].get()))
         alpha_label.grid(row=2, column=2, padx=10, pady=10, sticky="w")
-        ttk.Scale(spatial_frame, from_=0, to=1, variable=self.layout_values['alpha_slider'], orient="horizontal", command=lambda x: update_label(self.layout_values['alpha_slider'], alpha_label, form="float")).grid(row=2, column=1, padx=10, pady=10,  sticky="w")
+        ttk.Scale(spatial_frame, from_=0, to=1, variable=button_values['alpha_slider'], orient="horizontal", command=lambda x: update_label(button_values['alpha_slider'], alpha_label, form="float")).grid(row=2, column=1, padx=10, pady=10,  sticky="w")
 
         ttk.Label(spatial_frame, text="Delta").grid(row=2, column=3, padx=10, pady=10, sticky="w")
-        delta_label = ttk.Label(spatial_frame, text=str(self.layout_values['delta_slider'].get()))
-        spinbox(spatial_frame, 2, 4, self.layout_values['delta_slider'], delta_label, [0, 255])
+        delta_label = ttk.Label(spatial_frame, text=str(button_values['delta_slider'].get()))
+        spinbox(spatial_frame, 2, 4, button_values['delta_slider'], delta_label, [0, 255])
         ttk.Label(spatial_frame, text="(0, 255)").grid(row=2, column=5, padx=10, pady=10, sticky="w")
 
         current_row += 1
 
         # Temporal Filter Frame
         ttk.Label(custom_settings_frame, text="Temporal Filter Enable").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
-        temporal_filter_checkbox = ttk.Checkbutton(custom_settings_frame, variable=self.layout_values['temporal_filter_enable'], command=lambda: toggle_frame_settings(self.layout_values['temporal_filter_enable'], temporal_frame))
+        temporal_filter_checkbox = ttk.Checkbutton(custom_settings_frame, variable=button_values['temporal_filter_enable'], command=lambda: toggle_frame_settings(button_values['temporal_filter_enable'], temporal_frame))
         temporal_filter_checkbox.grid(row=current_row, column=1, padx=10, pady=10,  sticky="w")
         current_row += 1
 
@@ -505,21 +533,21 @@ class ReplayVisualizer:
 
         # Temporal Filter Enable
         ttk.Label(temporal_frame, text="Alpha").grid(row=2, column=0, padx=10, pady=10, sticky="w")
-        temporal_alpha_label = ttk.Label(temporal_frame, text=str(self.layout_values['temporal_alpha_slider'].get()))
+        temporal_alpha_label = ttk.Label(temporal_frame, text=str(button_values['temporal_alpha_slider'].get()))
         temporal_alpha_label.grid(row=2, column=2, padx=10, pady=10, sticky="w")
-        ttk.Scale(temporal_frame, from_=0, to=1, variable=self.layout_values['temporal_alpha_slider'], orient="horizontal",
-                  command=lambda x: update_label(self.layout_values['temporal_alpha_slider'], temporal_alpha_label, form="float")).grid(row=2, column=1, padx=10, pady=10,  sticky="w")
+        ttk.Scale(temporal_frame, from_=0, to=1, variable=button_values['temporal_alpha_slider'], orient="horizontal",
+                  command=lambda x: update_label(button_values['temporal_alpha_slider'], temporal_alpha_label, form="float")).grid(row=2, column=1, padx=10, pady=10,  sticky="w")
 
         ttk.Label(temporal_frame, text="Delta").grid(row=2, column=3, padx=10, pady=10, sticky="w")
-        temporal_delta_label = ttk.Label(temporal_frame, text=str(self.layout_values['temporal_delta_slider'].get()))
-        spinbox(temporal_frame, 2, 4, self.layout_values['temporal_delta_slider'], temporal_delta_label, [0, 255])
+        temporal_delta_label = ttk.Label(temporal_frame, text=str(button_values['temporal_delta_slider'].get()))
+        spinbox(temporal_frame, 2, 4, button_values['temporal_delta_slider'], temporal_delta_label, [0, 255])
         ttk.Label(temporal_frame, text="(0, 255)").grid(row=2, column=5, padx=10, pady=10, sticky="w")
 
         current_row += 1
 
         # Threshold Filter Enable
         ttk.Label(custom_settings_frame, text="Threshold Filter Enable").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
-        threshold_filter_checkbox = ttk.Checkbutton(custom_settings_frame, variable=self.layout_values['threshold_filter_enable'], command=lambda: toggle_frame_settings(self.layout_values['threshold_filter_enable'], threshold_frame))
+        threshold_filter_checkbox = ttk.Checkbutton(custom_settings_frame, variable=button_values['threshold_filter_enable'], command=lambda: toggle_frame_settings(button_values['threshold_filter_enable'], threshold_frame))
         threshold_filter_checkbox.grid(row=current_row, column=1, padx=10, pady=10,  sticky="w")
         current_row += 1
 
@@ -529,12 +557,12 @@ class ReplayVisualizer:
 
         # Threshold Filter Min and Max with Spinboxes
         ttk.Label(threshold_frame, text="Min").grid(row=1, column=0, padx=10, pady=10, sticky="w")
-        spinbox(threshold_frame, 1, 1, self.layout_values['min_range_val'], None, [0, self.layout_values['max_range_val'].get()])
-        ttk.Label(threshold_frame, text="(0, " + str(self.layout_values['max_range_val'].get()) + ")").grid(row=1, column=2, padx=10, pady=10, sticky="w")
+        spinbox(threshold_frame, 1, 1, button_values['min_range_val'], None, [0, button_values['max_range_val'].get()])
+        ttk.Label(threshold_frame, text="(0, " + str(button_values['max_range_val'].get()) + ")").grid(row=1, column=2, padx=10, pady=10, sticky="w")
 
         ttk.Label(threshold_frame, text="Max").grid(row=1, column=3, padx=10, pady=10, sticky="w")
-        spinbox(threshold_frame, 1, 4, self.layout_values['max_range_val'], None, [0, self.layout_values['max_range_val'].get()])
-        ttk.Label(threshold_frame, text="(" + str(self.layout_values['min_range_val'].get()) + ", 65535)").grid(row=1, column=5, padx=10, pady=10, sticky="w")
+        spinbox(threshold_frame, 1, 4, button_values['max_range_val'], None, [0, button_values['max_range_val'].get()])
+        ttk.Label(threshold_frame, text="(" + str(button_values['min_range_val'].get()) + ", 65535)").grid(row=1, column=5, padx=10, pady=10, sticky="w")
 
         current_row += 1
 
@@ -560,7 +588,7 @@ class ReplayVisualizer:
 
         # Brightness Filter Enable
         ttk.Label(custom_settings_frame, text="Brightness Filter Enable (NOT TESTED IN GUI)").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
-        brightness_filter_checkbox = ttk.Checkbutton(custom_settings_frame, variable=self.layout_values['brightness_filter_enable'], command=lambda: toggle_frame_settings(self.layout_values['brightness_filter_enable'], brightness_frame))
+        brightness_filter_checkbox = ttk.Checkbutton(custom_settings_frame, variable=button_values['brightness_filter_enable'], command=lambda: toggle_frame_settings(button_values['brightness_filter_enable'], brightness_frame))
         brightness_filter_checkbox.grid(row=current_row, column=1, padx=10, pady=10,  sticky="w")
         current_row += 1
 
@@ -570,21 +598,21 @@ class ReplayVisualizer:
 
         # Brightness Filter Sliders
         ttk.Label(brightness_frame, text="Min Brightness").grid(row=1, column=0, padx=10, pady=10, sticky="w")
-        min_brightness_label = ttk.Label(brightness_frame, text=str(self.layout_values['min_brightness_slider'].get()))
+        min_brightness_label = ttk.Label(brightness_frame, text=str(button_values['min_brightness_slider'].get()))
         min_brightness_label.grid(row=1, column=2, padx=10, pady=10, sticky="w")
-        ttk.Scale(brightness_frame, from_=0, to=int(self.layout_values['max_brightness_slider'].get()), variable=self.layout_values['min_brightness_slider'], orient="horizontal",
-                  command=lambda x: update_label(self.layout_values['min_brightness_slider'], min_brightness_label)).grid(row=1, column=1,padx=10, pady=10,  sticky="w")
+        ttk.Scale(brightness_frame, from_=0, to=int(button_values['max_brightness_slider'].get()), variable=button_values['min_brightness_slider'], orient="horizontal",
+                  command=lambda x: update_label(button_values['min_brightness_slider'], min_brightness_label)).grid(row=1, column=1,padx=10, pady=10,  sticky="w")
 
         ttk.Label(brightness_frame, text="Max Brightness").grid(row=1, column=3, padx=10, pady=10, sticky="w")
-        max_brightness_label = ttk.Label(brightness_frame, text=str(self.layout_values['max_brightness_slider'].get()))
+        max_brightness_label = ttk.Label(brightness_frame, text=str(button_values['max_brightness_slider'].get()))
         max_brightness_label.grid(row=1, column=5, padx=10, pady=10, sticky="w")
-        ttk.Scale(brightness_frame, from_=int(self.layout_values['min_brightness_slider'].get()), to=255, variable=self.layout_values['max_brightness_slider'], orient="horizontal",
-                  command=lambda x: update_label(self.layout_values['max_brightness_slider'], max_brightness_label)).grid(row=1, column=4, padx=10, pady=10,  sticky="w")
+        ttk.Scale(brightness_frame, from_=int(button_values['min_brightness_slider'].get()), to=255, variable=button_values['max_brightness_slider'], orient="horizontal",
+                  command=lambda x: update_label(button_values['max_brightness_slider'], max_brightness_label)).grid(row=1, column=4, padx=10, pady=10,  sticky="w")
         current_row += 1
 
         # Filter Order Enable
         ttk.Label(custom_settings_frame, text="Filter Order Selection Enable (NOT TESTED IN GUI)").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
-        send_filter_order_checkbox = ttk.Checkbutton(custom_settings_frame, variable=self.layout_values['filtering_order_enable'], command=lambda: toggle_frame_settings(self.layout_values['filtering_order_enable'], order_frame))
+        send_filter_order_checkbox = ttk.Checkbutton(custom_settings_frame, variable=button_values['filtering_order_enable'], command=lambda: toggle_frame_settings(button_values['filtering_order_enable'], order_frame))
         send_filter_order_checkbox.grid(row=current_row, column=1, padx=10, pady=10,  sticky="w")
         current_row += 1
 
@@ -596,37 +624,37 @@ class ReplayVisualizer:
         ttk.Label(order_frame, text="Decimation").grid(row=row, column=0, padx=10, pady=10, sticky="w")
         order_label = ttk.Label(order_frame)
         order_label.grid(row=row, column=2, padx=10, pady=10, sticky="w")
-        dropdown(order_frame, row, 1, self.layout_values['decimation_order'], [1, 2, 3, 4, 5])
+        dropdown(order_frame, row, 1, button_values['decimation_order'], [1, 2, 3, 4, 5])
 
         row = 2
         ttk.Label(order_frame, text="Median").grid(row=row, column=0, padx=10, pady=10, sticky="w")
         order_label = ttk.Label(order_frame)
         order_label.grid(row=row, column=2, padx=10, pady=10, sticky="w")
-        dropdown(order_frame, row, 1, self.layout_values['median_order'], [1, 2, 3, 4, 5])
+        dropdown(order_frame, row, 1, button_values['median_order'], [1, 2, 3, 4, 5])
 
         row = 3
         ttk.Label(order_frame, text="Speckle").grid(row=row, column=0, padx=10, pady=10, sticky="w")
         order_label = ttk.Label(order_frame)
         order_label.grid(row=row, column=2, padx=10, pady=10, sticky="w")
-        dropdown(order_frame, row, 1, self.layout_values['speckle_order'], [1, 2, 3, 4, 5])
+        dropdown(order_frame, row, 1, button_values['speckle_order'], [1, 2, 3, 4, 5])
 
         row = 4
         ttk.Label(order_frame, text="Spatial").grid(row=row, column=0, padx=10, pady=10, sticky="w")
         order_label = ttk.Label(order_frame)
         order_label.grid(row=row, column=2, padx=10, pady=10, sticky="w")
-        dropdown(order_frame, row, 1, self.layout_values['spatial_order'], [1, 2, 3, 4, 5])
+        dropdown(order_frame, row, 1, button_values['spatial_order'], [1, 2, 3, 4, 5])
 
         row = 5
         ttk.Label(order_frame, text="Temporal").grid(row=row, column=0, padx=10, pady=10, sticky="w")
         order_label = ttk.Label(order_frame)
         order_label.grid(row=row, column=2, padx=10, pady=10, sticky="w")
-        dropdown(order_frame, row, 1, self.layout_values['temporal_order'], [1, 2, 3, 4, 5])
+        dropdown(order_frame, row, 1, button_values['temporal_order'], [1, 2, 3, 4, 5])
 
         current_row += 1
 
         # STEREO ALGORITHM ADVANCED SETTINGS -------------------------------------------------------------------------------
         ttk.Label(popup_window, text="Enable Advanced Settings (I know what I'm doing)").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
-        advanced_settings_checkbox = ttk.Checkbutton(popup_window, variable=self.layout_values['advanced_settings_enable'], command=toggle_advanced_settings)
+        advanced_settings_checkbox = ttk.Checkbutton(popup_window, variable=button_values['advanced_settings_enable'], command=toggle_advanced_settings)
         advanced_settings_checkbox.grid(row=current_row, column=1, padx=10, pady=10,  sticky="w")
 
         current_row += 1
@@ -637,78 +665,78 @@ class ReplayVisualizer:
         advanced_stereo_setting_frame.grid(row=current_row, column=0, columnspan=6, padx=10, pady=10, sticky="ew")
 
         ttk.Label(advanced_stereo_setting_frame, text="censusTransform.kernelSize").grid(row=inner_row, column=0, padx=10, pady=10, sticky="w")
-        dropdown(advanced_stereo_setting_frame, inner_row, 1, self.layout_values['CT_kernel_val'], ['KERNEL_AUTO', 'KERNEL_5x5', 'KERNEL_7x7', 'KERNEL_7x9'])
+        dropdown(advanced_stereo_setting_frame, inner_row, 1, button_values['CT_kernel_val'], ['KERNEL_AUTO', 'KERNEL_5x5', 'KERNEL_7x7', 'KERNEL_7x9'])
 
         inner_row += 1
 
         ttk.Label(advanced_stereo_setting_frame, text="censusTransform.enableMeanMode").grid(row=inner_row, column=0, padx=10, pady=10, sticky="w")
-        mean_mode_checkbox = ttk.Checkbutton(advanced_stereo_setting_frame, variable=self.layout_values['mean_mode_enable'])
+        mean_mode_checkbox = ttk.Checkbutton(advanced_stereo_setting_frame, variable=button_values['mean_mode_enable'])
         mean_mode_checkbox.grid(row=inner_row, column=1, padx=10, pady=10,  sticky="w")
 
         inner_row += 1
 
         ttk.Label(advanced_stereo_setting_frame, text="censusTransform.threshold").grid(row=inner_row, column=0, padx=10, pady=10, sticky="w")
-        spinbox(advanced_stereo_setting_frame, inner_row, 1, self.layout_values['CT_threshold_val'], None, [0, 255])
+        spinbox(advanced_stereo_setting_frame, inner_row, 1, button_values['CT_threshold_val'], None, [0, 255])
         ttk.Label(advanced_stereo_setting_frame, text="(0, 255)").grid(row=3, column=2, padx=10, pady=10, sticky="w")
 
         inner_row += 1
 
         ttk.Label(advanced_stereo_setting_frame, text="costAggregation.divisionFactor").grid(row=inner_row, column=0, padx=10, pady=10, sticky="w")
-        spinbox(advanced_stereo_setting_frame, inner_row, 1, self.layout_values['division_factor_val'], None, [0, 100])
+        spinbox(advanced_stereo_setting_frame, inner_row, 1, button_values['division_factor_val'], None, [0, 100])
         ttk.Label(advanced_stereo_setting_frame, text="(1, 100)").grid(row=inner_row, column=2, padx=10, pady=10, sticky="w")
 
         inner_row += 1
 
         ttk.Label(advanced_stereo_setting_frame, text="costAggregation.horizontalPenaltyCostP1").grid(row=inner_row, column=0, padx=10, pady=10, sticky="w")
-        spinbox(advanced_stereo_setting_frame, inner_row, 1, self.layout_values['horizontal_penalty_p1_val'], None, [0, 500])
+        spinbox(advanced_stereo_setting_frame, inner_row, 1, button_values['horizontal_penalty_p1_val'], None, [0, 500])
         ttk.Label(advanced_stereo_setting_frame, text="(0, 500)").grid(row=inner_row, column=2, padx=10, pady=10, sticky="w")
 
         inner_row += 1
 
         ttk.Label(advanced_stereo_setting_frame, text="costAggregation.horizontalPenaltyCostP2").grid(row=inner_row, column=0, padx=10, pady=10, sticky="w")
-        spinbox(advanced_stereo_setting_frame, inner_row, 1, self.layout_values['horizontal_penalty_p2_val'], None, [0, 1000])
+        spinbox(advanced_stereo_setting_frame, inner_row, 1, button_values['horizontal_penalty_p2_val'], None, [0, 1000])
         ttk.Label(advanced_stereo_setting_frame, text="(0, 1000)").grid(row=inner_row, column=2, padx=10, pady=10, sticky="w")
 
         inner_row += 1
 
         ttk.Label(advanced_stereo_setting_frame, text="costAggregation.verticalPenaltyCostP1").grid(row=inner_row, column=0, padx=10, pady=10, sticky="w")
-        spinbox(advanced_stereo_setting_frame, inner_row, 1, self.layout_values['vertical_penalty_p1_val'], None, [0, 500])
+        spinbox(advanced_stereo_setting_frame, inner_row, 1, button_values['vertical_penalty_p1_val'], None, [0, 500])
         ttk.Label(advanced_stereo_setting_frame, text="(0, 500)").grid(row=inner_row, column=2, padx=10, pady=10, sticky="w")
 
         inner_row += 1
 
         ttk.Label(advanced_stereo_setting_frame, text="costAggregation.verticalPenaltyCostP2").grid(row=inner_row, column=0,padx=10, pady=10, sticky="w")
-        spinbox(advanced_stereo_setting_frame, inner_row, 1, self.layout_values['vertical_penalty_p2_val'], None, [0, 1000])
+        spinbox(advanced_stereo_setting_frame, inner_row, 1, button_values['vertical_penalty_p2_val'], None, [0, 1000])
         ttk.Label(advanced_stereo_setting_frame, text="(0, 1000)").grid(row=inner_row, column=2, padx=10, pady=10, sticky="w")
 
         inner_row += 1
 
         ttk.Label(advanced_stereo_setting_frame, text="costMatching.confidenceThreshold").grid(row=inner_row, column=0, padx=10, pady=10, sticky="w")
-        spinbox(advanced_stereo_setting_frame, inner_row, 1, self.layout_values['confidence_threshold_val'], None, [0, 255])
+        spinbox(advanced_stereo_setting_frame, inner_row, 1, button_values['confidence_threshold_val'], None, [0, 255])
         ttk.Label(advanced_stereo_setting_frame, text="(0, 255)").grid(row=inner_row, column=2, padx=10, pady=10, sticky="w")
 
         inner_row += 1
 
         # Alpha Slider
         ttk.Label(advanced_stereo_setting_frame, text="costMatching.linearEquationParameters.alpha").grid(row=inner_row, column=0, padx=10, pady=10, sticky="w")
-        CM_alpha_slider = ttk.Scale(advanced_stereo_setting_frame, from_=0, to=10, variable=self.layout_values['CM_alpha_val'], orient="horizontal", command=lambda x: update_label(CM_alpha_slider, CM_alpha_label))
+        CM_alpha_slider = ttk.Scale(advanced_stereo_setting_frame, from_=0, to=10, variable=button_values['CM_alpha_val'], orient="horizontal", command=lambda x: update_label(CM_alpha_slider, CM_alpha_label))
         CM_alpha_slider.grid(row=inner_row, column=1, padx=10, pady=10, sticky="ew")
-        CM_alpha_label = ttk.Label(advanced_stereo_setting_frame, text=str(int(self.layout_values['CM_alpha_val'].get())))
+        CM_alpha_label = ttk.Label(advanced_stereo_setting_frame, text=str(int(button_values['CM_alpha_val'].get())))
         CM_alpha_label.grid(row=inner_row, column=2, padx=10, pady=10, sticky="w")
 
         inner_row += 1
 
         # Beta Slider
         ttk.Label(advanced_stereo_setting_frame, text="costMatching.linearEquationParameters.beta").grid(row=inner_row, column=0, padx=10, pady=10, sticky="w")
-        CM_beta_slider = ttk.Scale(advanced_stereo_setting_frame, from_=0, to=10, variable=self.layout_values['CM_beta_val'], orient="horizontal", command=lambda x: update_label(CM_beta_slider, CM_beta_label))
+        CM_beta_slider = ttk.Scale(advanced_stereo_setting_frame, from_=0, to=10, variable=button_values['CM_beta_val'], orient="horizontal", command=lambda x: update_label(CM_beta_slider, CM_beta_label))
         CM_beta_slider.grid(row=inner_row, column=1, padx=10, pady=10, sticky="ew")
-        CM_beta_label = ttk.Label(advanced_stereo_setting_frame, text=str(int(self.layout_values['CM_beta_val'].get())))
+        CM_beta_label = ttk.Label(advanced_stereo_setting_frame, text=str(int(button_values['CM_beta_val'].get())))
         CM_beta_label.grid(row=inner_row, column=2, padx=10, pady=10, sticky="w")
 
         inner_row += 1
 
         ttk.Label(advanced_stereo_setting_frame, text="costMatching.linearEquationParameters.threshold").grid(row=inner_row, column=0, padx=10, pady=10, sticky="w")
-        spinbox(advanced_stereo_setting_frame, inner_row, 1, self.layout_values['matching_threshold_val'], None, [0, 255])
+        spinbox(advanced_stereo_setting_frame, inner_row, 1, button_values['matching_threshold_val'], None, [0, 255])
         ttk.Label(advanced_stereo_setting_frame, text="(0, 255)").grid(row=inner_row, column=2, padx=10, pady=10, sticky="w")
 
         inner_row += 1
@@ -718,11 +746,11 @@ class ReplayVisualizer:
         # ------------------------------------------------------------------------------------------------------------------------------
 
         # Add a "GENERATE" button at the bottom
-        generate_button = tk.Button(popup_window, text="GENERATE", bg="green2", activebackground="green4", command=lambda: self.on_generate_button_keydown())
+        generate_button = tk.Button(popup_window, text="GENERATE", bg="green2", activebackground="green4", command=lambda: self.on_generate_button_keydown(button_values))
         generate_button.grid(row=current_row, column=0, columnspan=2, pady=20)
 
         # Add a "GENERATE" button at the bottom
-        generate_button = tk.Button(popup_window, text="GENERATE", bg="blue2", activebackground="blue4", command=lambda: self.on_generate_button_keydown())  # todo
+        generate_button = tk.Button(popup_window, text="GENERATE", bg="blue2", activebackground="blue4", command=lambda: self.on_generate_button_keydown(button_values))  # todo
         generate_button.grid(row=current_row, column=1, columnspan=2, pady=20)
         current_row += 1
         # ------------------------------------------------------------------------------------------------------------------------------
@@ -737,21 +765,29 @@ class ReplayVisualizer:
     def on_mouse_wheel(self, event):
         # print(event.widget)
         if event.delta > 0:
-            self.canvas.yview_scroll(-1, "units")  # Scroll up
+            self.on_mouse_wheel_up(event)
         elif event.delta < 0:
-            self.canvas.yview_scroll(1, "units")  # Scroll down
+            self.on_mouse_wheel_down(event)
     def on_mouse_wheel_up(self, event):
-        # print("up", event.widget)
-        self.canvas.yview_scroll(-1, "units")
+        if "settings_canvas1" in str(event.widget):
+            self.settings_canvas1.yview_scroll(-1, "units")
+        elif "settings_canvas2" in str(event.widget):
+            self.settings_canvas2.yview_scroll(-1, "units")
     def on_mouse_wheel_down(self, event):
-        # print("down", event.widget)
-        self.canvas.yview_scroll(1, "units")
+        if "settings_canvas1" in str(event.widget):
+            self.settings_canvas1.yview_scroll(1, "units")
+        elif "settings_canvas2" in str(event.widget):
+            self.settings_canvas2.yview_scroll(1, "units")
 
     def bind_scrolling(self):
+        # todo bind scrolling for config canvas
         # --- BINDING FOR SCROLLING
         if platform.system() == "Linux":
-            self.settings_frame_custom.bind("<Button-4>", self.on_mouse_wheel_up)
-            self.settings_frame_custom.bind("<Button-5>", self.on_mouse_wheel_down)
+            self.settings_frame_custom1.bind("<Button-4>", self.on_mouse_wheel_up)
+            self.settings_frame_custom1.bind("<Button-5>", self.on_mouse_wheel_down)
+
+            self.settings_frame_custom2.bind("<Button-4>", self.on_mouse_wheel_up)
+            self.settings_frame_custom2.bind("<Button-5>", self.on_mouse_wheel_down)
 
             def bind_recursively(frame):
                 for widget in frame.winfo_children():
@@ -763,129 +799,156 @@ class ReplayVisualizer:
                     widget.bind("<Button-5>", self.on_mouse_wheel_down)
                     bind_recursively(widget)
 
-            bind_recursively(self.settings_frame_custom)
+            bind_recursively(self.settings_frame_custom1)
+            bind_recursively(self.settings_frame_custom2)
 
         else:
-            self.canvas.bind_all("<MouseWheel>", self.on_mouse_wheel)
+            self.settings_canvas1.bind_all("<MouseWheel>", self.on_mouse_wheel)
+            self.settings_canvas2.bind_all("<MouseWheel>", self.on_mouse_wheel)
 
-        self.canvas.focus_set()
+        self.settings_canvas1.focus_set()
+        self.settings_canvas2.focus_set()
 
-    def show_pointcloud(self):
-        if self.pcl_path is None: return False
+    def show_pointcloud(self, pcl_path, config_json):
+        if pcl_path is None: return False
         script_directory = os.path.dirname(os.path.abspath(__file__))
         visualize_pointcloud_path = os.path.join(script_directory, 'visualize_pointcloud.py')
-        subprocess.Popen(['python', visualize_pointcloud_path, self.pcl_path, str(self.config_json)])  # o3d.visualization.draw_geometries([pointcloud])
+        subprocess.Popen(['python', visualize_pointcloud_path, pcl_path, str(config_json)])  # o3d.visualization.draw_geometries([pointcloud])
         time.sleep(1)
 
-    def create_layout(self):
-        self.main_frame = tk.Frame(self.toplLevel)
-        self.main_frame.grid(row=0, column=0, sticky="nsew")
+    def create_depth_section(self, collumn_in_main_frame):
+        generated_depth_frame = tk.Frame(self.main_frame)
+        generated_depth_frame.grid(row=1, column=collumn_in_main_frame, padx=5, pady=5, sticky='nsew')
 
-        self.generated_depth_frame = tk.Frame(self.main_frame)
-        self.generated_depth_frame.grid(row=1, column=0, padx=5, pady=5, sticky='nsew')
+        generated_depth_text_label1 = tk.Label(generated_depth_frame, text="Generated Depth", font=("Arial", 12, "bold"))
+        generated_depth_text_label1.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="nsew")
 
-        generated_depth_text_label = tk.Label(self.generated_depth_frame, text="Generated Depth", font=("Arial", 12, "bold"))
-        generated_depth_text_label.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="nsew")
+        generated_depth_image = tk.Label(generated_depth_frame, image=None)
+        generated_depth_image.image = None
+        generated_depth_image.grid(row=1, column=0, padx=10, pady=10)
 
-        self.generated_depth_image = tk.Label(self.generated_depth_frame, image=None)
-        self.generated_depth_image.image = None
-        self.generated_depth_image.grid(row=1, column=0, padx=10, pady=10)
-
-        pointcloud_button = tk.Button(self.generated_depth_frame, text="Pointcloud", command=self.show_pointcloud)
+        if collumn_in_main_frame == 0:
+            pointcloud_button = tk.Button(generated_depth_frame, text="Pointcloud", command=lambda: self.show_pointcloud(self.pcl_path1, self.config_json1))
+        else:
+            pointcloud_button = tk.Button(generated_depth_frame, text="Pointcloud", command=lambda: self.show_pointcloud(self.pcl_path2, self.config_json2))
         pointcloud_button.grid(row=1, column=2, pady=(50, 0))
 
-        # Configure grid weights to allow for proper expansion
-        self.main_frame.grid_rowconfigure(0, weight=0)  # Row for the label (no need to expand)
-        self.main_frame.grid_rowconfigure(1, weight=1, uniform="equal")  # Row for generated_depth_frame
-        self.main_frame.grid_rowconfigure(2, weight=1, uniform="equal")  # Row for settings_frame_custom
-        self.main_frame.grid_columnconfigure(0, weight=1,  uniform="equal")  # Column for the left side (containing labels & settings_frame_custom)
-        self.main_frame.grid_columnconfigure(1, weight=1, uniform="equal")  # Column for the right side (containing settings_frame)
+        return generated_depth_frame, generated_depth_image
 
-        self.settings_frame_custom = tk.Frame(self.main_frame)
-        self.settings_frame_custom.grid(row=2, column=0, sticky="nsew")
+    def create_settings_section(self, collumn_in_main_frame, frame_name, button_values):
+        settings_frame_custom = tk.Frame(self.main_frame, name=frame_name)
+        settings_frame_custom.grid(row=2, column=collumn_in_main_frame, sticky="nsew")
 
-        self.settings_frame_custom.grid_rowconfigure(0, weight=1)
-        self.settings_frame_custom.grid_columnconfigure(0, weight=1, minsize=850)
+        settings_frame_custom.grid_rowconfigure(0, weight=1)
+        settings_frame_custom.grid_columnconfigure(0, weight=1, minsize=850)
 
         # ---- CANVAS FOR SETTINGS
-        self.canvas = tk.Canvas(self.settings_frame_custom)
-        self.canvas.grid(row=0, column=0, sticky="nsew")
-        self.scrollbar = tk.Scrollbar(self.settings_frame_custom, orient="vertical", command=self.canvas.yview)
-        self.scrollbar.grid(row=0, column=1, sticky="ns")
+        settings_canvas = tk.Canvas(settings_frame_custom)
+        settings_canvas.grid(row=0, column=0, sticky="nsew")
+        scrollbar = tk.Scrollbar(settings_frame_custom, orient="vertical", command=settings_canvas.yview)
+        scrollbar.grid(row=0, column=1, sticky="ns")
 
-        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+        settings_canvas.configure(yscrollcommand=scrollbar.set)
 
-        self.content_frame = tk.Frame(self.canvas)
-        current_config = self.get_current_config(original_config=None)
-        self.initialize_button_values(current_config)
-        self.create_settings_layout(self.content_frame)
-        self.canvas.create_window((0, 0), window=self.content_frame, anchor="nw")
-        self.content_frame.update_idletasks()
+        content_frame = tk.Frame(settings_canvas)
+        initial_config = self.get_initial_config(original_config=None)
+        self.inicialize_button_values(initial_config, button_values)
+        self.create_settings_layout(content_frame, button_values)
+        settings_canvas.create_window((0, 0), window=content_frame, anchor="nw")
+        content_frame.update_idletasks()
 
-        self.canvas.config(scrollregion=self.canvas.bbox("all"))
+        settings_canvas.config(scrollregion=settings_canvas.bbox("all"))
 
-        # --- CAVAS FOR CONFIG
-        self.config_frame = tk.Frame(self.main_frame)
-        self.config_frame.grid(row=3, column=0, padx=5, pady=5, sticky='nsew')
+        return settings_frame_custom, settings_canvas
+
+    def create_config_section(self, collumn_in_main_frame):
+        config_frame = tk.Frame(self.main_frame)
+        config_frame.grid(row=3, column=collumn_in_main_frame, padx=5, pady=5, sticky='nsew')
 
         # Create canvas with scrollbar
-        self.canvas2 = tk.Canvas(self.config_frame)
-        self.canvas2.grid(row=0, column=0, sticky="nsew")
-        self.scrollbar2 = tk.Scrollbar(self.config_frame, orient="vertical", command=self.canvas2.yview)
-        self.scrollbar2.grid(row=0, column=1, sticky="ns")
+        canvas2 = tk.Canvas(config_frame)
+        canvas2.grid(row=0, column=0, sticky="nsew")
+        scrollbar2 = tk.Scrollbar(config_frame, orient="vertical", command=canvas2.yview)
+        scrollbar2.grid(row=0, column=1, sticky="ns")
 
-        self.canvas2.configure(yscrollcommand=self.scrollbar2.set)
+        canvas2.configure(yscrollcommand=scrollbar2.set)
 
         # Create a content frame inside the canvas
-        self.content_frame2 = tk.Frame(self.canvas2)
-        self.canvas2.create_window((0, 0), window=self.content_frame2, anchor="nw")
-        self.content_frame2.update_idletasks()
+        content_frame2 = tk.Frame(canvas2)
+        canvas2.create_window((0, 0), window=content_frame2, anchor="nw")
+        content_frame2.update_idletasks()
 
         # Configure scrolling area
-        self.canvas2.config(scrollregion=self.canvas2.bbox("all"))
+        canvas2.config(scrollregion=canvas2.bbox("all"))
 
         # JSON data for each depth image (example)
         generated_settings = self.view_info["metadata"].get("config2settings", {})
         generated_json_str = json.dumps(generated_settings, indent=4)
 
         # Create a Text widget to display the JSON data
-        self.generated_json_text = tk.Text(self.content_frame2,
-                                      bg="white",
-                                      fg="black",
-                                      font=("Courier", 8),
-                                      wrap="none",
-                                      height=20,  # Adjust based on your needs
-                                      width=80)  # Adjust width as necessary
-        self.generated_json_text.insert(tk.END, generated_json_str)
-        self.generated_json_text.config(state=tk.DISABLED)  # Disable editing
-        self.generated_json_text.grid(row=2, column=1, padx=10, pady=10, sticky="nsew")
+        generated_json_text = tk.Text(content_frame2,
+                                           bg="white",
+                                           fg="black",
+                                           font=("Courier", 8),
+                                           wrap="none",
+                                           height=20,  # Adjust based on your needs
+                                           width=80)  # Adjust width as necessary
+        generated_json_text.insert(tk.END, generated_json_str)
+        generated_json_text.config(state=tk.DISABLED)  # Disable editing
+        generated_json_text.grid(row=2, column=1, padx=10, pady=10, sticky="nsew")
+
+        return generated_json_text
+
+    def create_layout(self):
+        self.main_frame = tk.Frame(self.toplLevel)
+        self.main_frame.grid(row=0, column=0, sticky="nsew")
+
+        # depth 1 and depth 2
+        self.generated_depth_frame1, self.generated_depth_image1 = self.create_depth_section(0)
+        self.generated_depth_frame2, self.generated_depth_image2 = self.create_depth_section(1)
+
+        # SETTINGS
+        self.settings_frame_custom1, self.settings_canvas1 = self.create_settings_section(0, "settings_canvas1", self.button_values1)
+        self.settings_frame_custom2, self.settings_canvas2 = self.create_settings_section(1, "settings_canvas2", self.button_values2)
+
+        # CONFIG
+        self.generated_json_text1 = self.create_config_section(0)
+        self.generated_json_text2 = self.create_config_section(1)
 
         self.bind_scrolling()
 
-
-    def refresh_display(self, label=None):
-        print("Refresh display:", label)
-        if self.generated_depth is None:
+    def refresh_generated_depth_or_placeholder(self, generated_depth, generated_depth_image, label):
+        if generated_depth is None:
             colorized_generated_depth = create_placeholder_frame(self.scaled_original_size, label)
         else:
-            colorized_generated_depth, range_min, range_max = colorize_depth(self.generated_depth, type="depth", label=0)
+            colorized_generated_depth, range_min, range_max = colorize_depth(generated_depth, type="depth", label=0)
         # update generated depth
         resized_generated_depth = cv2.resize(colorized_generated_depth, self.scaled_original_size,
                                              interpolation=cv2.INTER_AREA)
 
         tk_image = ImageTk.PhotoImage(image=Image.fromarray(resized_generated_depth))
 
-        self.generated_depth_image.configure(image=tk_image)
-        self.generated_depth_image.image = tk_image
+        generated_depth_image.configure(image=tk_image)
+        generated_depth_image.image = tk_image
 
-        # Update settings labels
-        updated_json_str = json.dumps(self.config_json, indent=4)
-        self.generated_json_text.config(state=tk.NORMAL)  # Enable editing temporarily
-        self.generated_json_text.delete('1.0', tk.END)  # Clear the existing text
-        self.generated_json_text.insert(tk.END, updated_json_str)  # Insert updated JSON
-        self.generated_json_text.config(state=tk.DISABLED)  # Disable editing again
+    def refresh_json_text(self, generated_json_text, config_json):
+        updated_json_str = json.dumps(config_json, indent=4)
+        generated_json_text.config(state=tk.NORMAL)  # Enable editing temporarily
+        generated_json_text.delete('1.0', tk.END)  # Clear the existing text
+        generated_json_text.insert(tk.END, updated_json_str)  # Insert updated JSON
+        generated_json_text.config(state=tk.DISABLED)  # Disable editing again
 
-    def get_and_create_output_folder(self):
+    def refresh_display(self, label=None):
+        print("Refresh display:", label)
+
+        self.refresh_generated_depth_or_placeholder(self.generated_depth1, self.generated_depth_image1, label)
+        self.refresh_generated_depth_or_placeholder(self.generated_depth2, self.generated_depth_image2, label)
+
+        self.refresh_json_text(self.generated_json_text1, self.config_json1)
+        self.refresh_json_text(self.generated_json_text2, self.config_json2)
+
+
+    def get_or_create_output_folder(self):
         def compare_json(file_path, json_data):
             """
             Compare the content of a JSON file with a given JSON data object.
@@ -1109,10 +1172,7 @@ class ReplayVisualizer:
 
 
     def load_or_generate(self):
-        self.refresh_display(label="Loading...")
-        self.main_frame.update_idletasks()
-
-        self.output_folder = self.get_and_create_output_folder()
+        self.output_folder = self.get_or_create_output_folder()
 
         if not self.depth_in_replay_outputs:
             self.generate_and_save_depth_replay()
@@ -1121,9 +1181,6 @@ class ReplayVisualizer:
         print(f"LOADING TIMESTEP: {current_timestamp}")
         self.generated_depth = np.load(os.path.join(self.output_folder, f"depth_{current_timestamp}"))
         self.pcl_path = os.path.join(self.output_folder, f"pcl_{current_timestamp.split('.npy')[0]}.ply")
-        self.refresh_display(label="Updated")
-
-        self.main_frame.update_idletasks()
 
 if __name__ == '__main__':
     root = tk.Tk()
