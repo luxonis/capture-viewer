@@ -60,6 +60,9 @@ class ReplayVisualizer:
         self.button_values1 = {"settings_section_number" : 1}  # button_key: value
         self.button_values2 = {"settings_section_number" : 2}  # button_key: value
 
+        self.depth_generate_thread1 = threading.Thread(target=lambda: None)
+        self.depth_generate_thread2 = threading.Thread(target=lambda: None)
+
     def add_depthai_to_config(self, config_json):
         """ adding dai. at the beginning of strings so they can be validated as depthai objects in replay"""
         new_config = {}
@@ -256,13 +259,18 @@ class ReplayVisualizer:
         return config
 
     def on_generate_button_keydown(self, button_values):
-        print("Starting thread")
-        thread = threading.Thread(target=self.on_generate, args=(button_values,))
-        thread.start()
+        if self.depth_generate_thread1.is_alive() or self.depth_generate_thread2.is_alive():
+            print("Depth Thread is already running")
+            return
+        if button_values["settings_section_number"] == 1:
+            self.depth_generate_thread1 = threading.Thread(target=self.on_generate, args=(button_values,))
+            self.depth_generate_thread1.start()
+        elif button_values["settings_section_number"] == 2:
+            self.depth_generate_thread2 = threading.Thread(target=self.on_generate, args=(button_values,))
+            self.depth_generate_thread2.start()
     def on_generate(self, button_values):
-        print("GENERATE")
-
         settings_section_number = button_values['settings_section_number']
+        print(f"GENERATE THREAD: {settings_section_number}")
 
         self.last_config = self.last_extracted_config_json
         self.last_extracted_config_json = self.convert_current_button_values_to_config(button_values)
@@ -285,6 +293,7 @@ class ReplayVisualizer:
 
         self.refresh_display(label="Loading...")
         self.main_frame.update_idletasks()
+
         self.load_or_generate()
 
         if settings_section_number == 1:
@@ -298,6 +307,7 @@ class ReplayVisualizer:
 
         self.refresh_display(label="Updated")
         self.main_frame.update_idletasks()
+        print(f"Thread {settings_section_number} finished")
 
     def create_settings_layout(self, frame, button_values):
         def update_label(var, label, form="int"):
@@ -975,11 +985,15 @@ class ReplayVisualizer:
         generated_depth_image.image = tk_image
 
     def refresh_difference_or_placeholder(self, depth1, depth2, difference_image):
+        label = "Absolute Difference"
         if depth1 is None or depth2 is None: difference = None
+        elif depth1.shape != depth2.shape:
+            label = "Depth maps have incompatible shapes"
+            difference = None
         else: difference = np.abs(depth1 - depth2)
 
         if difference is None:
-            colorized_difference = create_placeholder_frame(self.scaled_original_size, "Absolute Difference")
+            colorized_difference = create_placeholder_frame(self.scaled_original_size, label)
         else:
             colorized_difference, _, _ = colorize_depth(difference, min_val=self.depth_range_min, max_val=self.depth_range_max, type="depth", label=0)
 
