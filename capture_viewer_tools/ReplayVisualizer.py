@@ -12,8 +12,6 @@ import subprocess
 import time
 import platform
 
-from traitlets.config.sphinxdoc import write_doc
-
 from capture_viewer_tools.capture_tools import (colorize_depth, calculate_scaled_dimensions,
                                                 format_json_for_replay, create_placeholder_frame)
 from capture_viewer_tools.convertor_capture2replay_json import config2settings
@@ -26,7 +24,7 @@ class ReplayVisualizer:
     def __init__(self, root, view_info, current_view):
         self.toplLevel = tk.Toplevel(root)
         self.toplLevel.title("REPLAY")
-        self.toplLevel.geometry("2200x1200")
+        self.toplLevel.geometry("2450x1200")
 
         max_image_width = 840
         max_image_height = 400
@@ -58,8 +56,8 @@ class ReplayVisualizer:
         self.output_folder = None
         self.depth_in_replay_outputs = False
 
-        self.button_values1 = {"frame_number" : 1}  # button_key: value
-        self.button_values2 = {"frame_number" : 2}  # button_key: value
+        self.button_values1 = {"settings_section_number" : 1}  # button_key: value
+        self.button_values2 = {"settings_section_number" : 2}  # button_key: value
 
     def add_depthai_to_config(self, config_json):
         """ adding dai. at the beginning of strings so they can be validated as depthai objects in replay"""
@@ -260,7 +258,7 @@ class ReplayVisualizer:
     def on_generate_button_keydown(self, button_values):
         print("GENERATE")
 
-        frame_number = button_values['frame_number']
+        settings_section_number = button_values['settings_section_number']
 
         self.last_config = self.last_extracted_config_json
         self.last_extracted_config_json = self.convert_current_button_values_to_config(button_values)
@@ -271,11 +269,11 @@ class ReplayVisualizer:
 
         self.last_generated_depth = None
 
-        if frame_number == 1:
+        if settings_section_number == 1:
             self.config_json1 = self.last_extracted_config_json
             self.generated_depth1 = None
             self.pcl_path1 = None
-        elif frame_number == 2:
+        elif settings_section_number == 2:
             self.config_json2 = self.last_extracted_config_json
             self.generated_depth2 = None
             self.pcl_path2 = None
@@ -285,12 +283,14 @@ class ReplayVisualizer:
         self.main_frame.update_idletasks()
         self.load_or_generate()
 
-        if frame_number == 1:
+        if settings_section_number == 1:
             self.generated_depth1 = self.last_generated_depth
             self.pcl_path1 = self.last_generated_pcl_path
-        elif frame_number == 2:
+        elif settings_section_number == 2:
             self.generated_depth2 = self.last_generated_depth
             self.pcl_path2 = self.last_generated_pcl_path
+        
+        self.depth_range_min, self.depth_range_max = self.get_min_max_depths(self.generated_depth1, self.generated_depth2)
 
         self.refresh_display(label="Updated")
         self.main_frame.update_idletasks()
@@ -924,6 +924,18 @@ class ReplayVisualizer:
         config_json_frame.bind("<Configure>", update_scroll_region)
 
         return generated_json_text, config_frame, config_canvas
+    def create_difference_section(self, collumn_in_main_frame):
+        difference_frame = tk.Frame(self.main_frame)
+        difference_frame.grid(row=1, column=collumn_in_main_frame, padx=5, pady=5, sticky='nsew')
+
+        difference_depth_text_label = tk.Label(difference_frame, text="Absolute Difference", font=("Arial", 12, "bold"))
+        difference_depth_text_label.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="nsew")
+
+        difference_image = tk.Label(difference_frame, image=None)
+        difference_image.image = None
+        difference_image.grid(row=1, column=0, padx=10, pady=10)
+
+        return difference_frame, difference_image
 
     def create_layout(self):
         self.main_frame = tk.Frame(self.toplLevel)
@@ -932,6 +944,8 @@ class ReplayVisualizer:
         # depth 1 and depth 2
         self.generated_depth_frame1, self.generated_depth_image1 = self.create_depth_section(0)
         self.generated_depth_frame2, self.generated_depth_image2 = self.create_depth_section(1)
+
+        self.difference_frame, self.difference_image = self.create_difference_section(2)
 
         # SETTINGS
         self.settings_frame_custom1, self.settings_canvas1 = self.create_settings_section(0, "settings_canvas1", self.button_values1)
@@ -947,15 +961,30 @@ class ReplayVisualizer:
         if generated_depth is None:
             colorized_generated_depth = create_placeholder_frame(self.scaled_original_size, label)
         else:
-            colorized_generated_depth, range_min, range_max = colorize_depth(generated_depth, type="depth", label=0)
+            colorized_generated_depth, _, _ = colorize_depth(generated_depth, min_val=self.depth_range_min, max_val=self.depth_range_max, type="depth", label=0)
         # update generated depth
-        resized_generated_depth = cv2.resize(colorized_generated_depth, self.scaled_original_size,
-                                             interpolation=cv2.INTER_AREA)
+        resized_generated_depth = cv2.resize(colorized_generated_depth, self.scaled_original_size, interpolation=cv2.INTER_AREA)
 
         tk_image = ImageTk.PhotoImage(image=Image.fromarray(resized_generated_depth))
 
         generated_depth_image.configure(image=tk_image)
         generated_depth_image.image = tk_image
+
+    def refresh_difference_or_placeholder(self, depth1, depth2, difference_image):
+        if depth1 is None or depth2 is None: difference = None
+        else: difference = np.abs(depth1 - depth2)
+
+        if difference is None:
+            colorized_difference = create_placeholder_frame(self.scaled_original_size, "Absolute Difference")
+        else:
+            colorized_difference, _, _ = colorize_depth(difference, min_val=self.depth_range_min, max_val=self.depth_range_max, type="depth", label=0)
+
+        resized_difference = cv2.resize(colorized_difference, self.scaled_original_size, interpolation=cv2.INTER_AREA)
+
+        tk_image = ImageTk.PhotoImage(image=Image.fromarray(resized_difference))
+
+        difference_image.configure(image=tk_image)
+        difference_image.image = tk_image
 
     def refresh_json_text(self, generated_json_text, config_json):
         updated_json_str = json.dumps(config_json, indent=4)
@@ -964,11 +993,33 @@ class ReplayVisualizer:
         generated_json_text.insert(tk.END, updated_json_str)  # Insert updated JSON
         generated_json_text.config(state=tk.DISABLED)  # Disable editing again
 
+    def get_min_max_depths(self, depth1, depth2, color_noise_percent_removal=1):
+        if depth1 is None and depth2 is None:
+            print("Both NONE")
+            return None, None
+        elif depth1 is not None and depth2 is not None:
+            print("Both not NONE")
+            range_min1, range_max1 = np.percentile(depth1[depth1 > 0], [0, 100 - color_noise_percent_removal])
+            range_min2, range_max2 = np.percentile(depth2[depth2 > 0], [0, 100 - color_noise_percent_removal])
+            depth_range_max = max(range_max1, range_max2)
+            depth_range_min = min(range_min1, range_min2)
+            return depth_range_min, depth_range_max
+        elif depth1 is None and depth2 is not None:
+            range_min2, range_max2 = np.percentile(depth2[depth2 > 0], [0, 100 - color_noise_percent_removal])
+            return range_min2, range_max2
+        elif depth1 is not None and depth2 is None:
+            range_min1, range_max1 = np.percentile(depth1[depth1 > 0], [0, 100 - color_noise_percent_removal])
+            return range_min1, range_max1
+        else:
+            raise ValueError("depth1 and depth2")
+
     def refresh_display(self, label=None):
         print("Refresh display:", label)
 
         self.refresh_generated_depth_or_placeholder(self.generated_depth1, self.generated_depth_image1, label)
         self.refresh_generated_depth_or_placeholder(self.generated_depth2, self.generated_depth_image2, label)
+
+        self.refresh_difference_or_placeholder(self.generated_depth1, self.generated_depth2, self.difference_image)
 
         self.refresh_json_text(self.generated_json_text1, self.config_json1)
         self.refresh_json_text(self.generated_json_text2, self.config_json2)
