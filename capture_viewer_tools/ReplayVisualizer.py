@@ -3,6 +3,7 @@ import cv2
 import open3d as o3d
 import tkinter as tk
 from tkinter import ttk
+import threading
 import os
 import json
 import glob
@@ -254,8 +255,11 @@ class ReplayVisualizer:
 
         return config
 
-
     def on_generate_button_keydown(self, button_values):
+        print("Starting thread")
+        thread = threading.Thread(target=self.on_generate, args=(button_values,))
+        thread.start()
+    def on_generate(self, button_values):
         print("GENERATE")
 
         settings_section_number = button_values['settings_section_number']
