@@ -35,18 +35,18 @@ class ReplayVisualizer:
         self.view_info = view_info
         self.current_view = current_view
 
-        self.generated_depth = None
+        self.last_generated_depth = None
         self.generated_depth1 = None
         self.generated_depth2 = None
 
-        self.pcl_path = None
+        self.last_generated_pcl_path = None
         self.pcl_path1 = None
         self.pcl_path2 = None
 
         self.generated_depth_image1 = None
         self.generated_depth_image2 = None
 
-        self.config_json = None
+        self.last_extracted_config_json = None
         self.config_json1 = None
         self.config_json2 = None
 
@@ -262,31 +262,35 @@ class ReplayVisualizer:
 
         frame_number = button_values['frame_number']
 
-        self.last_config = self.config_json
-        self.config_json = self.convert_current_button_values_to_config(button_values)
+        self.last_config = self.last_extracted_config_json
+        self.last_extracted_config_json = self.convert_current_button_values_to_config(button_values)
 
-        print(self.config_json)
+        print(self.last_extracted_config_json)
 
-        self.config_json = self.add_depthai_to_config(self.config_json)
+        self.last_extracted_config_json = self.add_depthai_to_config(self.last_extracted_config_json)
 
-        self.generated_depth = None
+        self.last_generated_depth = None
 
         if frame_number == 1:
-            self.config_json1 = self.config_json
+            self.config_json1 = self.last_extracted_config_json
+            self.generated_depth1 = None
+            self.pcl_path1 = None
         elif frame_number == 2:
-            self.config_json2 = self.config_json
+            self.config_json2 = self.last_extracted_config_json
+            self.generated_depth2 = None
+            self.pcl_path2 = None
 
 
-        self.main_frame.update_idletasks()
         self.refresh_display(label="Loading...")
+        self.main_frame.update_idletasks()
         self.load_or_generate()
 
         if frame_number == 1:
-            self.generated_depth1 = self.generated_depth
-            self.pcl_path1 = self.pcl_path
+            self.generated_depth1 = self.last_generated_depth
+            self.pcl_path1 = self.last_generated_pcl_path
         elif frame_number == 2:
-            self.generated_depth2 = self.generated_depth
-            self.pcl_path2 = self.pcl_path
+            self.generated_depth2 = self.last_generated_depth
+            self.pcl_path2 = self.last_generated_pcl_path
 
         self.refresh_display(label="Updated")
         self.main_frame.update_idletasks()
@@ -788,7 +792,6 @@ class ReplayVisualizer:
             self.config_canvas2.yview_scroll(1, "units")
 
     def bind_scrolling(self):
-        # todo bind scrolling for config canvas
         # --- BINDING FOR SCROLLING
         if platform.system() == "Linux":
             self.settings_frame_custom1.bind("<Button-4>", self.on_mouse_wheel_up)
@@ -804,7 +807,6 @@ class ReplayVisualizer:
             self.config_frame2.bind("<Button-5>", self.on_mouse_wheel_down)
 
             def bind_recursively(frame):
-                print(frame.winfo_children())
                 for widget in frame.winfo_children():
                     if isinstance(widget, ttk.Spinbox) or isinstance(widget, ttk.Combobox):
                         widget.bind("<Button-4>", 'break')
@@ -851,7 +853,6 @@ class ReplayVisualizer:
         pointcloud_button.grid(row=1, column=2, pady=(50, 0))
 
         return generated_depth_frame, generated_depth_image
-
     def create_settings_section(self, collumn_in_main_frame, frame_name, button_values):
         settings_frame_custom = tk.Frame(self.main_frame, name=frame_name)
         settings_frame_custom.grid(row=2, column=collumn_in_main_frame, sticky="nsew")
@@ -877,7 +878,6 @@ class ReplayVisualizer:
         settings_canvas.config(scrollregion=settings_canvas.bbox("all"))
 
         return settings_frame_custom, settings_canvas
-
     def create_config_section(self, collumn_in_main_frame, config_frame_name):
         config_frame = tk.Frame(self.main_frame, name=config_frame_name)
         config_frame.grid(row=3, column=collumn_in_main_frame, padx=5, pady=5, sticky='nsew')
@@ -1016,7 +1016,7 @@ class ReplayVisualizer:
             if not os.path.isdir(dir_path):
                 continue
             if os.path.exists(os.path.join(dir_path, "config.json")):
-                if compare_json(os.path.join(dir_path, "config.json"), format_json_for_replay(str(self.config_json))):
+                if compare_json(os.path.join(dir_path, "config.json"), format_json_for_replay(str(self.last_extracted_config_json))):
                     output_folder = dir_path
                     # Check if files with the current timestamp exist in the folder
                     if check_folder_for_timestamp(dir_path, current_timestamp):
@@ -1045,7 +1045,7 @@ class ReplayVisualizer:
         left = self.current_view["left"]
         right = self.current_view["right"]
         color = self.current_view["isp"]
-        config = self.config_json
+        config = self.last_extracted_config_json
         calib = self.view_info["calib"]
 
         if left is None or right is None:
@@ -1102,12 +1102,12 @@ class ReplayVisualizer:
             pcd.colors = o3d.utility.Vector3dVector(aligned_colors / 255.0)  # Normalize to [0, 1]
 
 
-        self.generated_depth = depth
+        self.last_generated_depth = depth
 
         # Save depth data
         timestep = self.view_info['timestamps'][self.view_info['current_index']].split('.npy')[0]
-        np.save(os.path.join(output_folder, f"depth_{timestep}.npy"), self.generated_depth)
-        cv2.imwrite(os.path.join(output_folder, f"depth_{timestep}.png"), self.generated_depth)
+        np.save(os.path.join(output_folder, f"depth_{timestep}.npy"), self.last_generated_depth)
+        cv2.imwrite(os.path.join(output_folder, f"depth_{timestep}.png"), self.last_generated_depth)
         o3d.io.write_point_cloud(os.path.join(output_folder, f"pcl_{timestep}.ply"), pcd)
 
         with open(os.path.join(output_folder, f'config.json'), 'w') as f:
@@ -1158,7 +1158,7 @@ class ReplayVisualizer:
         print("Lading data for generation")
         timestamps = self.view_info['timestamps']
         data = self.view_info['data']
-        config = self.config_json
+        config = self.last_extracted_config_json
         calib = self.view_info["calib"]
         if calib is None: raise ValueError("No calibration provided")
 
@@ -1205,8 +1205,8 @@ class ReplayVisualizer:
 
         current_timestamp = self.view_info['timestamps'][self.view_info['current_index']]
         print(f"LOADING TIMESTEP: {current_timestamp}")
-        self.generated_depth = np.load(os.path.join(self.output_folder, f"depth_{current_timestamp}"))
-        self.pcl_path = os.path.join(self.output_folder, f"pcl_{current_timestamp.split('.npy')[0]}.ply")
+        self.last_generated_depth = np.load(os.path.join(self.output_folder, f"depth_{current_timestamp}"))
+        self.last_generated_pcl_path = os.path.join(self.output_folder, f"pcl_{current_timestamp.split('.npy')[0]}.ply")
 
 if __name__ == '__main__':
     root = tk.Tk()
