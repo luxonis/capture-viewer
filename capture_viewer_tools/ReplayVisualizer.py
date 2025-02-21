@@ -773,11 +773,19 @@ class ReplayVisualizer:
             self.settings_canvas1.yview_scroll(-1, "units")
         elif "settings_canvas2" in str(event.widget):
             self.settings_canvas2.yview_scroll(-1, "units")
+        elif "config_frame1" in str(event.widget):
+            self.config_canvas1.yview_scroll(-1, "units")
+        elif "config_frame2" in str(event.widget):
+            self.config_canvas2.yview_scroll(-1, "units")
     def on_mouse_wheel_down(self, event):
         if "settings_canvas1" in str(event.widget):
             self.settings_canvas1.yview_scroll(1, "units")
         elif "settings_canvas2" in str(event.widget):
             self.settings_canvas2.yview_scroll(1, "units")
+        elif "config_frame1" in str(event.widget):
+            self.config_canvas1.yview_scroll(1, "units")
+        elif "config_frame2" in str(event.widget):
+            self.config_canvas2.yview_scroll(1, "units")
 
     def bind_scrolling(self):
         # todo bind scrolling for config canvas
@@ -789,7 +797,14 @@ class ReplayVisualizer:
             self.settings_frame_custom2.bind("<Button-4>", self.on_mouse_wheel_up)
             self.settings_frame_custom2.bind("<Button-5>", self.on_mouse_wheel_down)
 
+            self.config_frame1.bind("<Button-4>", self.on_mouse_wheel_up)
+            self.config_frame1.bind("<Button-5>", self.on_mouse_wheel_down)
+
+            self.config_frame2.bind("<Button-4>", self.on_mouse_wheel_up)
+            self.config_frame2.bind("<Button-5>", self.on_mouse_wheel_down)
+
             def bind_recursively(frame):
+                print(frame.winfo_children())
                 for widget in frame.winfo_children():
                     if isinstance(widget, ttk.Spinbox) or isinstance(widget, ttk.Combobox):
                         widget.bind("<Button-4>", 'break')
@@ -801,6 +816,8 @@ class ReplayVisualizer:
 
             bind_recursively(self.settings_frame_custom1)
             bind_recursively(self.settings_frame_custom2)
+            bind_recursively(self.config_frame1)
+            bind_recursively(self.config_frame2)
 
         else:
             self.settings_canvas1.bind_all("<MouseWheel>", self.on_mouse_wheel)
@@ -861,43 +878,52 @@ class ReplayVisualizer:
 
         return settings_frame_custom, settings_canvas
 
-    def create_config_section(self, collumn_in_main_frame):
-        config_frame = tk.Frame(self.main_frame)
+    def create_config_section(self, collumn_in_main_frame, config_frame_name):
+        config_frame = tk.Frame(self.main_frame, name=config_frame_name)
         config_frame.grid(row=3, column=collumn_in_main_frame, padx=5, pady=5, sticky='nsew')
 
-        # Create canvas with scrollbar
-        canvas2 = tk.Canvas(config_frame)
-        canvas2.grid(row=0, column=0, sticky="nsew")
-        scrollbar2 = tk.Scrollbar(config_frame, orient="vertical", command=canvas2.yview)
-        scrollbar2.grid(row=0, column=1, sticky="ns")
+        config_frame.grid_rowconfigure(0, weight=1)
+        config_frame.grid_columnconfigure(0, weight=1, minsize=850)
 
-        canvas2.configure(yscrollcommand=scrollbar2.set)
+        config_canvas = tk.Canvas(config_frame, height=150) # set max height
+        config_canvas.grid(row=0, column=0, sticky="nsew")
+
+        v_scrollbar = tk.Scrollbar(config_frame, orient="vertical", command=config_canvas.yview)
+        v_scrollbar.grid(row=0, column=1, sticky="ns")
+
+        config_canvas.configure(yscrollcommand=v_scrollbar.set)
 
         # Create a content frame inside the canvas
-        content_frame2 = tk.Frame(canvas2)
-        canvas2.create_window((0, 0), window=content_frame2, anchor="nw")
-        content_frame2.update_idletasks()
-
-        # Configure scrolling area
-        canvas2.config(scrollregion=canvas2.bbox("all"))
+        config_json_frame = tk.Frame(config_canvas)
+        config_window = config_canvas.create_window((0, 0), window=config_json_frame, anchor="nw")
 
         # JSON data for each depth image (example)
         generated_settings = self.view_info["metadata"].get("config2settings", {})
         generated_json_str = json.dumps(generated_settings, indent=4)
 
         # Create a Text widget to display the JSON data
-        generated_json_text = tk.Text(content_frame2,
-                                           bg="white",
-                                           fg="black",
-                                           font=("Courier", 8),
-                                           wrap="none",
-                                           height=20,  # Adjust based on your needs
-                                           width=80)  # Adjust width as necessary
+        generated_json_text = tk.Text(config_json_frame,
+                                      bg="white",
+                                      fg="black",
+                                      font=("Courier", 8),
+                                      wrap="word",  # Enables text wrapping
+                                      height=20,  # Adjust based on needs
+                                      width=64)  # Adjust width as necessary
         generated_json_text.insert(tk.END, generated_json_str)
         generated_json_text.config(state=tk.DISABLED)  # Disable editing
-        generated_json_text.grid(row=2, column=1, padx=10, pady=10, sticky="nsew")
+        generated_json_text.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
 
-        return generated_json_text
+        # Ensure wrapping applies when resizing
+        config_json_frame.grid_columnconfigure(0, weight=1)
+        config_json_frame.grid_rowconfigure(0, weight=1)
+
+        # Update scroll region dynamically
+        def update_scroll_region(event):
+            config_canvas.config(scrollregion=config_canvas.bbox("all"))
+
+        config_json_frame.bind("<Configure>", update_scroll_region)
+
+        return generated_json_text, config_frame, config_canvas
 
     def create_layout(self):
         self.main_frame = tk.Frame(self.toplLevel)
@@ -912,8 +938,8 @@ class ReplayVisualizer:
         self.settings_frame_custom2, self.settings_canvas2 = self.create_settings_section(1, "settings_canvas2", self.button_values2)
 
         # CONFIG
-        self.generated_json_text1 = self.create_config_section(0)
-        self.generated_json_text2 = self.create_config_section(1)
+        self.generated_json_text1, self.config_frame1, self.config_canvas1 = self.create_config_section(0, "config_frame1")
+        self.generated_json_text2, self.config_frame2, self.config_canvas2 = self.create_config_section(1, "config_frame2")
 
         self.bind_scrolling()
 
