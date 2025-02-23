@@ -20,7 +20,7 @@ def key_callback(vis, action, mods):
             print(f"Displaying JSON Info: {info_text}")
 
             # Show the popup window with the JSON info
-            show_popup(info_text)
+            show_popup("Point Cloud generated with:", info_text)
 
 
 # Visualize the point cloud and listen for key presses

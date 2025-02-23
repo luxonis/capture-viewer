@@ -110,11 +110,6 @@ if __name__ == "__main__":
     else:
         datas = None, None, None, None, None, None, None, None
 
-    if 'disparity' in selected_types or 'neural_disparity' in selected_types:
-        slider_upper_range = 800
-    else:
-        slider_upper_range = 7000
-
     # load metadata
     metadata_file = os.path.join(capture_folder, 'metadata.json')
     if os.path.exists(metadata_file):
@@ -207,7 +202,7 @@ if __name__ == "__main__":
     replay_button.pack(side="left")
 
     info_button = Button(root, text="INFO", bg="#32CD32", activebackground="#90EE90",
-                              command=lambda: show_popup(str(view_info["metadata"])))
+                              command=lambda: show_popup("Metadata", str(view_info["metadata"])))
     info_button.pack(side="left")
 
     update_button = Button(root, text="Colorize\nDepth", command=lambda: display_images(root, canvas, view_info, current_view,
@@ -215,6 +210,11 @@ if __name__ == "__main__":
     update_button.pack(side="right")
 
     # Sliders for setting range
+    if 'disparity' in selected_types or 'neural_disparity' in selected_types:
+        slider_upper_range = 800
+    else:
+        slider_upper_range = 7000
+
     min_slider = Scale(root, from_=0, to=slider_upper_range, orient=VERTICAL, label="Min Value")  # Adjust range and labels as needed
     max_slider = Scale(root, from_=0, to=slider_upper_range, orient=VERTICAL, label="Max Value")  # Adjust range and labels as needed
     min_slider.pack(side=RIGHT, fill="y")
