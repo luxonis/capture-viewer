@@ -1,6 +1,6 @@
 from tkinter import messagebox
 
-def show_popup(info_text):
+def show_popup(info_title, info_text, parent_window=None):
     if info_text[0] == '{':
         text = '{'  # assuming the string is a json for better readibility
         i = 1
@@ -29,7 +29,7 @@ def show_popup(info_text):
             text += info_text[i]
             i += 1
     # Show the formatted JSON in the popup window
-    messagebox.showinfo("Point Cloud generated with:", text)
+    messagebox.showinfo(info_title, text, parent=parent_window)
 
 if __name__ == "__main__":
     # Example multi-level JSON with "lorem ipsum" text
@@ -83,4 +83,4 @@ if __name__ == "__main__":
     }
     '''
 
-    show_popup(lorem_json)
+    show_popup("Warning", lorem_json)

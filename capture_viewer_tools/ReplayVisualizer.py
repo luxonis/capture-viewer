@@ -45,7 +45,7 @@ class ReplayVisualizer:
         self.generated_depth_image1 = None
         self.generated_depth_image2 = None
 
-        self.last_extracted_config_json = None
+        self.config_json = None
         self.config_json1 = None
         self.config_json2 = None
 
@@ -258,9 +258,10 @@ class ReplayVisualizer:
 
         return config
 
-    def on_generate_button_keydown(self, button_values):
+    def on_generate_button_keydown(self, button_values, frame=None):
         if self.depth_generate_thread1.is_alive() or self.depth_generate_thread2.is_alive():
             print("Depth Thread is already running")
+            show_popup("Warning", "Depth processing thread is already running, please wait for replay on camera to finish.", frame)
             return
         if button_values["settings_section_number"] == 1:
             self.depth_generate_thread1 = threading.Thread(target=self.on_generate, args=(button_values,))
@@ -272,21 +273,21 @@ class ReplayVisualizer:
         settings_section_number = button_values['settings_section_number']
         print(f"GENERATE THREAD: {settings_section_number}")
 
-        self.last_config = self.last_extracted_config_json
-        self.last_extracted_config_json = self.convert_current_button_values_to_config(button_values)
+        self.last_config = self.config_json
+        self.config_json = self.convert_current_button_values_to_config(button_values)
 
-        print(self.last_extracted_config_json)
+        print(self.config_json)
 
-        self.last_extracted_config_json = self.add_depthai_to_config(self.last_extracted_config_json)
+        self.config_json = self.add_depthai_to_config(self.config_json)
 
         self.last_generated_depth = None
 
         if settings_section_number == 1:
-            self.config_json1 = self.last_extracted_config_json
+            self.config_json1 = self.config_json
             self.generated_depth1 = None
             self.pcl_path1 = None
         elif settings_section_number == 2:
-            self.config_json2 = self.last_extracted_config_json
+            self.config_json2 = self.config_json
             self.generated_depth2 = None
             self.pcl_path2 = None
 
@@ -763,16 +764,6 @@ class ReplayVisualizer:
 
         # ------------------------------------------------------------------------------------------------------------------------------
 
-        # Add a "GENERATE" button at the bottom
-        generate_button = tk.Button(popup_window, text="GENERATE", bg="green2", activebackground="green4", command=lambda: self.on_generate_button_keydown(button_values))
-        generate_button.grid(row=current_row, column=0, columnspan=2, pady=20)
-
-        # Add a "GENERATE" button at the bottom
-        generate_button = tk.Button(popup_window, text="GENERATE", bg="blue2", activebackground="blue4", command=lambda: self.on_generate_button_keydown(button_values))  # todo
-        generate_button.grid(row=current_row, column=1, columnspan=2, pady=20)
-        current_row += 1
-        # ------------------------------------------------------------------------------------------------------------------------------
-
         toggle_custom_frame_settings()
         toggle_advanced_settings()  # turn off by default
 
@@ -890,6 +881,14 @@ class ReplayVisualizer:
         content_frame.update_idletasks()
 
         settings_canvas.config(scrollregion=settings_canvas.bbox("all"))
+
+        # Add a "GENERATE" button at the bottom
+        generate_button = tk.Button(settings_frame_custom, text="GENERATE", bg="green2", activebackground="green4", command=lambda: self.on_generate_button_keydown(button_values, frame=settings_frame_custom))
+        generate_button.grid(row=1, column=0, columnspan=2, pady=20)
+
+        # # Add a "GENERATE" button at the bottom
+        # generate_button = tk.Button(popup_window, text="GENERATE", bg="blue2", activebackground="blue4", command=lambda: self.on_generate_button_keydown(button_values))  # todo
+        # generate_button.grid(row=current_row, column=1, columnspan=2, pady=20)
 
         return settings_frame_custom, settings_canvas
     def create_config_section(self, collumn_in_main_frame, config_frame_name):
@@ -1085,7 +1084,7 @@ class ReplayVisualizer:
             if not os.path.isdir(dir_path):
                 continue
             if os.path.exists(os.path.join(dir_path, "config.json")):
-                if compare_json(os.path.join(dir_path, "config.json"), format_json_for_replay(str(self.last_extracted_config_json))):
+                if compare_json(os.path.join(dir_path, "config.json"), format_json_for_replay(str(self.config_json))):
                     output_folder = dir_path
                     # Check if files with the current timestamp exist in the folder
                     if check_folder_for_timestamp(dir_path, current_timestamp):
@@ -1114,7 +1113,7 @@ class ReplayVisualizer:
         left = self.current_view["left"]
         right = self.current_view["right"]
         color = self.current_view["isp"]
-        config = self.last_extracted_config_json
+        config = self.config_json
         calib = self.view_info["calib"]
 
         if left is None or right is None:
@@ -1227,7 +1226,7 @@ class ReplayVisualizer:
         print("Lading data for generation")
         timestamps = self.view_info['timestamps']
         data = self.view_info['data']
-        config = self.last_extracted_config_json
+        config = self.config_json
         calib = self.view_info["calib"]
         if calib is None: raise ValueError("No calibration provided")
 

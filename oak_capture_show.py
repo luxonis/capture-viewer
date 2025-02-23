@@ -202,7 +202,7 @@ if __name__ == "__main__":
     replay_button.pack(side="left")
 
     info_button = Button(root, text="INFO", bg="#32CD32", activebackground="#90EE90",
-                              command=lambda: show_popup(str(view_info["metadata"])))
+                              command=lambda: show_popup("Metadata", str(view_info["metadata"])))
     info_button.pack(side="left")
 
     update_button = Button(root, text="Colorize\nDepth", command=lambda: display_images(root, canvas, view_info, current_view,

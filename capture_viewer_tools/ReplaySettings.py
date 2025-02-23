@@ -44,7 +44,7 @@ last_config = None
 
 def warning():
     print("FILTERING ORDER IS NOT VALID")
-    show_popup("FILTERING ORDER IS NOT VALID")
+    show_popup("Warning", "FILTERING ORDER IS NOT VALID")
     pass
 
 def check_valid_filtering_order(order):
