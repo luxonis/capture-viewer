@@ -63,6 +63,8 @@ class ReplayVisualizer:
         self.depth_generate_thread1 = threading.Thread(target=lambda: None)
         self.depth_generate_thread2 = threading.Thread(target=lambda: None)
 
+        self.batch_generation = True
+
     def add_depthai_to_config(self, config_json):
         """ adding dai. at the beginning of strings so they can be validated as depthai objects in replay"""
         new_config = {}
@@ -258,11 +260,14 @@ class ReplayVisualizer:
 
         return config
 
-    def on_generate_button_keydown(self, button_values, frame=None):
+    def on_generate_button_keydown(self, button_values, batch_generation=True, frame=None):
         if self.depth_generate_thread1.is_alive() or self.depth_generate_thread2.is_alive():
             print("Depth Thread is already running")
             show_popup("Warning", "Depth processing thread is already running, please wait for replay on camera to finish.", frame)
             return
+
+        self.batch_generation = batch_generation
+
         if button_values["settings_section_number"] == 1:
             self.depth_generate_thread1 = threading.Thread(target=self.on_generate, args=(button_values,))
             self.depth_generate_thread1.start()
@@ -833,7 +838,7 @@ class ReplayVisualizer:
         self.settings_canvas1.focus_set()
         self.settings_canvas2.focus_set()
 
-    def show_pointcloud(self, pcl_path, config_json):
+    def on_pointcloud_button(self, pcl_path, config_json):
         if pcl_path is None: return False
         script_directory = os.path.dirname(os.path.abspath(__file__))
         visualize_pointcloud_path = os.path.join(script_directory, 'visualize_pointcloud.py')
@@ -852,9 +857,9 @@ class ReplayVisualizer:
         generated_depth_image.grid(row=1, column=0, padx=10, pady=10)
 
         if collumn_in_main_frame == 0:
-            pointcloud_button = tk.Button(generated_depth_frame, text="Pointcloud", command=lambda: self.show_pointcloud(self.pcl_path1, self.config_json1))
+            pointcloud_button = tk.Button(generated_depth_frame, text="Pointcloud", command=lambda: self.on_pointcloud_button(self.pcl_path1, self.config_json1))
         else:
-            pointcloud_button = tk.Button(generated_depth_frame, text="Pointcloud", command=lambda: self.show_pointcloud(self.pcl_path2, self.config_json2))
+            pointcloud_button = tk.Button(generated_depth_frame, text="Pointcloud", command=lambda: self.on_pointcloud_button(self.pcl_path2, self.config_json2))
         pointcloud_button.grid(row=1, column=2, pady=(50, 0))
 
         return generated_depth_frame, generated_depth_image
@@ -882,13 +887,19 @@ class ReplayVisualizer:
 
         settings_canvas.config(scrollregion=settings_canvas.bbox("all"))
 
+        content_frame2 = tk.Frame(settings_frame_custom)
+        content_frame2.grid(row=1, column=0, sticky="n")
         # Add a "GENERATE" button at the bottom
-        generate_button = tk.Button(settings_frame_custom, text="GENERATE", bg="green2", activebackground="green4", command=lambda: self.on_generate_button_keydown(button_values, frame=settings_frame_custom))
-        generate_button.grid(row=1, column=0, columnspan=2, pady=20)
+        generate_button = tk.Button(content_frame2, text="GENERATE batch", bg="green2", activebackground="green4", command=lambda: self.on_generate_button_keydown(button_values,
+                                                                                                                                                                    batch_generation=True,
+                                                                                                                                                                    frame=settings_frame_custom))
+        generate_button.grid(row=0, column=0, sticky="nsew")
 
-        # # Add a "GENERATE" button at the bottom
-        # generate_button = tk.Button(popup_window, text="GENERATE", bg="blue2", activebackground="blue4", command=lambda: self.on_generate_button_keydown(button_values))  # todo
-        # generate_button.grid(row=current_row, column=1, columnspan=2, pady=20)
+        generate_button = tk.Button(content_frame2, text="GENERATE single", bg="SeaGreen1", activebackground="SeaGreen3", command=lambda: self.on_generate_button_keydown(button_values,
+                                                                                                                                                                    batch_generation=False,
+                                                                                                                                                                    frame=settings_frame_custom))
+        generate_button.grid(row=0, column=1, sticky="n")
+
 
         return settings_frame_custom, settings_canvas
     def create_config_section(self, collumn_in_main_frame, config_frame_name):
@@ -982,7 +993,6 @@ class ReplayVisualizer:
 
         generated_depth_image.configure(image=tk_image)
         generated_depth_image.image = tk_image
-
     def refresh_difference_or_placeholder(self, depth1, depth2, difference_image):
         label = "Absolute Difference"
         if depth1 is None or depth2 is None: difference = None
@@ -1002,7 +1012,6 @@ class ReplayVisualizer:
 
         difference_image.configure(image=tk_image)
         difference_image.image = tk_image
-
     def refresh_json_text(self, generated_json_text, config_json):
         updated_json_str = json.dumps(config_json, indent=4)
         generated_json_text.config(state=tk.NORMAL)  # Enable editing temporarily
@@ -1100,21 +1109,36 @@ class ReplayVisualizer:
             os.makedirs(output_folder, exist_ok=False)
         return output_folder
 
+    def process_pointcloud(self, pcl, depth, color=None):
+        pcl[:, 0] = -pcl[:, 0]  # switch because it goes wrong from the camera
+        pcl = rotate_pointcloud(pcl, 180, axis="y")
+
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(pcl)
+
+        if color is not None and self.config_json['stereo.setDepthAlign'] == "dai.CameraBoardSocket.CAM_A":
+            # Resize `isp_frame` to match the number of points
+            isp_height, isp_width, _ = color.shape
+            # Calculate the target dimensions
+            target_height = depth.shape[0]
+            target_width = depth.shape[1]
+
+            # Resize and reshape the ISP frame
+            aligned_isp_frame = cv2.resize(color, (target_width, target_height))
+            aligned_isp_frame = cv2.cvtColor(aligned_isp_frame, cv2.COLOR_BGR2RGB)
+            aligned_colors = aligned_isp_frame.reshape(-1, 3)
+
+            pcd.colors = o3d.utility.Vector3dVector(aligned_colors / 255.0)  # Normalize to [0, 1]
+        return pcd
 
     def generate_save_depth_replay_one_frame(self, output_folder=None):
-        print("Generating NEW outputs...")
-        if output_folder is not None:
-            output_folder = output_folder
-        else:
-            date_time = datetime.now().strftime("%Y%m%d%H%M%S")
-            output_folder = os.path.join(self.output_dir, date_time)
-            os.makedirs(output_folder, exist_ok=False)
-
+        print("Generating depth for ONE timestamp")
         left = self.current_view["left"]
         right = self.current_view["right"]
         color = self.current_view["isp"]
         config = self.config_json
         calib = self.view_info["calib"]
+        timestamp = self.view_info['timestamps'][self.view_info['current_index']].split('.npy')[0]
 
         if left is None or right is None:
             print("No left or right frames provided, closing replay")
@@ -1128,14 +1152,6 @@ class ReplayVisualizer:
             print("No color specified")
             color = left
 
-        # old version which doesnt work for decimation filter
-        # replayed = next(
-        #     replay(((left, right),), outputs={'depth', 'pcl'}, calib=calib, stereo_config=json.dumps(config)))
-        # replayed = next(
-        #     replay(((left, right),), outputs={'depth', 'pcl'}, calib=calib, stereo_config=json.dumps(config)))
-        # depth = replayed['depth']
-        # pcl = replayed['pcl']
-
         # FIXED - sends two frames and takes the second, works with decimation filter
         replayed = tuple(replay(
             (
@@ -1148,37 +1164,15 @@ class ReplayVisualizer:
         depth = replayed[1]['depth']
         pcl = replayed[1]['pcl']
 
-        pcl[:, 0] = -pcl[:, 0]  # switch because it goes wrong from the camera
-        pcl = rotate_pointcloud(pcl, 180, axis="y")
-
-        pcd = o3d.geometry.PointCloud()
-        pcd.points = o3d.utility.Vector3dVector(pcl)
-
-        print(config)
-        if color is not None and config['stereo.setDepthAlign'] == "dai.CameraBoardSocket.CAM_A":
-            # Resize `isp_frame` to match the number of points
-            isp_height, isp_width, _ = color.shape
-            # Calculate the target dimensions
-            target_height = depth.shape[0]
-            target_width = depth.shape[1]
-
-            # Resize and reshape the ISP frame
-            aligned_isp_frame = cv2.resize(color, (target_width, target_height))
-            aligned_isp_frame = cv2.cvtColor(aligned_isp_frame, cv2.COLOR_BGR2RGB)
-            aligned_colors = aligned_isp_frame.reshape(-1, 3)
-
-            pcd.colors = o3d.utility.Vector3dVector(aligned_colors / 255.0)  # Normalize to [0, 1]
-
-
-        self.last_generated_depth = depth
+        pcl = self.process_pointcloud(pcl, depth, color)
 
         # Save depth data
-        timestep = self.view_info['timestamps'][self.view_info['current_index']].split('.npy')[0]
-        np.save(os.path.join(output_folder, f"depth_{timestep}.npy"), self.last_generated_depth)
-        cv2.imwrite(os.path.join(output_folder, f"depth_{timestep}.png"), self.last_generated_depth)
-        o3d.io.write_point_cloud(os.path.join(output_folder, f"pcl_{timestep}.ply"), pcd)
+        np.save(os.path.join(self.output_folder, f"depth_{timestamp}.npy"), depth)
+        colorized_depth, _, _ = colorize_depth(depth, "depth", label=False, min_val=0, max_val=7000)
+        cv2.imwrite(os.path.join(self.output_folder, f"depth_{timestamp}.png"), colorized_depth)
+        o3d.io.write_point_cloud(os.path.join(self.output_folder, f"pcl_{timestamp}.ply"), pcl)
 
-        with open(os.path.join(output_folder, f'config.json'), 'w') as f:
+        with open(os.path.join(self.output_folder, f'config.json'), 'w') as f:
             json.dump(config, f, indent=4)
 
         print("GENERATED")
@@ -1199,28 +1193,6 @@ class ReplayVisualizer:
                 image_path = images['isp']
                 frames[timestamp]['isp'] = np.load(image_path)
             return frames
-
-        def process_pointcloud(pcl, depth, color=None):
-            pcl[:, 0] = -pcl[:, 0]  # switch because it goes wrong from the camera
-            pcl = rotate_pointcloud(pcl, 180, axis="y")
-
-            pcd = o3d.geometry.PointCloud()
-            pcd.points = o3d.utility.Vector3dVector(pcl)
-
-            if color is not None and config['stereo.setDepthAlign'] == "dai.CameraBoardSocket.CAM_A":
-                # Resize `isp_frame` to match the number of points
-                isp_height, isp_width, _ = color.shape
-                # Calculate the target dimensions
-                target_height = depth.shape[0]
-                target_width = depth.shape[1]
-
-                # Resize and reshape the ISP frame
-                aligned_isp_frame = cv2.resize(color, (target_width, target_height))
-                aligned_isp_frame = cv2.cvtColor(aligned_isp_frame, cv2.COLOR_BGR2RGB)
-                aligned_colors = aligned_isp_frame.reshape(-1, 3)
-
-                pcd.colors = o3d.utility.Vector3dVector(aligned_colors / 255.0)  # Normalize to [0, 1]
-            return pcd
 
         print("Generating NEW outputs for the whole folder")
         print("Lading data for generation")
@@ -1251,7 +1223,7 @@ class ReplayVisualizer:
                 depth = replayed[i]['depth']
                 pcl = replayed[i]['pcl']
                 timestamp = timestamps[batch + i - 1] # i starts at one for batch frames to skip double but there is no double for frames
-                pcl = process_pointcloud(pcl, depth, frames[timestamp].get("isp", None))
+                pcl = self.process_pointcloud(pcl, depth, frames[timestamp].get("isp", None))
 
                 timestamp = timestamp.split(".npy")[0]
                 np.save(os.path.join(self.output_folder, f"depth_{timestamp}.npy"), depth)
@@ -1269,7 +1241,8 @@ class ReplayVisualizer:
         self.output_folder = self.get_or_create_output_folder()
 
         if not self.depth_in_replay_outputs:
-            self.generate_and_save_depth_replay()
+            if self.batch_generation: self.generate_and_save_depth_replay()
+            else: self.generate_save_depth_replay_one_frame()
 
         current_timestamp = self.view_info['timestamps'][self.view_info['current_index']]
         print(f"LOADING TIMESTEP: {current_timestamp}")
