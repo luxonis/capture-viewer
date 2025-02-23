@@ -2,6 +2,8 @@ import numpy as np
 import depthai as dai
 import cv2
 import matplotlib.pyplot as plt
+import open3d as o3d
+from capture_viewer_tools.pointcloud import rotate_pointcloud
 
 def extract_calibration_values_old(json_data, width=None, height=None):
     depthSize = (1280, 800)
@@ -233,9 +235,65 @@ def create_placeholder_frame(size, text):
 def device_connected():
     print("connecting to device...")
     try:
-        device = dai.Device()
-        print(f"Device connected: {device.getDeviceName()}")
+        print("Not trying to connect!!!!")
+        # device = dai.Device()
+        # print(f"Device connected: {device.getDeviceName()}")
         return True
     except RuntimeError:
         print("No device connected. Connect a camera to use REPLAY features.")
         return False
+
+def add_depthai_to_config(config_json):
+    """ adding dai. at the beginning of strings so they can be validated as depthai objects in replay"""
+    new_config = {}
+    for key in config_json.keys():
+        config_value = config_json[key]
+        print(key, config_value, type(config_value))
+        try: config_value = int(config_value)
+        except Exception: pass
+        if type(config_value) == str and config_value[0] != '[': new_config[key] = "dai." + config_value
+        else: new_config[key] = config_value
+    return new_config
+
+def get_min_max_depths(depth1, depth2, color_noise_percent_removal=1):
+    if depth1 is None and depth2 is None:
+        print("Both NONE")
+        return None, None
+    elif depth1 is not None and depth2 is not None:
+        print("Both not NONE")
+        range_min1, range_max1 = np.percentile(depth1[depth1 > 0], [0, 100 - color_noise_percent_removal])
+        range_min2, range_max2 = np.percentile(depth2[depth2 > 0], [0, 100 - color_noise_percent_removal])
+        depth_range_max = max(range_max1, range_max2)
+        depth_range_min = min(range_min1, range_min2)
+        return depth_range_min, depth_range_max
+    elif depth1 is None and depth2 is not None:
+        range_min2, range_max2 = np.percentile(depth2[depth2 > 0], [0, 100 - color_noise_percent_removal])
+        return range_min2, range_max2
+    elif depth1 is not None and depth2 is None:
+        range_min1, range_max1 = np.percentile(depth1[depth1 > 0], [0, 100 - color_noise_percent_removal])
+        return range_min1, range_max1
+    else:
+        raise ValueError("depth1 and depth2")
+
+
+def process_pointcloud(pcl, depth, color=None, aligned_to_rgb=False):
+    pcl[:, 0] = -pcl[:, 0]  # switch because it goes wrong from the camera
+    pcl = rotate_pointcloud(pcl, 180, axis="y")
+
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(pcl)
+
+    if color is not None and aligned_to_rgb:
+        # Resize `isp_frame` to match the number of points
+        isp_height, isp_width, _ = color.shape
+        # Calculate the target dimensions
+        target_height = depth.shape[0]
+        target_width = depth.shape[1]
+
+        # Resize and reshape the ISP frame
+        aligned_isp_frame = cv2.resize(color, (target_width, target_height))
+        aligned_isp_frame = cv2.cvtColor(aligned_isp_frame, cv2.COLOR_BGR2RGB)
+        aligned_colors = aligned_isp_frame.reshape(-1, 3)
+
+        pcd.colors = o3d.utility.Vector3dVector(aligned_colors / 255.0)  # Normalize to [0, 1]
+    return pcd
