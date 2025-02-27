@@ -1,0 +1,176 @@
+#!/usr/bin/env python3
+
+import cv2
+import os
+import depthai as dai
+import numpy as np
+import argparse
+import time
+import json
+
+print(dai.__version__)
+
+if str(dai.__version__)[0] != "3":
+    print("Go to depthai-core branch v3-develop")
+    print("and run this: depthai-core/examples/python/install_requirements.py")
+    exit("U dont have depthai 3")
+
+script_dir = os.path.dirname(os.path.abspath(__file__))
+root_path = os.path.join(os.path.dirname(script_dir), 'DATA')
+
+from utils.capture_universal import initialize_capture, finalise_capture
+from oak_capture import visualize_frame, count_output_streams
+
+def initialize_pipeline(pipeline):
+    monoLeft = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_B)
+    monoRight = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_C)
+    stereo = pipeline.create(dai.node.StereoDepth)
+
+    # Linking
+    monoLeftOut = monoLeft.requestFullResolutionOutput(type=dai.ImgFrame.Type.NV12)
+    monoRightOut = monoRight.requestFullResolutionOutput(type=dai.ImgFrame.Type.NV12)
+
+    monoLeftOut.link(stereo.left)
+    monoRightOut.link(stereo.right)
+
+    stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
+    # stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_ACCURACY)
+    stereo.setRectification(True)
+    stereo.setExtendedDisparity(True)
+    stereo.setLeftRightCheck(True)
+    stereo.setSubpixel(True)
+    stereo.setSubpixelFractionalBits(5)
+
+    syncedLeftQueue = stereo.syncedLeft.createOutputQueue()
+    syncedRightQueue = stereo.syncedRight.createOutputQueue()
+    disparityQueue = stereo.disparity.createOutputQueue()
+
+    queues = {
+        "left": syncedLeftQueue,
+        "right": syncedRightQueue,
+        "disparity": disparityQueue,
+    }
+    return pipeline, queues
+
+def parseArguments():
+    # PARSE ARGUMENTS
+    parser = argparse.ArgumentParser()
+    # Mandatory arguments
+    parser.add_argument("settings_file_path", help="Path to settings JSON")
+    parser.add_argument("view_name", help="Name of the capture")
+    parser.add_argument("--output", default=root_path, help="Custom output folder")
+    parser.add_argument("--autostart", default=-1, type=int, help='Automatically start capturing after given number of seconds (-1 to disable)')
+    # parser.add_argument("--devices", default=[], dest="mxids", nargs="+", help="MXIDS of devices to connect to")
+    parser.add_argument("--ip", default=[], dest="ip", help="IP to connect to")
+
+    args = parser.parse_args()
+    settings_path = args.settings_file_path
+    view_name = args.view_name
+
+    # SETTINGS loading
+    if not os.path.exists(settings_path):
+        settings_path_1 = f"settings_jsons/{settings_path}.json"
+        settings_path_2 = f"settings_jsons/{settings_path}"
+        if os.path.exists(settings_path_1):
+            settings_path = settings_path_1
+        elif os.path.exists(settings_path_2):
+            settings_path = settings_path_2
+        else: raise FileNotFoundError(f"Settings file '{settings_path}' does not exist.")
+
+    return settings_path, view_name, args.ip, args.autostart
+
+if __name__ == "__main__":
+    settings_path, view_name, ip, autostart = parseArguments()
+
+    print("connecting to device...")
+    print(ip)
+    device = dai.Device(ip)
+    mxid = device.getMxId()
+
+    device_name = device.getDeviceName()
+    print(device_name)
+
+    with open(settings_path) as settings_file:
+        settings = json.load(settings_file)
+
+    # devices, shared_devices = {}, {}
+    output_folders = {}
+    mxids = [mxid]
+    num_captures = {mxid: 0}
+    streams = [None]
+
+    save = False
+    capture_ended = False
+
+    streams = count_output_streams(settings['output_settings'])
+    final_num_captures = settings['num_captures'] * len(streams)
+    print(f"Streams: {streams}")
+    print(f"Number of streams: {len(streams)}")
+    print(f"Will capture max frames ({settings['num_captures']}) * number of streams ({len(streams)}) = {final_num_captures}")
+
+    print("Starting loop...")
+    initial_time = time.time()
+    initialize_capture_time = initial_time + autostart
+
+    with dai.Pipeline(device) as pipeline:
+
+        pipeline, q = initialize_pipeline(pipeline)
+
+        colorMap = cv2.applyColorMap(np.arange(256, dtype=np.uint8), cv2.COLORMAP_JET)
+        colorMap[0] = [0, 0, 0]  # to make zero-disparity pixels black
+
+        pipeline.start()
+        maxDisparity = 0
+
+        pipeline.getDefaultDevice().setIrLaserDotProjectorIntensity(1)
+
+        save = False
+
+        print("Starting loop...")
+        initial_time = time.time()
+        initialize_capture_time = initial_time + autostart
+
+        while pipeline.isRunning():
+            if not save and autostart > -1 and time.time() > initialize_capture_time:
+                out_dir = initialize_capture(root_path, device, settings_path, view_name)
+                output_folders[mxid] = out_dir
+
+                save = True
+                print("Starting capture via autosave")
+                start_time = time.time()
+
+            for name in q.keys():
+                for name in q.keys():
+                    frame = q[name].get()
+                    cvFrame = frame.getCvFrame()
+                    timestamp = int(frame.getTimestamp().total_seconds() * 1000)
+                    if save:
+                        np.save(f'{output_folders[mxid]}/{name}_{timestamp}.npy', cvFrame)
+                        num_captures[mxid] += 1
+                    visualize_frame(name, cvFrame, timestamp, mxid)
+
+            key = cv2.waitKey(1)
+            if key == ord('q'):
+                pipeline.stop()
+                break
+            elif key == ord("s"):
+                save = not save
+                if save:
+                    out_dir = initialize_capture(root_path, device, settings_path, view_name)
+                    output_folders[mxid] = out_dir
+                    save = True
+                    print("Starting capture")
+                    start_time = time.time()
+                else:
+                    end_time = time.time()
+                    print(mxid, end=' ')
+                    finalise_capture(start_time, end_time, num_captures[mxid], streams)
+                    capture_ended, save = True, False
+                    pipeline.stop()
+
+            if num_captures[mxid] >= final_num_captures:
+                end_time = time.time()
+                print(mxid, end=' ')
+                finalise_capture(start_time, end_time, num_captures[mxid], streams)
+                capture_ended, save = True, False
+                pipeline.stop()
