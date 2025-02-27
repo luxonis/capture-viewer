@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import queue
 
 import cv2
 import os
@@ -21,35 +22,53 @@ root_path = os.path.join(os.path.dirname(script_dir), 'DATA')
 from utils.capture_universal import initialize_capture, finalise_capture
 from oak_capture import visualize_frame, count_output_streams
 
-def initialize_pipeline(pipeline):
-    monoLeft = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_B)
-    monoRight = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_C)
+def set_stereo_node(pipeline, settings):
     stereo = pipeline.create(dai.node.StereoDepth)
 
-    # Linking
-    monoLeftOut = monoLeft.requestFullResolutionOutput(type=dai.ImgFrame.Type.NV12)
-    monoRightOut = monoRight.requestFullResolutionOutput(type=dai.ImgFrame.Type.NV12)
-
-    monoLeftOut.link(stereo.left)
-    monoRightOut.link(stereo.right)
-
-    stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
-    # stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_ACCURACY)
     stereo.setRectification(True)
-    stereo.setExtendedDisparity(True)
-    stereo.setLeftRightCheck(True)
-    stereo.setSubpixel(True)
-    stereo.setSubpixelFractionalBits(5)
 
-    syncedLeftQueue = stereo.syncedLeft.createOutputQueue()
-    syncedRightQueue = stereo.syncedRight.createOutputQueue()
-    disparityQueue = stereo.disparity.createOutputQueue()
+    stereo.setLeftRightCheck(settings["LRcheck"])
+    if settings["extendedDisparity"]: stereo.setExtendedDisparity(True)
+    if settings["subpixelDisparity"]: stereo.setSubpixel(True)
+    if settings["subpixelValue"]: stereo.setSubpixelFractionalBits(settings["subpixelValue"])
+    stereo.setDefaultProfilePreset(eval(f"dai.node.StereoDepth.PresetMode.{settings['profilePreset']}"))
 
-    queues = {
-        "left": syncedLeftQueue,
-        "right": syncedRightQueue,
-        "disparity": disparityQueue,
-    }
+    return stereo
+
+def initialize_pipeline(pipeline, settings):
+    queues = {}
+    output_settings = settings["output_settings"]
+    if output_settings["left"] or output_settings["left_raw"]:
+        monoLeft = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_B)
+        monoLeftOut = monoLeft.requestFullResolutionOutput()
+
+    if output_settings["right"] or output_settings["right_raw"]:
+        monoRight = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_C)
+        monoRightOut = monoRight.requestFullResolutionOutput()
+
+    if output_settings["rgb"] or output_settings["rgb_png"]:
+        color = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_A)
+        queues["rgb"] = color.requestFullResolutionOutput().createOutputQueue()
+
+
+    if output_settings["depth"] or output_settings["disparity"]:
+        stereo = set_stereo_node(pipeline, settings)
+        monoLeftOut.link(stereo.left)
+        monoRightOut.link(stereo.right)
+
+        syncedLeftQueue = stereo.syncedLeft.createOutputQueue()
+        syncedRightQueue = stereo.syncedRight.createOutputQueue()
+        disparityQueue = stereo.disparity.createOutputQueue()
+        depthQueue = stereo.depth.createOutputQueue()
+
+        queues['left'] = syncedLeftQueue
+        queues['right'] = syncedRightQueue
+        queues['disparity'] = disparityQueue
+        queues['depth'] = depthQueue
+    else:
+        queues['left'] = monoLeftOut.createOutputQueue()
+        queues['right'] = monoRightOut.createOutputQueue()
+
     return pipeline, queues
 
 def parseArguments():
@@ -61,11 +80,12 @@ def parseArguments():
     parser.add_argument("--output", default=root_path, help="Custom output folder")
     parser.add_argument("--autostart", default=-1, type=int, help='Automatically start capturing after given number of seconds (-1 to disable)')
     # parser.add_argument("--devices", default=[], dest="mxids", nargs="+", help="MXIDS of devices to connect to")
-    parser.add_argument("--ip", default=[], dest="ip", help="IP to connect to")
+    parser.add_argument("--ip", default=None, dest="ip", help="IP to connect to")
 
     args = parser.parse_args()
     settings_path = args.settings_file_path
     view_name = args.view_name
+    ip = args.ip
 
     # SETTINGS loading
     if not os.path.exists(settings_path):
@@ -77,18 +97,19 @@ def parseArguments():
             settings_path = settings_path_2
         else: raise FileNotFoundError(f"Settings file '{settings_path}' does not exist.")
 
-    return settings_path, view_name, args.ip, args.autostart
+    return settings_path, view_name, ip, args.autostart
 
 if __name__ == "__main__":
     settings_path, view_name, ip, autostart = parseArguments()
 
-    print("connecting to device...")
-    print(ip)
-    device = dai.Device(ip)
-    mxid = device.getMxId()
+    print(f"connecting to device... IP: {ip}")
+
+    if ip is not None: device = dai.Device(ip)
+    else: device = dai.Device()
+    mxid = device.getDeviceId()
 
     device_name = device.getDeviceName()
-    print(device_name)
+    print(f"Device connected! Device Name: {device_name}")
 
     with open(settings_path) as settings_file:
         settings = json.load(settings_file)
@@ -108,23 +129,16 @@ if __name__ == "__main__":
     print(f"Number of streams: {len(streams)}")
     print(f"Will capture max frames ({settings['num_captures']}) * number of streams ({len(streams)}) = {final_num_captures}")
 
-    print("Starting loop...")
     initial_time = time.time()
     initialize_capture_time = initial_time + autostart
 
     with dai.Pipeline(device) as pipeline:
-
-        pipeline, q = initialize_pipeline(pipeline)
-
-        colorMap = cv2.applyColorMap(np.arange(256, dtype=np.uint8), cv2.COLORMAP_JET)
-        colorMap[0] = [0, 0, 0]  # to make zero-disparity pixels black
-
+        pipeline, q = initialize_pipeline(pipeline, settings)
         pipeline.start()
-        maxDisparity = 0
 
-        pipeline.getDefaultDevice().setIrLaserDotProjectorIntensity(1)
 
-        save = False
+        if settings['ir']: pipeline.getDefaultDevice().setIrLaserDotProjectorIntensity(settings['ir_value'])
+        if settings['flood_light']: pipeline.getDefaultDevice().setIrFloodLightIntensity(settings['flood_light_intensity'])
 
         print("Starting loop...")
         initial_time = time.time()
