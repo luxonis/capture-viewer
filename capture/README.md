@@ -115,3 +115,14 @@ configure the appropriate fsync settings. Trying to run multiple TOFs without fs
 ```bash
 python capture/oak_capture.py <appropriate_tof_config> <capture_name> --devices <mxids_of_tofs>
 ```
+
+---
+
+## Depthai 3 Capture (for RVC4)
+Capture with RVC4 still has limited settings as not all the functions were implemented and/or are reliably running on all devices.
+
+To change settings for RVC4 capture, edit the `rvc4.json` file.
+
+```bash
+python capture/rvc4_capture.py rvc4 <rvc4_capture_name> --ip <camera_ip>
+```

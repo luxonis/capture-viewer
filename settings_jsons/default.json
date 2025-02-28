@@ -12,14 +12,14 @@
     "sensIso": 800,
     "output_settings": {
         "left": true,
-        "right": false,
+        "right": true,
         "left_raw": true,
         "right_raw": true,
         "rgb": true,
         "rgb_png": false,
-        "depth": false,
+        "depth": true,
         "disparity": false,
-        "sync": false
+        "sync": true
     },
     "LRcheck": true,
     "extendedDisparity": false,
