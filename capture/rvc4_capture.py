@@ -48,26 +48,49 @@ def initialize_pipeline(pipeline, settings):
 
     if output_settings["rgb"] or output_settings["rgb_png"]:
         color = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_A)
-        queues["rgb"] = color.requestFullResolutionOutput().createOutputQueue()
-
 
     if output_settings["depth"] or output_settings["disparity"]:
         stereo = set_stereo_node(pipeline, settings)
         monoLeftOut.link(stereo.left)
         monoRightOut.link(stereo.right)
 
-        syncedLeftQueue = stereo.syncedLeft.createOutputQueue()
-        syncedRightQueue = stereo.syncedRight.createOutputQueue()
-        disparityQueue = stereo.disparity.createOutputQueue()
-        depthQueue = stereo.depth.createOutputQueue()
+    if output_settings["sync"]:
+        sync = pipeline.create(dai.node.Sync)
+        sync.setRunOnHost(True)  # Can also run on device
 
-        queues['left'] = syncedLeftQueue
-        queues['right'] = syncedRightQueue
-        queues['disparity'] = disparityQueue
-        queues['depth'] = depthQueue
-    else:
-        queues['left'] = monoLeftOut.createOutputQueue()
-        queues['right'] = monoRightOut.createOutputQueue()
+        if output_settings["depth"]:
+            stereo.syncedLeft.link(sync.inputs["left"])
+            stereo.syncedRight.link(sync.inputs["right"])
+            stereo.disparity.link(sync.inputs["disparity"])
+            stereo.depth.link(sync.inputs["depth"])
+        else:
+            monoLeftOut.link(sync.inputs["left"])
+            monoRightOut.link(sync.inputs["right"])
+
+        if output_settings["rgb"]:
+            color.requestFullResolutionOutput().link(sync.inputs["rgb"])
+
+        queues["sync"] = sync.out.createOutputQueue()
+
+    elif not output_settings["sync"]:
+        if output_settings["depth"]:
+            syncedLeftQueue = stereo.syncedLeft.createOutputQueue()
+            syncedRightQueue = stereo.syncedRight.createOutputQueue()
+            disparityQueue = stereo.disparity.createOutputQueue()
+            depthQueue = stereo.depth.createOutputQueue()
+
+            queues['left'] = syncedLeftQueue
+            queues['right'] = syncedRightQueue
+            queues['disparity'] = disparityQueue
+            queues['depth'] = depthQueue
+
+        else:
+            queues['left'] = monoLeftOut.createOutputQueue()
+            queues['right'] = monoRightOut.createOutputQueue()
+
+        if output_settings["rgb"]:
+            queues["rgb"] = color.requestFullResolutionOutput().createOutputQueue()
+
 
     return pipeline, queues
 
@@ -153,7 +176,18 @@ if __name__ == "__main__":
                 print("Starting capture via autosave")
                 start_time = time.time()
 
-            for name in q.keys():
+            if settings["output_settings"]["sync"]:
+                if not q['sync'].has():
+                    continue
+                msgGrp = q['sync'].get()
+                for name, msg in msgGrp:
+                    timestamp = int(msg.getTimestamp().total_seconds() * 1000)
+                    frame = msg.getCvFrame()
+                    if save:
+                        np.save(f'{output_folders[mxid]}/{name}_{timestamp}.npy', frame)
+                        num_captures[mxid] += 1
+                    visualize_frame(name, frame, timestamp, mxid)
+            else:
                 for name in q.keys():
                     frame = q[name].get()
                     cvFrame = frame.getCvFrame()
