@@ -621,7 +621,7 @@ class ReplayVisualizer:
         print("Generating depth for ONE timestamp")
         left = self.current_view["left"]
         right = self.current_view["right"]
-        color = self.current_view["isp"]
+        color = self.current_view["rgb"]
         config = self.config_json
         calib = self.view_info["calib"]
         timestamp = self.view_info['timestamps'][self.view_info['current_index']].split('.npy')[0]
@@ -674,10 +674,10 @@ class ReplayVisualizer:
                 frames[timestamp]['left'] = np.load(image_path)
                 image_path = images['right']
                 frames[timestamp]['right'] = np.load(image_path)
-                if 'isp' not in images:
+                if 'rgb' not in images:
                     continue
-                image_path = images['isp']
-                frames[timestamp]['isp'] = np.load(image_path)
+                image_path = images['rgb']
+                frames[timestamp]['rgb'] = np.load(image_path)
             return frames
 
         print("Generating NEW outputs for the whole folder")
@@ -697,8 +697,8 @@ class ReplayVisualizer:
             print("Processing by batches:", len(frames))
 
             # sending first frame twice because it used to cause some error when using decimation filter
-            batch_frames = ([(frames[timestamps[batch]]["left"], frames[timestamps[batch]]["right"], frames[timestamps[batch]].get("isp", frames[timestamps[batch]]["left"]))] +
-                            [(frames[t]["left"], frames[t]["right"], frames[t].get("isp", frames[t]["left"]))
+            batch_frames = ([(frames[timestamps[batch]]["left"], frames[timestamps[batch]]["right"], frames[timestamps[batch]].get("rgb", frames[timestamps[batch]]["left"]))] +
+                            [(frames[t]["left"], frames[t]["right"], frames[t].get("rgb", frames[t]["left"]))
                             for t in timestamps[batch:batch + batch_size]])
             replayed = tuple(replay(
                 tuple(batch_frames),
@@ -711,7 +711,7 @@ class ReplayVisualizer:
                 depth = replayed[i]['depth']
                 pcl = replayed[i]['pcl']
                 timestamp = timestamps[batch + i - 1] # i starts at one for batch frames to skip double but there is no double for frames
-                pcl = process_pointcloud(pcl, depth, frames[timestamp].get("isp", None), aligned_to_rgb)
+                pcl = process_pointcloud(pcl, depth, frames[timestamp].get("rgb", None), aligned_to_rgb)
 
                 timestamp = timestamp.split(".npy")[0]
                 np.save(os.path.join(self.output_folder, f"depth_{timestamp}.npy"), depth)

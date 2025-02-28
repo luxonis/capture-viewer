@@ -44,21 +44,15 @@ def load_data(folder, types):
     return data, height, width, rgb_width, rgb_height
 
 def check_settings(capture_folder):
-    # Define the path to the metadata.json file
     metadata_file = os.path.join(capture_folder, 'metadata.json')
+    if not os.path.isfile(metadata_file): raise ValueError(f"Error: {metadata_file} not found.")
 
-    # Check if the metadata file exists
-    if not os.path.isfile(metadata_file):
-        raise ValueError(f"Error: {metadata_file} not found.")
-
-    # Load the metadata.json file
     try:
         with open(metadata_file, 'r') as f:
             data = json.load(f)
     except json.JSONDecodeError:
         return ValueError("Error: Failed to parse {metadata_file}.")
 
-    # Check for 'stereoAlign' in the settings
     settings = data['settings']
     if 'stereoAlign' in settings and settings['stereoAlign']:
         return True
@@ -90,148 +84,132 @@ def extract_timestamps(data):
     timestamps = sorted(list(data.keys()), key=extract_number)
     return timestamps
 
+class MainApp():
+    def __init__(self):
+        capture_folder, selected_types = parse_arguments()
+        data, height, width, rgb_width, rgb_height = load_data(capture_folder, selected_types)
+        timestamps = extract_timestamps(data)
 
-# Main script
+        calib = ''
+        if os.path.exists(f'{capture_folder}/calib.json'):
+            calib = dai.CalibrationHandler(f'{capture_folder}/calib.json')
+            M1, D1, M2, D2, T, R, TARGET_MATRIX, lensPosition = extract_calibration_values(calib, width, height, rgb_width, rgb_height)
+            datas = M1, D1, M2, D2, T, R, TARGET_MATRIX, lensPosition
+        else:
+            datas = None, None, None, None, None, None, None, None
+
+        metadata_file = os.path.join(capture_folder, 'metadata.json')
+        if os.path.exists(metadata_file):
+            with open(metadata_file, 'r') as f:
+                metadata = json.load(f)
+
+        self.view_info = {
+            "capture_folder": capture_folder,
+            "types": selected_types,
+            "timestamps": timestamps,
+            "current_index": 0,
+            "data": data,
+            "metadata": metadata,
+            "calib": calib,
+            "canvas_width": canvas_width,
+            "canvas_height": canvas_height,
+            "depth_size": (width, height),
+            "rgb_size": (rgb_width, rgb_height),
+            "mono_size": (width, height),
+            "stereoAlign_used_in_capture": check_settings(capture_folder),
+            "calibration_parameters": datas,
+            "RGB_SOCKET": dai.CameraBoardSocket.CAM_A,
+            "LEFT_SOCKET": dai.CameraBoardSocket.CAM_B,
+            "RIGHT_SOCKET": dai.CameraBoardSocket.CAM_C,
+            "device_connected": device_connected(),
+        }
+
+        self.current_view = {
+            "rgb": None,
+            "depth": None,
+            "disparity": None,
+            "left": None,
+            "right": None,
+            "alignSocket": "COLOR"
+        }
+    
+    def main_layout(self):
+        def update_sliders(*args):
+            min_val = min_slider.get()
+            max_val = max_slider.get()
+            if min_val > max_val:
+                min_slider.set(max_val)
+            elif max_val < min_val:
+                max_slider.set(min_val)
+
+        def select_alignment():
+            self.current_view["alignSocket"] = align_socket.get()
+            
+        root = Tk()
+        root.title(f"Capture Viewer: {self.view_info['capture_folder']}")
+        canvas = Canvas(root, width=canvas_width, height=canvas_height, bg="black")
+        canvas.pack()
+    
+        prev_button = Button(root, text="<-", bg="orange", activebackground="yellow",
+                             command=lambda: on_prev(root, canvas, self.view_info, self.current_view))
+        next_button = Button(root, text="->", bg="orange", activebackground="yellow",
+                             command=lambda: on_next(root, canvas, self.view_info, self.current_view))
+        next_button.pack(side="right")
+        prev_button.pack(side="right")
+    
+        pointcloud_button = Button(root, text="OpenCV \nPointCloud", command=lambda: on_pointcloud_rgb(root, self.view_info, self.current_view,
+                                                                                                       downsample=False))
+        pointcloud_button.pack(side="right")
+    
+        align_button = Button(root, text="OpenCV\nAlignment\nset",
+                              command=select_alignment)
+        align_button.pack(side="right")
+    
+        align_socket = StringVar(value="COLOR")
+        radiobutton_color = Radiobutton(root, text="COLOR", variable=align_socket, value="COLOR")
+        radiobutton_color.pack(side="right")
+        radiobutton_left = Radiobutton(root, text="LEFT", variable=align_socket, value="LEFT")
+        radiobutton_left.pack(side="right")
+
+    
+        canvas.tooltip = Label(root, text="", background="white", relief="solid", borderwidth=1, padx=2, pady=2)
+        canvas.tooltip.place_forget()
+    
+        canvas.bind("<Motion>", lambda event: on_mouse_move(event, canvas))
+    
+        replay_button = Button(root, text="REPLAY", bg="#4169E1", activebackground="#63A8FF",
+                               command=lambda: on_replay(root, self.view_info, self.current_view))
+        replay_button.pack(side="left")
+    
+        info_button = Button(root, text="INFO", bg="#32CD32", activebackground="#90EE90",
+                             command=lambda: show_popup("Metadata", str(self.view_info["metadata"])))
+        info_button.pack(side="left")
+    
+        update_button = Button(root, text="Colorize\nDepth", command=lambda: display_images(root, canvas, self.view_info, self.current_view,
+                                                                                            min_slider.get(), max_slider.get()))
+        update_button.pack(side="right")
+    
+        # Sliders for setting range
+        if 'disparity' in self.view_info["types"] or 'neural_disparity' in self.view_info["types"]:
+            slider_upper_range = 800
+        else:
+            slider_upper_range = 7000
+    
+        min_slider = Scale(root, from_=0, to=slider_upper_range, orient=VERTICAL, label="Min Value")  # Adjust range and labels as needed
+        max_slider = Scale(root, from_=0, to=slider_upper_range, orient=VERTICAL, label="Max Value")  # Adjust range and labels as needed
+        min_slider.pack(side=RIGHT, fill="y")
+        max_slider.pack(side=RIGHT, fill="y")
+    
+        # Link sliders to update their behavior when changed
+        min_slider.config(command=update_sliders)
+        max_slider.config(command=update_sliders)
+    
+        display_images(root, canvas, self.view_info, self.current_view)
+    
+        root.mainloop()
+
+
 if __name__ == "__main__":
-    # ------------------- INITIALIZE --------------------------
-    capture_folder, selected_types = parse_arguments()
-    data, height, width, rgb_width, rgb_height = load_data(capture_folder, selected_types)
-    timestamps = extract_timestamps(data)
-    stereoAlign_used_in_capture = check_settings(capture_folder)
-
-    # with open(f'{capture_folder}/calib.json', 'r') as file:
-    #     calib_data = json.load(file)
-    # M1, D1, M2, D2, T, R, TARGET_MATRIX, lensPosition = extract_calibration_values_old(calib_data, width, height)
-    calib = ''
-    if os.path.exists(f'{capture_folder}/calib.json'):
-        calib = dai.CalibrationHandler(f'{capture_folder}/calib.json')
-        M1, D1, M2, D2, T, R, TARGET_MATRIX, lensPosition = extract_calibration_values(calib, width, height, rgb_width, rgb_height)
-        datas = M1, D1, M2, D2, T, R, TARGET_MATRIX, lensPosition
-    else:
-        datas = None, None, None, None, None, None, None, None
-
-    # load metadata
-    metadata_file = os.path.join(capture_folder, 'metadata.json')
-    if os.path.exists(metadata_file):
-        with open(metadata_file, 'r') as f:
-            metadata = json.load(f)
-
-    view_info = {
-        "capture_folder" : capture_folder,
-        "types" : selected_types,
-        "timestamps" : timestamps,
-        "current_index" : 0,
-        "data" : data,
-        "metadata" : metadata,
-        "calib" : calib,
-        "canvas_width" : canvas_width,
-        "canvas_height" : canvas_height,
-        "depth_size" : (width, height),
-        "rgb_size" : (rgb_width, rgb_height),
-        "mono_size" : (width, height),
-        "stereoAlign_used_in_capture": stereoAlign_used_in_capture,
-        "calibration_parameters" : datas,
-        "RGB_SOCKET" : dai.CameraBoardSocket.CAM_A,
-        "LEFT_SOCKET" : dai.CameraBoardSocket.CAM_B,
-        "RIGHT_SOCKET" : dai.CameraBoardSocket.CAM_C,
-        "device_connected": device_connected(),
-    }
-
-    current_view = {
-        "isp" : None,
-        "depth" : None,
-        "disparity" : None,
-        "left" : None,
-        "right" : None,
-        "alignSocket" : "COLOR"
-    }
-
-    # ------------------- TINKER PART --------------------------
-    root = Tk()
-    root.title(f"Capture Viewer: {capture_folder}")
-    canvas = Canvas(root, width=canvas_width, height=canvas_height, bg="black")
-    canvas.pack()
-
-    prev_button = Button(root, text="<-", bg="orange", activebackground="yellow",
-                         command=lambda: on_prev(root, canvas, view_info, current_view))
-    next_button = Button(root, text="->", bg="orange", activebackground="yellow",
-                         command=lambda: on_next(root, canvas, view_info, current_view))
-    next_button.pack(side="right")
-    prev_button.pack(side="right")
-
-    def select_alignment():
-        current_view["alignSocket"] = align_socket.get()
-
-    pointcloud_button = Button(root, text="OpenCV \nPointCloud", command=lambda: on_pointcloud_rgb(root, view_info, current_view,
-                                                                                          downsample=False))
-    pointcloud_button.pack(side="right")
-
-    align_button = Button(root, text="OpenCV\nAlignment\nset",
-                           command=select_alignment)
-    align_button.pack(side="right")
-
-
-    align_socket = StringVar(value="COLOR")
-    radiobutton_color = Radiobutton(root, text="COLOR", variable=align_socket, value="COLOR")
-    radiobutton_color.pack(side="right")
-    # radiobutton_right = Radiobutton(root, text="RIGHT", variable=align_socket, value="RIGHT")
-    # radiobutton_right.pack(side="right")  # right is not working
-    radiobutton_left = Radiobutton(root, text="LEFT", variable=align_socket, value="LEFT")
-    radiobutton_left.pack(side="right")
-
-
-    # alignment_button = Button(root, text="Alignment", command=lambda: on_alignment(root, view_info, current_view))
-    # alignment_button.pack(side="right")
-    #
-    # alignment_button = Button(root, text="Stereo rectify \n& undistort",
-    #                           command=lambda: on_alignment_stereo(root, view_info, current_view))
-    # alignment_button.pack(side="right")
-    #
-    # alignment_button = Button(root, text="Undistort",
-    #                           command=lambda: on_alignment_ref(root, view_info, current_view))
-    # alignment_button.pack(side="right")
-
-
-    canvas.tooltip = Label(root, text="", background="white", relief="solid", borderwidth=1, padx=2, pady=2)
-    canvas.tooltip.place_forget()
-
-    canvas.bind("<Motion>", lambda event: on_mouse_move(event, canvas))
-
-    replay_button = Button(root, text="REPLAY",  bg="#4169E1", activebackground="#63A8FF",
-                              command=lambda: on_replay(root, view_info, current_view))
-    replay_button.pack(side="left")
-
-    info_button = Button(root, text="INFO", bg="#32CD32", activebackground="#90EE90",
-                              command=lambda: show_popup("Metadata", str(view_info["metadata"])))
-    info_button.pack(side="left")
-
-    update_button = Button(root, text="Colorize\nDepth", command=lambda: display_images(root, canvas, view_info, current_view,
-                                                                              min_slider.get(), max_slider.get()))
-    update_button.pack(side="right")
-
-    # Sliders for setting range
-    if 'disparity' in selected_types or 'neural_disparity' in selected_types:
-        slider_upper_range = 800
-    else:
-        slider_upper_range = 7000
-
-    min_slider = Scale(root, from_=0, to=slider_upper_range, orient=VERTICAL, label="Min Value")  # Adjust range and labels as needed
-    max_slider = Scale(root, from_=0, to=slider_upper_range, orient=VERTICAL, label="Max Value")  # Adjust range and labels as needed
-    min_slider.pack(side=RIGHT, fill="y")
-    max_slider.pack(side=RIGHT, fill="y")
-    # Function to update slider ranges and constraints
-    def update_sliders(*args):
-        min_val = min_slider.get()
-        max_val = max_slider.get()
-        if min_val > max_val:
-            min_slider.set(max_val)
-        elif max_val < min_val:
-            max_slider.set(min_val)
-
-    # Link sliders to update their behavior when changed
-    min_slider.config(command=update_sliders)
-    max_slider.config(command=update_sliders)
-
-    display_images(root, canvas, view_info, current_view)
-
-    root.mainloop()
+    print(dai.__version__)
+    window = MainApp()
+    window.main_layout()
