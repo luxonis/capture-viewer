@@ -9,10 +9,7 @@
     "output_settings": {
         "left": true,
         "right": true,
-        "left_raw": false,
-        "right_raw": false,
         "rgb": true,
-        "rgb_png": false,
         "depth": true,
         "disparity": true,
         "sync": true
