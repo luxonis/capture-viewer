@@ -32,8 +32,9 @@ def set_stereo_node(pipeline, settings):
 
     stereo.setLeftRightCheck(settings["LRcheck"])
     if settings["extendedDisparity"]: stereo.setExtendedDisparity(True)
-    if settings["subpixelDisparity"]: stereo.setSubpixel(True)
-    if settings["subpixelValue"]: stereo.setSubpixelFractionalBits(settings["subpixelValue"])
+    else: stereo.setExtendedDisparity(False)
+    # if settings["subpixelDisparity"]: stereo.setSubpixel(True)
+    # if settings["subpixelValue"]: stereo.setSubpixelFractionalBits(settings["subpixelValue"])
 
     return stereo
 
