@@ -49,6 +49,6 @@
         "median_filter": false,
         "median_size": "KERNEL_3x3"
     },
-    "FPS": 40,
+    "FPS": 30,
     "num_captures": 20
 }
