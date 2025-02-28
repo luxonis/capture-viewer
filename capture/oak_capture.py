@@ -102,7 +102,7 @@ def worker(mxid, stack, devices, settings, num, shared_devices, exception_queue)
         raise
 
 
-def visualize_frame(name, frame, timestamp):
+def visualize_frame(name, frame, timestamp, mxid):
     if name == "tof_depth":
         max_depth = 5 * 1500  # 100MHz modulation freq.
         depth_colorized = colorize_depth(frame, min_depth=0, max_depth=max_depth)
@@ -232,7 +232,7 @@ if __name__ == "__main__":
                         if save:
                             np.save(f'{output_folders[mxid]}/{name}_{timestamp}.npy', frame)
                             num_captures[mxid] += 1
-                        visualize_frame(name, frame, timestamp)
+                        visualize_frame(name, frame, timestamp, mxid)
                 else:
                     for name in q.keys():
                         frame = q[name].get()
@@ -241,7 +241,7 @@ if __name__ == "__main__":
                         if save:
                             np.save(f'{output_folders[mxid]}/{name}_{timestamp}.npy', cvFrame)
                             num_captures[mxid] += 1
-                        visualize_frame(name, cvFrame, timestamp)
+                        visualize_frame(name, cvFrame, timestamp, mxid)
 
             key = cv2.waitKey(1) & 0xFF
             if key == ord('q'): break

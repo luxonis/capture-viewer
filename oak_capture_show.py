@@ -27,10 +27,11 @@ def load_data(folder, types):
                 type_key = 'tof_depth'
             else:
                 type_key = filename.split('_')[0]
+                if type_key == "isp": type_key = "rgb"  # to make compatible with old captures which use different naming
                 if (height == 0 or width == 0) and type_key == "left":
                     left = np.load(os.path.join(folder, filename), allow_pickle=True)
                     height, width = left.shape[0], left.shape[1]
-                elif (rgb_height == 0 or rgb_width == 0) and type_key == "isp":
+                elif (rgb_height == 0 or rgb_width == 0) and type_key == "rgb":
                     color = np.load(os.path.join(folder, filename), allow_pickle=True)
                     rgb_height, rgb_width = color.shape[0], color.shape[1]
             if type_key not in types:
@@ -82,21 +83,20 @@ def parse_arguments():
             raise ValueError("Provided capture path does not exist or is not a directory")
     return capture_folder, selected_types
 
-def extract_timestamps(capture_folder, selected_types):
+def extract_timestamps(data):
     def extract_number(file_name):
         match = re.match(r'(\d+)', file_name)
         return int(match.group(0)) if match else float('inf')
-
-    data, height, width, rgb_width, rgb_height = load_data(capture_folder, selected_types)
     timestamps = sorted(list(data.keys()), key=extract_number)
-    return timestamps, data, height, width, rgb_width, rgb_height
+    return timestamps
 
 
 # Main script
 if __name__ == "__main__":
     # ------------------- INITIALIZE --------------------------
     capture_folder, selected_types = parse_arguments()
-    timestamps, data, height, width, rgb_width, rgb_height= extract_timestamps(capture_folder, selected_types)
+    data, height, width, rgb_width, rgb_height = load_data(capture_folder, selected_types)
+    timestamps = extract_timestamps(data)
     stereoAlign_used_in_capture = check_settings(capture_folder)
 
     # with open(f'{capture_folder}/calib.json', 'r') as file:

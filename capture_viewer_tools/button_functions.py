@@ -276,7 +276,7 @@ def display_images(root, canvas, view_info, current_view, min_val=None, max_val=
             image_path = images[key]
             image = np.load(image_path)
             current_view[key] = image.copy()
-            if key == 'isp':
+            if key == 'rgb':
                 image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             original_image = image.copy()  # Keep original for depth value extraction
             if len(image.shape) == 2:  # if grayscale, convert to BGR
