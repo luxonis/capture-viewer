@@ -27,27 +27,37 @@ def set_stereo_node(pipeline, settings):
 
     stereo.setRectification(True)
 
+
+    stereo.setDefaultProfilePreset(eval(f"dai.node.StereoDepth.PresetMode.{settings['profilePreset']}"))
+
     stereo.setLeftRightCheck(settings["LRcheck"])
     if settings["extendedDisparity"]: stereo.setExtendedDisparity(True)
     if settings["subpixelDisparity"]: stereo.setSubpixel(True)
     if settings["subpixelValue"]: stereo.setSubpixelFractionalBits(settings["subpixelValue"])
-    stereo.setDefaultProfilePreset(eval(f"dai.node.StereoDepth.PresetMode.{settings['profilePreset']}"))
 
     return stereo
 
 def initialize_pipeline(pipeline, settings):
+    def configure_cam(cam, size_x:int, size_y:int, fps:float):
+        cap = dai.ImgFrameCapability()
+        cap.size.fixed((size_x, size_y))
+
+        cap.fps.fixed(fps)
+        return cam.requestOutput(cap, True)
     queues = {}
     output_settings = settings["output_settings"]
+
     if output_settings["left"] or output_settings["left_raw"]:
         monoLeft = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_B)
-        monoLeftOut = monoLeft.requestFullResolutionOutput()
+        monoLeftOut = configure_cam(monoLeft, settings["stereoResolution"]["x"], settings["stereoResolution"]["y"], settings["FPS"])
 
     if output_settings["right"] or output_settings["right_raw"]:
         monoRight = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_C)
-        monoRightOut = monoRight.requestFullResolutionOutput()
+        monoRightOut = configure_cam(monoRight, settings["stereoResolution"]["x"], settings["stereoResolution"]["y"], settings["FPS"])
 
     if output_settings["rgb"] or output_settings["rgb_png"]:
         color = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_A)
+        colorOut = configure_cam(color, settings["rgbResolution"]["x"], settings["rgbResolution"]["y"], settings["FPS"])
 
     if output_settings["depth"] or output_settings["disparity"]:
         stereo = set_stereo_node(pipeline, settings)
@@ -68,7 +78,7 @@ def initialize_pipeline(pipeline, settings):
             monoRightOut.link(sync.inputs["right"])
 
         if output_settings["rgb"]:
-            color.requestFullResolutionOutput().link(sync.inputs["rgb"])
+            colorOut.link(sync.inputs["rgb"])
 
         queues["sync"] = sync.out.createOutputQueue()
 
@@ -89,7 +99,7 @@ def initialize_pipeline(pipeline, settings):
             queues['right'] = monoRightOut.createOutputQueue()
 
         if output_settings["rgb"]:
-            queues["rgb"] = color.requestFullResolutionOutput().createOutputQueue()
+            queues["rgb"] = colorOut.createOutputQueue()
 
 
     return pipeline, queues
