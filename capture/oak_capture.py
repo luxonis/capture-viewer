@@ -37,6 +37,7 @@ def parseArguments():
     parser.add_argument("--output", default=root_path, help="Custom output folder")
     parser.add_argument("--autostart", default=-1, type=int, help='Automatically start capturing after given number of seconds (-1 to disable)')
     parser.add_argument("--devices", default=[], dest="mxids", nargs="+", help="MXIDS or IPs of devices to connect to")
+    parser.add_argument("--ram", default=2, type=float, help="Maximum RAM to be used while saving, in GB")
 
     args = parser.parse_args()
     settings_path = args.settings_file_path
@@ -52,7 +53,7 @@ def parseArguments():
             settings_path = settings_path_2
         else: raise FileNotFoundError(f"Settings file '{settings_path}' does not exist.")
 
-    return settings_path, view_name, args.mxids, args.autostart
+    return settings_path, view_name, args.mxids, args.autostart, args.ram
 
 def worker(mxid, stack, devices, settings, num, shared_devices, exception_queue):
     try:
@@ -101,6 +102,23 @@ def worker(mxid, stack, devices, settings, num, shared_devices, exception_queue)
         exception_queue.put((mxid, str(e)))
         raise
 
+def save_worker():
+    global save_queue, current_ram_usage
+    while True:
+        item = save_queue.get()
+        if item is None:
+            print("Closing Saving Thread")
+            break  # Exit thread gracefully
+
+        mxid, name, timestamp, frame_array, output_folders, settings, frame_size = item
+        np.save(f'{output_folders[mxid]}/{name}_{timestamp}.npy', frame_array)
+        if name == 'rgb' and settings['output_settings']['rgb_png']:
+            cv2.imwrite(f'{output_folders[mxid]}/{name}_{timestamp}.png', frame_array)
+
+        with lock:
+            current_ram_usage -= frame_size
+
+        save_queue.task_done()
 
 def visualize_frame(name, frame, timestamp, mxid):
     if name == "tof_depth":
@@ -153,7 +171,7 @@ def attempt_connection(mxids, attempts=10):
             return mxids
 
 if __name__ == "__main__":
-    settings_path, view_name, mxids, autostart = parseArguments()
+    settings_path, view_name, mxids, autostart, ram = parseArguments()
 
     # mxids = ['14442C1091F5D9E700', '14442C10F10AC8D600']
     # mxids = ['1944301031664E1300']
@@ -207,6 +225,14 @@ if __name__ == "__main__":
         print(f"Number of streams: {len(streams)}")
         print(f"Will capture max frames ({settings['num_captures']}) * number of streams ({len(streams)}) = {final_num_captures}")
 
+        MAX_RAM_USAGE = 1 * 1024 * 1024 * 1024  # 1GB
+        current_ram_usage = 0
+        lock = threading.Lock()  # Ensure thread-safe RAM tracking
+        save_queue = queue.Queue()
+
+        save_thread = threading.Thread(target=save_worker, daemon=True)
+        save_thread.start()
+
         print("Starting loop...")
         initial_time = time.time()
         initialize_capture_time = initial_time + autostart
@@ -220,30 +246,38 @@ if __name__ == "__main__":
                 print("Starting capture via autosave")
                 start_time = time.time()
 
-            for mxid, q in devices.items():
-                # if sync turned on unpack the message group
-                if settings['output_settings']['sync']:
+            if settings['output_settings']['sync']:
+                for mxid, q in devices.items():
                     if not q['sync'].has():
                         continue
                     msgGrp = q['sync'].get()
                     for name, msg in msgGrp:
                         timestamp = int(msg.getTimestamp().total_seconds() * 1000)
                         frame = msg.getCvFrame()
+
+                        frame_size = frame.nbytes
+                        while current_ram_usage + frame_size > MAX_RAM_USAGE:
+                            time.sleep(0.01)  # Small wait to let saving thread catch up
+
                         if save:
-                            np.save(f'{output_folders[mxid]}/{name}_{timestamp}.npy', frame)
-                            if name == 'rgb' and settings['output_settings']['rgb_png']:
-                                cv2.imwrite(f'{output_folders[mxid]}/{name}_{timestamp}.png', cvFrame)
+                            with lock: current_ram_usage += frame_size
+                            save_queue.put((mxid, name, timestamp, frame, output_folders, settings, frame_size))
                             num_captures[mxid] += 1
                         visualize_frame(name, frame, timestamp, mxid)
-                else:
+            else:
+                for mxid, q in devices.items():
                     for name in q.keys():
                         frame = q[name].get()
                         cvFrame = frame.getCvFrame()
+
+                        frame_size = cvFrame.nbytes
+                        while current_ram_usage + frame_size > MAX_RAM_USAGE:
+                            time.sleep(0.01)  # Small wait to let saving thread catch up
+
                         timestamp = int(frame.getTimestamp().total_seconds() * 1000)
                         if save:
-                            np.save(f'{output_folders[mxid]}/{name}_{timestamp}.npy', cvFrame)
-                            if name == 'rgb' and settings['output_settings']['rgb_png']:
-                                cv2.imwrite(f'{output_folders[mxid]}/{name}_{timestamp}.png', cvFrame)
+                            with lock: current_ram_usage += frame_size
+                            save_queue.put((mxid, name, timestamp, cvFrame, output_folders, settings, frame_size))
                             num_captures[mxid] += 1
                         visualize_frame(name, cvFrame, timestamp, mxid)
 
@@ -275,4 +309,8 @@ if __name__ == "__main__":
                     capture_ended, save = True, False
 
             if capture_ended:
+                print("Waiting for saving thread to finish...")
+                save_queue.put(None)
+                save_thread.join()
+                print("Finished saving.")
                 break
