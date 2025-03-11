@@ -231,6 +231,8 @@ if __name__ == "__main__":
                         frame = msg.getCvFrame()
                         if save:
                             np.save(f'{output_folders[mxid]}/{name}_{timestamp}.npy', frame)
+                            if name == 'rgb' and settings['output_settings']['rgb_png']:
+                                cv2.imwrite(f'{output_folders[mxid]}/{name}_{timestamp}.png', cvFrame)
                             num_captures[mxid] += 1
                         visualize_frame(name, frame, timestamp, mxid)
                 else:
@@ -240,6 +242,8 @@ if __name__ == "__main__":
                         timestamp = int(frame.getTimestamp().total_seconds() * 1000)
                         if save:
                             np.save(f'{output_folders[mxid]}/{name}_{timestamp}.npy', cvFrame)
+                            if name == 'rgb' and settings['output_settings']['rgb_png']:
+                                cv2.imwrite(f'{output_folders[mxid]}/{name}_{timestamp}.png', cvFrame)
                             num_captures[mxid] += 1
                         visualize_frame(name, cvFrame, timestamp, mxid)
 
