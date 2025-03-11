@@ -36,7 +36,7 @@ def parseArguments():
     parser.add_argument("view_name", help="Name of the capture")
     parser.add_argument("--output", default=root_path, help="Custom output folder")
     parser.add_argument("--autostart", default=-1, type=int, help='Automatically start capturing after given number of seconds (-1 to disable)')
-    parser.add_argument("--devices", default=[], dest="mxids", nargs="+", help="MXIDS of devices to connect to")
+    parser.add_argument("--devices", default=[], dest="mxids", nargs="+", help="MXIDS or IPs of devices to connect to")
 
     args = parser.parse_args()
     settings_path = args.settings_file_path
@@ -143,7 +143,7 @@ def attempt_connection(mxids, attempts=10):
     for attempt in range(attempts):  # try to connect to the correct cameras
         count = 0
         for device in dai.Device.getAllAvailableDevices():
-            if device.mxid in mxids:
+            if device.mxid in mxids or device.name in mxids:
                 count += 1
                 print(f"Found {device.mxid}, count: {count}")
         if count < len(mxids):
