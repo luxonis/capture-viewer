@@ -11,6 +11,7 @@ import os
 import argparse
 import numpy as np
 import time
+import screeninfo
 
 print(dai.__version__)
 
@@ -120,6 +121,12 @@ def save_worker():
 
         save_queue.task_done()
 
+def downscale_to_fit(frame, max_width, max_height):
+    h, w = frame.shape[:2]
+    scale = min(max_width / w, max_height / h)
+    new_w, new_h = int(w * scale), int(h * scale)
+    return cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_AREA)
+
 def visualize_frame(name, frame, timestamp, mxid):
     if name == "tof_depth":
         max_depth = 5 * 1500  # 100MHz modulation freq.
@@ -128,8 +135,16 @@ def visualize_frame(name, frame, timestamp, mxid):
                                       (255, 255, 255), 2)
         cv2.imshow(f"{mxid} {name}", depth_colorized)
     elif name in ["left", "right", "rgb"]:
-        left = cv2.putText(frame, f"{timestamp} ms", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-        cv2.imshow(f"{mxid} {name}", left)
+        frame = cv2.putText(frame, f"{timestamp} ms", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+
+        screen = screeninfo.get_monitors()[0]
+        screen_width, screen_height = screen.width, screen.height
+        h, w = frame.shape[:2]
+        if h > screen_height or w > screen_width:
+            frame = downscale_to_fit(frame, screen_width, screen_height)
+        cv2.imshow(f"{mxid} {name}", frame)
+
+        # cv2.imshow(f"{mxid} {name}", frame)
 
     elif name == "tof_amplitude":
         depth_vis = (frame * 255 / frame.max()).astype(np.uint8)
