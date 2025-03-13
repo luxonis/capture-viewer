@@ -135,14 +135,15 @@ def visualize_frame(name, frame, timestamp, mxid):
                                       (255, 255, 255), 2)
         cv2.imshow(f"{mxid} {name}", depth_colorized)
     elif name in ["left", "right", "rgb"]:
-        frame = cv2.putText(frame, f"{timestamp} ms", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+        frame_timestamp = frame.copy()
+        frame_timestamp = cv2.putText(frame_timestamp, f"{timestamp} ms", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
 
         screen = screeninfo.get_monitors()[0]
         screen_width, screen_height = screen.width, screen.height
-        h, w = frame.shape[:2]
+        h, w = frame_timestamp.shape[:2]
         if h > screen_height or w > screen_width:
-            frame = downscale_to_fit(frame, screen_width, screen_height)
-        cv2.imshow(f"{mxid} {name}", frame)
+            frame_timestamp = downscale_to_fit(frame_timestamp, screen_width, screen_height)
+        cv2.imshow(f"{mxid} {name}", frame_timestamp)
 
         # cv2.imshow(f"{mxid} {name}", frame)
 
