@@ -19,7 +19,7 @@ print(dai.__version__)
 from utils.capture_universal import colorize_depth, initialize_capture, finalise_capture
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
-root_path = os.path.join(os.path.dirname(script_dir), 'DATA')
+root_path_default = os.path.join(os.path.dirname(script_dir), 'DATA')
 
 def count_output_streams(output_streams):
     stream_names = []
@@ -32,10 +32,9 @@ def count_output_streams(output_streams):
 def parseArguments():
     # PARSE ARGUMENTS
     parser = argparse.ArgumentParser()
-    # Mandatory arguments
     parser.add_argument("settings_file_path", help="Path to settings JSON")
     parser.add_argument("view_name", help="Name of the capture")
-    parser.add_argument("--output", default=root_path, help="Custom output folder")
+    parser.add_argument("--output", default=root_path_default, help="Custom output folder")
     parser.add_argument("--autostart", default=-1, type=int, help='Automatically start capturing after given number of seconds (-1 to disable)')
     parser.add_argument("--devices", default=[], dest="mxids", nargs="+", help="MXIDS or IPs of devices to connect to")
     parser.add_argument("--ram", default=2, type=float, help="Maximum RAM to be used while saving, in GB")
@@ -43,6 +42,7 @@ def parseArguments():
     args = parser.parse_args()
     settings_path = args.settings_file_path
     view_name = args.view_name
+    root_path = args.output
 
     # SETTINGS loading
     if not os.path.exists(settings_path):
@@ -54,7 +54,7 @@ def parseArguments():
             settings_path = settings_path_2
         else: raise FileNotFoundError(f"Settings file '{settings_path}' does not exist.")
 
-    return settings_path, view_name, args.mxids, args.autostart, args.ram
+    return settings_path, view_name, args.mxids, args.autostart, args.ram, root_path
 
 def worker(mxid, stack, devices, settings, num, shared_devices, exception_queue):
     try:
@@ -187,7 +187,7 @@ def attempt_connection(mxids, attempts=10):
             return mxids
 
 if __name__ == "__main__":
-    settings_path, view_name, mxids, autostart, ram = parseArguments()
+    settings_path, view_name, mxids, autostart, ram, root_path = parseArguments()
 
     # mxids = ['14442C1091F5D9E700', '14442C10F10AC8D600']
     # mxids = ['1944301031664E1300']
