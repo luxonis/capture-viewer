@@ -2,7 +2,7 @@ import numpy as np
 import cv2
 import open3d as o3d
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, Tk, filedialog
 import threading
 import os
 import json
@@ -374,6 +374,20 @@ class ReplayVisualizer:
         subprocess.Popen(['python', visualize_pointcloud_path, pcl_path, str(config_json)])  # o3d.visualization.draw_geometries([pointcloud])
         time.sleep(1)
 
+    def on_load_custom_config(self, parent, button_values):
+        dialog_window = tk.Toplevel(parent)
+        dialog_window.withdraw()
+
+        file_path = filedialog.askopenfilename(parent=dialog_window, filetypes=[("JSON files", "*.json")])
+        dialog_window.destroy()
+
+        if file_path:
+            with open(file_path, 'r') as file:
+                loaded_config = json.load(file)
+                print(loaded_config)
+                self.inicialize_button_values(loaded_config, button_values)
+                # todo update buttons
+
     def create_depth_section(self, collumn_in_main_frame):
         generated_depth_frame = tk.Frame(self.main_frame)
         generated_depth_frame.grid(row=1, column=collumn_in_main_frame, padx=5, pady=5, sticky='nsew')
@@ -385,11 +399,21 @@ class ReplayVisualizer:
         generated_depth_image.image = None
         generated_depth_image.grid(row=1, column=0, padx=10, pady=10)
 
+        button_frame = tk.Frame(generated_depth_frame)
+        button_frame.grid(row=1, column=1, padx=5, pady=5, sticky='nsew')
+
         if collumn_in_main_frame == 0:
-            pointcloud_button = tk.Button(generated_depth_frame, text="Pointcloud", command=lambda: self.on_pointcloud_button(self.pcl_path1, self.config_json1))
+            pointcloud_button = tk.Button(button_frame, text="Point Cloud", command=lambda: self.on_pointcloud_button(self.pcl_path1, self.config_json1))
+            load_config_button = tk.Button(button_frame, text="Load Config", command=lambda: self.on_load_custom_config(self.toplLevel, self.button_values1))
         else:
-            pointcloud_button = tk.Button(generated_depth_frame, text="Pointcloud", command=lambda: self.on_pointcloud_button(self.pcl_path2, self.config_json2))
-        pointcloud_button.grid(row=1, column=2, pady=(50, 0))
+            pointcloud_button = tk.Button(button_frame, text="Point Cloud", command=lambda: self.on_pointcloud_button(self.pcl_path2, self.config_json2))
+            load_config_button = tk.Button(button_frame, text="Load Config", command=lambda: self.on_load_custom_config(self.toplLevel, self.button_values1))
+        pointcloud_button.grid(row=1, column=2, sticky='ew', padx=10)
+        load_config_button.grid(row=2, column=2, sticky='ew', padx=10)
+
+        button_frame.rowconfigure((0, 3), weight=1)
+        button_frame.columnconfigure(2, weight=1)
+
 
         return generated_depth_frame, generated_depth_image
     def create_settings_section(self, collumn_in_main_frame, frame_name, button_values):

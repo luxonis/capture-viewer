@@ -248,11 +248,13 @@ def add_depthai_to_config(config_json):
     new_config = {}
     for key in config_json.keys():
         config_value = config_json[key]
-        print(key, config_value, type(config_value))
-        try: config_value = int(config_value)
-        except Exception: pass
-        if type(config_value) == str and config_value[0] != '[': new_config[key] = "dai." + config_value
-        else: new_config[key] = config_value
+        if "dai." in config_value:
+            new_config[key] = config_value
+        else:
+            try: config_value = int(config_value)
+            except Exception: pass
+            if type(config_value) == str and config_value[0] != '[': new_config[key] = "dai." + config_value
+            else: new_config[key] = config_value
     return new_config
 
 def get_min_max_depths(depth1, depth2, color_noise_percent_removal=1):
