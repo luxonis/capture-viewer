@@ -257,6 +257,16 @@ def add_depthai_to_config(config_json):
             else: new_config[key] = config_value
     return new_config
 
+def remove_depthai_from_config(config_json):
+    new_config = {}
+    for key in config_json.keys():
+        config_value = config_json[key]
+        if isinstance(config_value, str) and config_value.startswith("dai."):
+            new_config[key] = config_value[4:]
+        else:
+            new_config[key] = config_value
+    return new_config
+
 def get_min_max_depths(depth1, depth2, color_noise_percent_removal=1):
     if depth1 is None and depth2 is None:
         print("Both NONE")
