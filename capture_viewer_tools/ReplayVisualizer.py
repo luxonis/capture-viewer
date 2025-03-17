@@ -461,7 +461,7 @@ class ReplayVisualizer:
             load_config_button = tk.Button(button_frame, text="Load Config", command=lambda: self.on_load_custom_config(self.toplLevel, self.button_values1))
         else:
             pointcloud_button = tk.Button(button_frame, text="Point Cloud", command=lambda: self.on_pointcloud_button(self.pcl_path2, self.config_json2))
-            load_config_button = tk.Button(button_frame, text="Load Config", command=lambda: self.on_load_custom_config(self.toplLevel, self.button_values1))
+            load_config_button = tk.Button(button_frame, text="Load Config", command=lambda: self.on_load_custom_config(self.toplLevel, self.button_values2))
         pointcloud_button.grid(row=1, column=2, sticky='ew', padx=10)
         load_config_button.grid(row=2, column=2, sticky='ew', padx=10)
 
