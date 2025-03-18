@@ -44,6 +44,12 @@ python capture_viewer.py -p /path/to/DATA
 Where DATA is the folder containing all the capture sessions. It will direct you to a session selection, where you can 
 visualize individual sessions.
 
+Optionally, you can add --ip to specify the **IP of the device** you want to run the replay on.
+
+```bash
+python capture_viewer.py -p /path/to/DATA --ip device_ip
+```
+
 ---
 
 ## REPLAY Feature

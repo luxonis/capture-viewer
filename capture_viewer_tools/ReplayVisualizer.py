@@ -36,6 +36,10 @@ class ReplayVisualizer:
         self.view_info = view_info
         self.current_view = current_view
 
+        self.device_info = view_info['device_info']
+
+        print(self.device_info)
+
         self.last_generated_depth = None
         self.generated_depth1 = None
         self.generated_depth2 = None
@@ -645,7 +649,8 @@ class ReplayVisualizer:
                 (left, right, color)),
             outputs={'depth', 'pcl'},
             calib=calib,
-            stereo_config=json.dumps(config)
+            stereo_config=json.dumps(config),
+            device_info=self.device_info
         ))
         depth = replayed[1]['depth']
         pcl = replayed[1]['pcl']

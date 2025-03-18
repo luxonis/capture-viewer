@@ -64,9 +64,11 @@ def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("capture_folder", nargs='?', help='Path to folder containing captures')
     parser.add_argument("types", nargs='+', help='write types')
+    parser.add_argument("--ip", default=None, help='IP of device to use')
     args = parser.parse_args()
     capture_folder = args.capture_folder
     selected_types = args.types
+    ip = args.ip
     print("capture folder:", capture_folder)
     if capture_folder is None:
         raise Exception
@@ -75,7 +77,7 @@ def parse_arguments():
         capture_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"DATA/{capture_folder}")
         if not (os.path.exists(capture_folder) and os.path.isdir(capture_folder)):
             raise ValueError("Provided capture path does not exist or is not a directory")
-    return capture_folder, selected_types
+    return capture_folder, selected_types, ip
 
 def extract_timestamps(data):
     def extract_number(file_name):
@@ -86,7 +88,7 @@ def extract_timestamps(data):
 
 class MainApp():
     def __init__(self):
-        capture_folder, selected_types = parse_arguments()
+        capture_folder, selected_types, ip = parse_arguments()
         data, height, width, rgb_width, rgb_height = load_data(capture_folder, selected_types)
         timestamps = extract_timestamps(data)
 
@@ -122,6 +124,7 @@ class MainApp():
             "LEFT_SOCKET": dai.CameraBoardSocket.CAM_B,
             "RIGHT_SOCKET": dai.CameraBoardSocket.CAM_C,
             "device_connected": device_connected(),
+            "device_info": dai.DeviceInfo(ip) if ip else None,
         }
 
         self.current_view = {
