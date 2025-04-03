@@ -14,7 +14,7 @@ import time
 import platform
 
 from capture_viewer_tools.capture_tools import (colorize_depth, calculate_scaled_dimensions, get_min_max_depths,
-                                                format_json_for_replay, create_placeholder_frame, add_depthai_to_config, process_pointcloud)
+                                                format_json_for_replay, create_placeholder_frame, process_pointcloud)
 from capture_viewer_tools.convertor_capture2replay_json import config2settings
 from capture_viewer_tools.ReplaySettings import *
 
@@ -277,7 +277,7 @@ class ReplayVisualizer:
 
         print(self.config_json)
 
-        self.config_json = add_depthai_to_config(self.config_json)
+        # self.config_json = add_depthai_to_config(self.config_json)
 
         self.last_generated_depth = None
 

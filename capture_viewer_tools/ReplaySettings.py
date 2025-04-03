@@ -3,8 +3,8 @@ from tkinter import ttk
 
 # Define a dictionary of default settings
 default_config = {
-    'stereo.setDepthAlign': 'StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_RIGHT',
-    'stereo.setDefaultProfilePreset': "node.StereoDepth.PresetMode.HIGH_DENSITY",
+    'stereo.setDepthAlign': 'dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_RIGHT',
+    'stereo.setDefaultProfilePreset': "dai.node.StereoDepth.PresetMode.HIGH_DENSITY",
     'stereo.setRectification': True,
     'stereo.setLeftRightCheck': True,
     'stereo.setExtendedDisparity': False,
@@ -12,7 +12,7 @@ default_config = {
     'stereo.setSubpixelFractionalBits': 3,
     'cfg.postProcessing.filteringOrder': "[dai.StereoDepthConfig.PostProcessing.Filter.DECIMATION, dai.StereoDepthConfig.PostProcessing.Filter.MEDIAN, dai.StereoDepthConfig.PostProcessing.Filter.TEMPORAL, dai.StereoDepthConfig.PostProcessing.Filter.SPECKLE, dai.StereoDepthConfig.PostProcessing.Filter.SPATIAL]",
     'cfg.postProcessing.medianFilter.enable': False,
-    'stereo.initialConfig.setMedianFilter': "MedianFilter.KERNEL_3x3",
+    'stereo.initialConfig.setMedianFilter': "dai.MedianFilter.KERNEL_3x3",
     'cfg.postProcessing.bilateralFilter.enable': False,
     'cfg.postProcessing.bilateralSigmaValue': 10,
     'cfg.postProcessing.brightnessFilter.enable': False,
@@ -34,7 +34,7 @@ default_config = {
     'cfg.postProcessing.thresholdFilter.maxRange': 65535,
     'cfg.postProcessing.decimationFilter.enable': False,
     'cfg.postProcessing.decimationFilter.decimationFactor': 1,
-    'cfg.postProcessing.decimationFilter.decimationMode': 'StereoDepthConfig.PostProcessing.DecimationFilter.DecimationMode.PIXEL_SKIPPING'
+    'cfg.postProcessing.decimationFilter.decimationMode': 'dai.StereoDepthConfig.PostProcessing.DecimationFilter.DecimationMode.PIXEL_SKIPPING'
 }
 
 
@@ -88,11 +88,11 @@ def create_settings_layout(frame, button_values):
 
     # Add radiobuttons for left/right choice with a label
     ttk.Label(popup_window, text="setDepthAlign").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
-    left_radiobutton = ttk.Radiobutton(popup_window, text="Left", variable=button_values['depth_align'], value="CameraBoardSocket.LEFT")
-    right_radiobutton = ttk.Radiobutton(popup_window, text="Right", variable=button_values['depth_align'], value="CameraBoardSocket.RIGHT")
-    rec_left_radiobutton = ttk.Radiobutton(popup_window, text="Rec Left", variable=button_values['depth_align'], value='StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_LEFT')
-    rec_right_radiobutton = ttk.Radiobutton(popup_window, text="Rec Right", variable=button_values['depth_align'], value='StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_RIGHT')
-    rgb_radiobutton = ttk.Radiobutton(popup_window, text="RGB", variable=button_values['depth_align'], value="CameraBoardSocket.CAM_A")
+    left_radiobutton = ttk.Radiobutton(popup_window, text="Left", variable=button_values['depth_align'], value="dai.CameraBoardSocket.LEFT")
+    right_radiobutton = ttk.Radiobutton(popup_window, text="Right", variable=button_values['depth_align'], value="dai.CameraBoardSocket.RIGHT")
+    rec_left_radiobutton = ttk.Radiobutton(popup_window, text="Rec Left", variable=button_values['depth_align'], value='dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_LEFT')
+    rec_right_radiobutton = ttk.Radiobutton(popup_window, text="Rec Right", variable=button_values['depth_align'], value='dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_RIGHT')
+    rgb_radiobutton = ttk.Radiobutton(popup_window, text="RGB", variable=button_values['depth_align'], value="dai.CameraBoardSocket.CAM_A")
     left_radiobutton.grid(row=current_row, column=1, padx=10, pady=5, sticky="w")
     right_radiobutton.grid(row=current_row, column=2, padx=10, pady=5, sticky="w")
     rec_left_radiobutton.grid(row=current_row, column=3, padx=10, pady=5, sticky="w")
@@ -102,12 +102,12 @@ def create_settings_layout(frame, button_values):
 
     #
     ttk.Label(popup_window, text="setDefaultProfilePreset").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
-    Hdef_radiobutton = ttk.Radiobutton(popup_window, text="DEFAULT", variable=button_values['profile_preset'], value="node.StereoDepth.PresetMode.DEFAULT")
-    HA_radiobutton = ttk.Radiobutton(popup_window, text="HIGH_ACCURACY", variable=button_values['profile_preset'], value="node.StereoDepth.PresetMode.HIGH_ACCURACY")
-    HD_radiobutton = ttk.Radiobutton(popup_window, text="HIGH_DENSITY", variable=button_values['profile_preset'], value="node.StereoDepth.PresetMode.HIGH_DENSITY")
-    HR_radiobutton = ttk.Radiobutton(popup_window, text="ROBOTICS", variable=button_values['profile_preset'], value="node.StereoDepth.PresetMode.ROBOTICS")
-    HDE_radiobutton = ttk.Radiobutton(popup_window, text="HIGH_DETAIL", variable=button_values['profile_preset'], value="node.StereoDepth.PresetMode.HIGH_DETAIL")
-    HF_radiobutton = ttk.Radiobutton(popup_window, text="FACE", variable=button_values['profile_preset'], value="node.StereoDepth.PresetMode.FACE")
+    Hdef_radiobutton = ttk.Radiobutton(popup_window, text="DEFAULT", variable=button_values['profile_preset'], value="dai.node.StereoDepth.PresetMode.DEFAULT")
+    HA_radiobutton = ttk.Radiobutton(popup_window, text="HIGH_ACCURACY", variable=button_values['profile_preset'], value="dai.node.StereoDepth.PresetMode.HIGH_ACCURACY")
+    HD_radiobutton = ttk.Radiobutton(popup_window, text="HIGH_DENSITY", variable=button_values['profile_preset'], value="dai.node.StereoDepth.PresetMode.HIGH_DENSITY")
+    HR_radiobutton = ttk.Radiobutton(popup_window, text="ROBOTICS", variable=button_values['profile_preset'], value="dai.node.StereoDepth.PresetMode.ROBOTICS")
+    HDE_radiobutton = ttk.Radiobutton(popup_window, text="HIGH_DETAIL", variable=button_values['profile_preset'], value="dai.node.StereoDepth.PresetMode.HIGH_DETAIL")
+    HF_radiobutton = ttk.Radiobutton(popup_window, text="FACE", variable=button_values['profile_preset'], value="dai.node.StereoDepth.PresetMode.FACE")
     HN_radiobutton = ttk.Radiobutton(popup_window, text="None", variable=button_values['profile_preset'], value="None")
     Hdef_radiobutton.grid(row=current_row, column=1, padx=10, pady=5, sticky="w")
     HR_radiobutton.grid(row=current_row, column=2, padx=10, pady=5, sticky="w")
@@ -203,9 +203,9 @@ def create_settings_layout(frame, button_values):
     median_frame.grid(row=current_row, column=0, columnspan=6, padx=10, pady=10, sticky="ew")
 
     ttk.Label(median_frame, text="Median").grid(row=0, column=0, padx=10, pady=10, sticky="w")
-    median_3_button = ttk.Radiobutton(median_frame, text="MEDIAN_3x3", variable=button_values['median_val'], value="MedianFilter.KERNEL_3x3")
-    median_5_button = ttk.Radiobutton(median_frame, text="MEDIAN_5x5", variable=button_values['median_val'], value="MedianFilter.KERNEL_5x5")
-    median_7_button = ttk.Radiobutton(median_frame, text="MEDIAN_7x7", variable=button_values['median_val'], value="MedianFilter.KERNEL_7x7")
+    median_3_button = ttk.Radiobutton(median_frame, text="MEDIAN_3x3", variable=button_values['median_val'], value="dai.MedianFilter.KERNEL_3x3")
+    median_5_button = ttk.Radiobutton(median_frame, text="MEDIAN_5x5", variable=button_values['median_val'], value="dai.MedianFilter.KERNEL_5x5")
+    median_7_button = ttk.Radiobutton(median_frame, text="MEDIAN_7x7", variable=button_values['median_val'], value="dai.MedianFilter.KERNEL_7x7")
     median_3_button.grid(row=0, column=1, padx=10, pady=5, sticky="w")
     median_5_button.grid(row=0, column=2, padx=10, pady=5, sticky="w")
     median_7_button.grid(row=0, column=3, padx=10, pady=5, sticky="w")
