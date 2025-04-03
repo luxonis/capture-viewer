@@ -161,9 +161,9 @@ def create_settings_layout(frame, button_values):
     def spinbox(frame, row, col, slider, label, range_of_spinbox, is_float=False):
         if is_float:
             values = [f"{i / 10:.1f}" for i in range(int(range_of_spinbox[0] * 10), int(range_of_spinbox[1] * 10) + 1)]
-            spinbox = ttk.Spinbox(frame, values=values, textvariable=slider, command=lambda: update_label(slider, label, form="float"), width=5)
+            spinbox = ttk.Spinbox(frame, values=values, textvariable=slider, command=lambda: update_label(slider, label, form="float"))
         else:
-            spinbox = ttk.Spinbox(frame, from_=range_of_spinbox[0], to=range_of_spinbox[1], textvariable=slider, command=lambda: update_label(slider, label), width=5)
+            spinbox = ttk.Spinbox(frame, from_=range_of_spinbox[0], to=range_of_spinbox[1], textvariable=slider, command=lambda: update_label(slider, label))
         spinbox.grid(row=row, column=col, padx=10, pady=10, sticky="w")
         spinbox.bind("<MouseWheel>", lambda event: "break")
         spinbox.bind("<Button-4>", lambda event: "break")
