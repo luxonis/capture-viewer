@@ -280,16 +280,13 @@ def create_settings_layout(frame, button_values):
     temporal_filter_checkbox.grid(row=current_row, column=1, padx=10, pady=10, sticky="w")
     current_row += 1
 
-    # Spatial Filter Frame
     temporal_frame = ttk.LabelFrame(custom_settings_frame, text="Temporal Filter", padding=(10, 10))
     temporal_frame.grid(row=current_row, column=0, columnspan=6, padx=10, pady=10, sticky="ew")
 
-    # Temporal Filter Enable
     ttk.Label(temporal_frame, text="Alpha").grid(row=2, column=0, padx=10, pady=10, sticky="w")
     temporal_alpha_label = ttk.Label(temporal_frame, text=str(button_values['temporal_alpha_slider'].get()))
-    temporal_alpha_label.grid(row=2, column=2, padx=10, pady=10, sticky="w")
-    ttk.Scale(temporal_frame, from_=0, to=1, variable=button_values['temporal_alpha_slider'], orient="horizontal",
-              command=lambda x: update_label(button_values['temporal_alpha_slider'], temporal_alpha_label, form="float")).grid(row=2, column=1, padx=10, pady=10, sticky="w")
+    spinbox(temporal_frame, 2, 1, button_values['temporal_alpha_slider'], temporal_alpha_label, [0.0, 1.0], is_float=True)
+    ttk.Label(temporal_frame, text="(0.0, 1.0)").grid(row=2, column=2, padx=10, pady=10, sticky="w")
 
     ttk.Label(temporal_frame, text="Delta").grid(row=2, column=3, padx=10, pady=10, sticky="w")
     temporal_delta_label = ttk.Label(temporal_frame, text=str(button_values['temporal_delta_slider'].get()))

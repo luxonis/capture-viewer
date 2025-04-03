@@ -173,7 +173,7 @@ def config2settings(config, capture_data):
             "speckle_range": config.get('cfg.postProcessing.speckleFilter.speckleRange', 50),
 
             "median_filter": 'stereo.initialConfig.setMedianFilter' in config,
-            "median_size": handle_dict(config.get('stereo.initialConfig.setMedianFilter', "MedianFilter.MEDIAN_OFF"),
+            "median_size": handle_dict(config.get('stereo.initialConfig.setMedianFilter', "dai.MedianFilter.MEDIAN_OFF"),
                                        median_dict, reverse=True),
 
             "bilateral_filter": 'cfg.postProcessing.bilateralSigmaValue' in config,
