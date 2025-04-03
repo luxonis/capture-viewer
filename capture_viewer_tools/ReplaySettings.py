@@ -158,8 +158,12 @@ def create_settings_layout(frame, button_values):
         combo.bind("<Button-4>", lambda event: "break")
         combo.bind("<Button-5>", lambda event: "break")
 
-    def spinbox(frame, row, col, slider, label, range):
-        spinbox = ttk.Spinbox(frame, from_=range[0], to=range[1], textvariable=slider, command=lambda: update_label(slider, label))
+    def spinbox(frame, row, col, slider, label, range_of_spinbox, is_float=False):
+        if is_float:
+            values = [f"{i / 10:.1f}" for i in range(int(range_of_spinbox[0] * 10), int(range_of_spinbox[1] * 10) + 1)]
+            spinbox = ttk.Spinbox(frame, values=values, textvariable=slider, command=lambda: update_label(slider, label, form="float"), width=5)
+        else:
+            spinbox = ttk.Spinbox(frame, from_=range_of_spinbox[0], to=range_of_spinbox[1], textvariable=slider, command=lambda: update_label(slider, label), width=5)
         spinbox.grid(row=row, column=col, padx=10, pady=10, sticky="w")
         spinbox.bind("<MouseWheel>", lambda event: "break")
         spinbox.bind("<Button-4>", lambda event: "break")
@@ -260,9 +264,8 @@ def create_settings_layout(frame, button_values):
 
     ttk.Label(spatial_frame, text="Alpha").grid(row=2, column=0, padx=10, pady=10, sticky="w")
     alpha_label = ttk.Label(spatial_frame, text=str(button_values['alpha_slider'].get()))
-    alpha_label.grid(row=2, column=2, padx=10, pady=10, sticky="w")
-    ttk.Scale(spatial_frame, from_=0, to=1, variable=button_values['alpha_slider'], orient="horizontal", command=lambda x: update_label(button_values['alpha_slider'], alpha_label, form="float")).grid(row=2, column=1, padx=10, pady=10,
-                                                                                                                                                                                                        sticky="w")
+    spinbox(spatial_frame, 2, 1, button_values['alpha_slider'], alpha_label, [0.0, 1.0], is_float=True)
+    ttk.Label(spatial_frame, text="(0.0, 1.0)").grid(row=2, column=2, padx=10, pady=10, sticky="w")
 
     ttk.Label(spatial_frame, text="Delta").grid(row=2, column=3, padx=10, pady=10, sticky="w")
     delta_label = ttk.Label(spatial_frame, text=str(button_values['delta_slider'].get()))
