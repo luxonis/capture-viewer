@@ -39,7 +39,9 @@ def run_capture_script(session, selected_streams, ip):
         'python',
         capture_show_path,
         session_path,
-    ] + selected_streams + ['--ip', ip]
+    ] + selected_streams
+
+    if ip is not None: command += ['--ip', ip]
 
     # Run the command as a subprocess
     try:
