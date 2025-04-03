@@ -14,7 +14,7 @@ import time
 import platform
 
 from capture_viewer_tools.capture_tools import (colorize_depth, calculate_scaled_dimensions, get_min_max_depths,
-                                                format_json_for_replay, create_placeholder_frame, add_depthai_to_config, process_pointcloud)
+                                                format_json_for_replay, create_placeholder_frame, process_pointcloud)
 from capture_viewer_tools.convertor_capture2replay_json import config2settings
 from capture_viewer_tools.ReplaySettings import *
 
@@ -95,7 +95,7 @@ class ReplayVisualizer:
         button_values['fractional_bits_val'] = tk.IntVar(value=current_config.get('stereo.setSubpixelFractionalBits', default_config['stereo.setSubpixelFractionalBits']))
 
         # FILTERS -----------------------------------------------------------------------------------
-        button_values['filtering_order_enable'] = tk.BooleanVar(value=(True if 'cfg.postProcessing.filteringOrder' in current_config else False))
+        button_values['filtering_order_enable'] = tk.BooleanVar(value=False)
         if 'cfg.postProcessing.filteringOrder' in current_config:
             button_values['initial_filter_order'] = get_filter_order_back(current_config['cfg.postProcessing.filteringOrder'])
         else:
@@ -107,7 +107,7 @@ class ReplayVisualizer:
         button_values['spatial_order'] = tk.IntVar(value=button_values['initial_filter_order'][3])
         button_values['temporal_order'] = tk.IntVar(value=button_values['initial_filter_order'][4])
 
-        button_values['median_filter_enable'] = tk.BooleanVar(value=(current_config.get('stereo.initialConfig.setMedianFilter', "MedianFilter.MEDIAN_OFF") != "MedianFilter.MEDIAN_OFF"))
+        button_values['median_filter_enable'] = tk.BooleanVar(value=(current_config.get('stereo.initialConfig.setMedianFilter', "dai.MedianFilter.MEDIAN_OFF") != "dai.MedianFilter.MEDIAN_OFF"))
         button_values['median_val'] = tk.StringVar(value=current_config.get('stereo.initialConfig.setMedianFilter', default_config['stereo.initialConfig.setMedianFilter']))
 
         # bilateral_filter_enable = tk.BooleanVar(value=current_config.get('cfg.postProcessing.bilateralFilter.enable', False))
@@ -131,11 +131,11 @@ class ReplayVisualizer:
         button_values['temporal_alpha_slider'] = tk.DoubleVar(value=current_config.get('cfg.postProcessing.temporalFilter.alpha', default_config['cfg.postProcessing.temporalFilter.alpha']))
         button_values['temporal_delta_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.temporalFilter.delta', default_config['cfg.postProcessing.temporalFilter.delta']))
 
-        button_values['threshold_filter_enable'] = tk.BooleanVar(value=(True if 'cfg.postProcessing.thresholdFilter.minRange' in current_config else False))
+        button_values['threshold_filter_enable'] = tk.BooleanVar(value=False)
         button_values['min_range_val'] = tk.IntVar(value=current_config.get('cfg.postProcessing.thresholdFilter.minRange', default_config['cfg.postProcessing.thresholdFilter.minRange']))
         button_values['max_range_val'] = tk.IntVar(value=current_config.get('cfg.postProcessing.thresholdFilter.maxRange', default_config['cfg.postProcessing.thresholdFilter.maxRange']))
 
-        button_values['decimation_filter_enable'] = tk.BooleanVar(value=(True if 'cfg.postProcessing.decimationFilter.decimationFactor' in current_config else False))
+        button_values['decimation_filter_enable'] = tk.BooleanVar(value=(True if (current_config.get('cfg.postProcessing.decimationFilter.decimationFactor', 1) > 1 ) else False))
         button_values['decimation_factor_val'] = tk.IntVar(value=current_config.get('cfg.postProcessing.decimationFilter.decimationFactor', default_config['cfg.postProcessing.decimationFilter.decimationFactor']))
         button_values['decimation_mode_val'] = tk.StringVar(
             value=handle_dict(current_config.get('cfg.postProcessing.decimationFilter.decimationMode', default_config['cfg.postProcessing.decimationFilter.decimationMode']), decimation_set_dict, reverse=True))
@@ -189,7 +189,7 @@ class ReplayVisualizer:
             if button_values['median_filter_enable'].get():
                 config['stereo.initialConfig.setMedianFilter'] = button_values['median_val'].get()
             else:
-                config['stereo.initialConfig.setMedianFilter'] = "MedianFilter.MEDIAN_OFF"
+                config['stereo.initialConfig.setMedianFilter'] = "dai.MedianFilter.MEDIAN_OFF"
 
             # Bilateral filter
             # todo - [1944301021AA992E00] [1.2.2] [9.439] [StereoDepth(2)] [warning] Bilateral filter is deprecated!
@@ -277,7 +277,7 @@ class ReplayVisualizer:
 
         print(self.config_json)
 
-        self.config_json = add_depthai_to_config(self.config_json)
+        # self.config_json = add_depthai_to_config(self.config_json)
 
         self.last_generated_depth = None
 
