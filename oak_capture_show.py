@@ -137,42 +137,42 @@ class MainApp():
         }
     
     def main_layout(self):
-        def update_sliders(*args):
-            min_val = min_slider.get()
-            max_val = max_slider.get()
-            if min_val > max_val:
-                min_slider.set(max_val)
-            elif max_val < min_val:
-                max_slider.set(min_val)
-
-        def select_alignment():
-            self.current_view["alignSocket"] = align_socket.get()
+        # def update_sliders(*args):
+        #     min_val = min_slider.get()
+        #     max_val = max_slider.get()
+        #     if min_val > max_val:
+        #         min_slider.set(max_val)
+        #     elif max_val < min_val:
+        #         max_slider.set(min_val)
+        #
+        # def select_alignment():
+        #     self.current_view["alignSocket"] = align_socket.get()
             
         root = Tk()
         root.title(f"Capture Viewer: {self.view_info['capture_folder']}")
         canvas = Canvas(root, width=canvas_width, height=canvas_height, bg="black")
         canvas.pack()
     
-        prev_button = Button(root, text="<-", bg="orange", activebackground="yellow",
+        prev_button = Button(root, text="<-", bg="orange", activebackground="#FFB84D",
                              command=lambda: on_prev(root, canvas, self.view_info, self.current_view))
-        next_button = Button(root, text="->", bg="orange", activebackground="yellow",
+        next_button = Button(root, text="->", bg="orange", activebackground="#FFB84D",
                              command=lambda: on_next(root, canvas, self.view_info, self.current_view))
         next_button.pack(side="right")
         prev_button.pack(side="right")
     
-        pointcloud_button = Button(root, text="OpenCV \nPointCloud", command=lambda: on_pointcloud_rgb(root, self.view_info, self.current_view,
-                                                                                                       downsample=False))
-        pointcloud_button.pack(side="right")
-    
-        align_button = Button(root, text="OpenCV\nAlignment\nset",
-                              command=select_alignment)
-        align_button.pack(side="right")
-    
-        align_socket = StringVar(value="COLOR")
-        radiobutton_color = Radiobutton(root, text="COLOR", variable=align_socket, value="COLOR")
-        radiobutton_color.pack(side="right")
-        radiobutton_left = Radiobutton(root, text="LEFT", variable=align_socket, value="LEFT")
-        radiobutton_left.pack(side="right")
+        # pointcloud_button = Button(root, text="OpenCV \nPointCloud", command=lambda: on_pointcloud_rgb(root, self.view_info, self.current_view,
+        #                                                                                                downsample=False))
+        # pointcloud_button.pack(side="right")
+        #
+        # align_button = Button(root, text="OpenCV\nAlignment\nset",
+        #                       command=select_alignment)
+        # align_button.pack(side="right")
+        #
+        # align_socket = StringVar(value="COLOR")
+        # radiobutton_color = Radiobutton(root, text="COLOR", variable=align_socket, value="COLOR")
+        # radiobutton_color.pack(side="right")
+        # radiobutton_left = Radiobutton(root, text="LEFT", variable=align_socket, value="LEFT")
+        # radiobutton_left.pack(side="right")
 
     
         canvas.tooltip = Label(root, text="", background="white", relief="solid", borderwidth=1, padx=2, pady=2)
@@ -187,25 +187,35 @@ class MainApp():
         info_button = Button(root, text="INFO", bg="#32CD32", activebackground="#90EE90",
                              command=lambda: show_popup("Metadata", str(self.view_info["metadata"])))
         info_button.pack(side="left")
-    
-        update_button = Button(root, text="Colorize\nDepth", command=lambda: display_images(root, canvas, self.view_info, self.current_view,
-                                                                                            min_slider.get(), max_slider.get()))
-        update_button.pack(side="right")
-    
-        # Sliders for setting range
+
         if 'disparity' in self.view_info["types"] or 'neural_disparity' in self.view_info["types"]:
-            slider_upper_range = 800
+            label_text = "Disparity"
         else:
-            slider_upper_range = 7000
-    
-        min_slider = Scale(root, from_=0, to=slider_upper_range, orient=VERTICAL, label="Min Value")  # Adjust range and labels as needed
-        max_slider = Scale(root, from_=0, to=slider_upper_range, orient=VERTICAL, label="Max Value")  # Adjust range and labels as needed
-        min_slider.pack(side=RIGHT, fill="y")
-        max_slider.pack(side=RIGHT, fill="y")
-    
-        # Link sliders to update their behavior when changed
-        min_slider.config(command=update_sliders)
-        max_slider.config(command=update_sliders)
+            label_text = "Depth"
+
+        default_min, default_max = 0, 15000
+
+        depth_frame = Frame(root)
+
+        depth_label = Label(depth_frame, text=label_text + " range")
+        depth_label.pack()
+
+        min_var = StringVar(value=str(default_min))
+        max_var = StringVar(value=str(default_max))
+
+        min_entry = Entry(depth_frame, textvariable=min_var, width=6)
+        max_entry = Entry(depth_frame, textvariable=max_var, width=6)
+
+        min_entry.pack(side=LEFT)
+        max_entry.pack(side=LEFT)
+
+        update_button = Button(root, text=f"Colorize\n{label_text}",
+            bg="#FFFF00", activebackground="#FFFF90", command=lambda: display_images(
+            root, canvas, self.view_info, self.current_view,
+            int(min_var.get()), int(max_var.get())
+        ))
+        update_button.pack(side="right")
+        depth_frame.pack(side=RIGHT, padx=10)
     
         display_images(root, canvas, self.view_info, self.current_view)
     

@@ -159,6 +159,7 @@ def colorize_depth(image, type, label=True, min_val=None, max_val=None, color_no
         normalized = np.clip((image - min_disparity) / (max_disparity - min_disparity), 0, 1)
         scaled_disparity = (normalized * 255).astype(np.uint8)
         colored_image = cv2.applyColorMap(scaled_disparity, cv2.COLORMAP_JET )
+        range_min, range_max = min_disparity, max_disparity
     elif type == 'difference':
         if np.all(image == 0):
             return image, 0, 0
