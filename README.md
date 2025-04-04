@@ -1,7 +1,7 @@
 
 # Capture Viewer
 
-`capture-viewer` is a Luxonis Python tool designed to view and analyze data captured by OAK cameras. 
+`capture-viewer` is a Luxonis internal Python tool designed to view and analyze data captured by OAK cameras. 
 It provides functionalities to capture, display, and inspect stereo depth captures along with other types of camera data. 
 It also allows the use of a REPLAY to regenerate data with different settings.
 
@@ -44,12 +44,6 @@ python capture_viewer.py -p /path/to/DATA
 Where DATA is the folder containing all the capture sessions. It will direct you to a session selection, where you can 
 visualize individual sessions.
 
-Optionally, you can add --ip to specify the **IP of the device** you want to run the replay on.
-
-```bash
-python capture_viewer.py -p /path/to/DATA --ip device_ip
-```
-
 ---
 
 ## REPLAY Feature
@@ -74,8 +68,7 @@ Each folder is named based on the time of generation and contains the following 
 
 ## Adjusting window size
 
-If the App window is too large/small for your screen, you can adjust window size. 
-This will be improved in future versions of the app.
+If the App window is too large/small for your screen, you can adjust window size
 
 For one capture display: `coak_capture_show.py`
     

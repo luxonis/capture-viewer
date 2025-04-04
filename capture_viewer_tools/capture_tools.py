@@ -159,7 +159,6 @@ def colorize_depth(image, type, label=True, min_val=None, max_val=None, color_no
         normalized = np.clip((image - min_disparity) / (max_disparity - min_disparity), 0, 1)
         scaled_disparity = (normalized * 255).astype(np.uint8)
         colored_image = cv2.applyColorMap(scaled_disparity, cv2.COLORMAP_JET )
-        range_min, range_max = min_disparity, max_disparity
     elif type == 'difference':
         if np.all(image == 0):
             return image, 0, 0
@@ -244,6 +243,29 @@ def device_connected():
         print("No device connected. Connect a camera to use REPLAY features.")
         return False
 
+def add_depthai_to_config(config_json):
+    """ adding dai. at the beginning of strings so they can be validated as depthai objects in replay"""
+    new_config = {}
+    for key in config_json.keys():
+        config_value = config_json[key]
+        if "dai." in config_value:
+            new_config[key] = config_value
+        else:
+            try: config_value = int(config_value)
+            except Exception: pass
+            if type(config_value) == str and config_value[0] != '[': new_config[key] = "dai." + config_value
+            else: new_config[key] = config_value
+    return new_config
+
+def remove_depthai_from_config(config_json):
+    new_config = {}
+    for key in config_json.keys():
+        config_value = config_json[key]
+        if isinstance(config_value, str) and config_value.startswith("dai."):
+            new_config[key] = config_value[4:]
+        else:
+            new_config[key] = config_value
+    return new_config
 
 def get_min_max_depths(depth1, depth2, color_noise_percent_removal=1):
     if depth1 is None and depth2 is None:

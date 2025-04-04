@@ -128,7 +128,7 @@ def on_alignment(root, view_info, current_view, pointcloud=False):
     RIGHT_SOCKET = view_info["RIGHT_SOCKET"]
     if current_view["alignSocket"] == "COLOR":
         SOCKET = view_info["RGB_SOCKET"]
-        frame = current_view['rgb']
+        frame = current_view['isp']
         size = view_info['rgb_size']
     elif current_view["alignSocket"] == "RIGHT":
         SOCKET = view_info["RIGHT_SOCKET"]
