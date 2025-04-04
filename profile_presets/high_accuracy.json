@@ -1,0 +1,8 @@
+{
+    "stereo.setConfidenceThreshold": 200,
+    "stereo.setLeftRightCheck": true,
+    "cfg.algorithmControl.leftRightCheckThreshold": 5,
+    "stereo.setExtendedDisparity": true,
+    "stereo.setSubpixel": true,
+    "stereo.setSubpixelFractionalBits": 3
+}
