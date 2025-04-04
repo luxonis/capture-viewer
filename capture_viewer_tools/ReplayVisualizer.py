@@ -2,7 +2,7 @@ import numpy as np
 import cv2
 import open3d as o3d
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, Tk, filedialog
 import threading
 import os
 import json
@@ -15,6 +15,7 @@ import platform
 
 from capture_viewer_tools.capture_tools import (colorize_depth, calculate_scaled_dimensions, get_min_max_depths,
                                                 format_json_for_replay, create_placeholder_frame, process_pointcloud)
+
 from capture_viewer_tools.convertor_capture2replay_json import config2settings
 from capture_viewer_tools.ReplaySettings import *
 
@@ -154,6 +155,61 @@ class ReplayVisualizer:
         button_values['CM_alpha_val'] = tk.IntVar(value=0)
         button_values['CM_beta_val'] = tk.IntVar(value=2)
         button_values['matching_threshold_val'] = tk.IntVar(value=127)
+
+    def update_button_values(self, new_config, button_values):
+        button_values['depth_align'].set(new_config.get('stereo.setDepthAlign', default_config['stereo.setDepthAlign']))
+        button_values['profile_preset'].set(new_config.get('stereo.setDefaultProfilePreset', default_config['stereo.setDefaultProfilePreset']))
+
+        button_values['rectificationBox_val'].set(new_config.get('stereo.setRectification', True))
+        button_values['LRBox_val'].set(new_config.get('stereo.setLeftRightCheck', default_config['stereo.setLeftRightCheck']))
+        button_values['extendedBox_val'].set(new_config.get('stereo.setExtendedDisparity', default_config['stereo.setExtendedDisparity']))
+        button_values['subpixelBox_val'].set(new_config.get('stereo.setSubpixel', default_config['stereo.setSubpixel']))
+        button_values['fractional_bits_val'].set(new_config.get('stereo.setSubpixelFractionalBits', default_config['stereo.setSubpixelFractionalBits']))
+
+        filter_order_enabled = 'cfg.postProcessing.filteringOrder' in new_config
+        button_values['filtering_order_enable'].set(filter_order_enabled)
+
+        if filter_order_enabled:
+            initial_filter_order = get_filter_order_back(new_config['cfg.postProcessing.filteringOrder'])
+        else:
+            initial_filter_order = get_filter_order_back(default_config['cfg.postProcessing.filteringOrder'])
+
+        button_values['decimation_order'].set(initial_filter_order[0])
+        button_values['median_order'].set(initial_filter_order[1])
+        button_values['speckle_order'].set(initial_filter_order[2])
+        button_values['spatial_order'].set(initial_filter_order[3])
+        button_values['temporal_order'].set(initial_filter_order[4])
+
+        button_values['median_filter_enable'].set(new_config.get('stereo.initialConfig.setMedianFilter', "MedianFilter.MEDIAN_OFF") != "MedianFilter.MEDIAN_OFF")
+        button_values['median_val'].set(new_config.get('stereo.initialConfig.setMedianFilter', default_config['stereo.initialConfig.setMedianFilter']))
+
+        button_values['brightness_filter_enable'].set(new_config.get('cfg.postProcessing.brightnessFilter.enable', False))
+        button_values['min_brightness_slider'].set(new_config.get('cfg.postProcessing.brightnessFilter.minBrightness', default_config['cfg.postProcessing.brightnessFilter.minBrightness']))
+        button_values['max_brightness_slider'].set(new_config.get('cfg.postProcessing.brightnessFilter.maxBrightness', default_config['cfg.postProcessing.brightnessFilter.maxBrightness']))
+
+        button_values['speckle_filter_enable'].set(new_config.get('cfg.postProcessing.speckleFilter.enable', False))
+        button_values['speckle_range_slider'].set(new_config.get('cfg.postProcessing.speckleFilter.speckleRange', default_config['cfg.postProcessing.speckleFilter.speckleRange']))
+        button_values['speckle_difference_threshold'].set(new_config.get('cfg.postProcessing.speckleFilter.differenceThreshold', default_config['cfg.postProcessing.speckleFilter.differenceThreshold']))
+
+        button_values['spatial_filter_enable'].set(new_config.get('cfg.postProcessing.spatialFilter.enable', False))
+        button_values['hole_filling_radius_slider'].set(new_config.get('cfg.postProcessing.spatialFilter.holeFillingRadius', default_config['cfg.postProcessing.spatialFilter.holeFillingRadius']))
+        button_values['num_iterations_slider'].set(new_config.get('cfg.postProcessing.spatialFilter.numIterations', default_config['cfg.postProcessing.spatialFilter.numIterations']))
+        button_values['alpha_slider'].set(new_config.get('cfg.postProcessing.spatialFilter.alpha', default_config['cfg.postProcessing.spatialFilter.alpha']))
+        button_values['delta_slider'].set(new_config.get('cfg.postProcessing.spatialFilter.delta', default_config['cfg.postProcessing.spatialFilter.delta']))
+
+        button_values['temporal_filter_enable'].set(new_config.get('cfg.postProcessing.temporalFilter.enable', False))
+        button_values['temporal_alpha_slider'].set(new_config.get('cfg.postProcessing.temporalFilter.alpha', default_config['cfg.postProcessing.temporalFilter.alpha']))
+        button_values['temporal_delta_slider'].set(new_config.get('cfg.postProcessing.temporalFilter.delta', default_config['cfg.postProcessing.temporalFilter.delta']))
+
+        button_values['threshold_filter_enable'].set('cfg.postProcessing.thresholdFilter.minRange' in new_config)
+        button_values['min_range_val'].set(new_config.get('cfg.postProcessing.thresholdFilter.minRange', default_config['cfg.postProcessing.thresholdFilter.minRange']))
+        button_values['max_range_val'].set(new_config.get('cfg.postProcessing.thresholdFilter.maxRange', default_config['cfg.postProcessing.thresholdFilter.maxRange']))
+
+        button_values['decimation_filter_enable'].set('cfg.postProcessing.decimationFilter.decimationFactor' in new_config)
+        button_values['decimation_factor_val'].set(new_config.get('cfg.postProcessing.decimationFilter.decimationFactor', default_config['cfg.postProcessing.decimationFilter.decimationFactor']))
+        button_values['decimation_mode_val'].set(
+            handle_dict(new_config.get('cfg.postProcessing.decimationFilter.decimationMode', default_config['cfg.postProcessing.decimationFilter.decimationMode']), decimation_set_dict, reverse=True)
+        )
 
     def convert_current_button_values_to_config(self, button_values, frame):
         config = {}
@@ -378,9 +434,22 @@ class ReplayVisualizer:
         subprocess.Popen(['python', visualize_pointcloud_path, pcl_path, str(config_json)])  # o3d.visualization.draw_geometries([pointcloud])
         time.sleep(1)
 
-    def create_depth_section(self, collumn_in_main_frame):
+    def on_load_custom_config(self, parent, button_values):
+        dialog_window = tk.Toplevel(parent)
+        dialog_window.withdraw()
+
+        file_path = filedialog.askopenfilename(parent=dialog_window, filetypes=[("JSON files", "*.json")])
+        dialog_window.destroy()
+
+        if file_path:
+            with open(file_path, 'r') as file:
+                loaded_config = json.load(file)
+                loaded_config = remove_depthai_from_config(loaded_config)  # to make it compatible with buttons
+                self.update_button_values(loaded_config, button_values)
+
+    def create_depth_section(self, column_in_main_frame):
         generated_depth_frame = tk.Frame(self.main_frame)
-        generated_depth_frame.grid(row=1, column=collumn_in_main_frame, padx=5, pady=5, sticky='nsew')
+        generated_depth_frame.grid(row=1, column=column_in_main_frame, padx=5, pady=5, sticky='nsew')
 
         generated_depth_text_label1 = tk.Label(generated_depth_frame, text="Generated Depth", font=("Arial", 12, "bold"))
         generated_depth_text_label1.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="nsew")
@@ -389,11 +458,21 @@ class ReplayVisualizer:
         generated_depth_image.image = None
         generated_depth_image.grid(row=1, column=0, padx=10, pady=10)
 
-        if collumn_in_main_frame == 0:
-            pointcloud_button = tk.Button(generated_depth_frame, text="Pointcloud", command=lambda: self.on_pointcloud_button(self.pcl_path1, self.config_json1))
+        button_frame = tk.Frame(generated_depth_frame)
+        button_frame.grid(row=1, column=1, padx=5, pady=5, sticky='nsew')
+
+        if column_in_main_frame == 0:
+            pointcloud_button = tk.Button(button_frame, text="Point Cloud", command=lambda: self.on_pointcloud_button(self.pcl_path1, self.config_json1))
+            load_config_button = tk.Button(button_frame, text="Load Config", command=lambda: self.on_load_custom_config(self.toplLevel, self.button_values1))
         else:
-            pointcloud_button = tk.Button(generated_depth_frame, text="Pointcloud", command=lambda: self.on_pointcloud_button(self.pcl_path2, self.config_json2))
-        pointcloud_button.grid(row=1, column=2, pady=(50, 0))
+            pointcloud_button = tk.Button(button_frame, text="Point Cloud", command=lambda: self.on_pointcloud_button(self.pcl_path2, self.config_json2))
+            load_config_button = tk.Button(button_frame, text="Load Config", command=lambda: self.on_load_custom_config(self.toplLevel, self.button_values2))
+        pointcloud_button.grid(row=1, column=2, sticky='ew', padx=10)
+        load_config_button.grid(row=2, column=2, sticky='ew', padx=10)
+
+        button_frame.rowconfigure((0, 3), weight=1)
+        button_frame.columnconfigure(2, weight=1)
+
 
         return generated_depth_frame, generated_depth_image
     def create_settings_section(self, collumn_in_main_frame, frame_name, button_values):
@@ -414,6 +493,7 @@ class ReplayVisualizer:
         initial_config = self.get_initial_config(original_config=None)
         self.inicialize_button_values(initial_config, button_values)
         create_settings_layout(content_frame, button_values)
+
         settings_canvas.create_window((0, 0), window=content_frame, anchor="nw")
         content_frame.update_idletasks()
 

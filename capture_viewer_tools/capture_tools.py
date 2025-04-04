@@ -244,6 +244,7 @@ def device_connected():
         print("No device connected. Connect a camera to use REPLAY features.")
         return False
 
+
 def get_min_max_depths(depth1, depth2, color_noise_percent_removal=1):
     if depth1 is None and depth2 is None:
         print("Both NONE")
