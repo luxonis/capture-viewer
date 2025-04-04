@@ -27,7 +27,7 @@ def load_sessions(folder_path):
 
 
 # Function to handle button click and run the capture script with selected streams
-def run_capture_script(session, selected_streams, ip):
+def run_capture_script(session, selected_streams):
     session_path = session['session_path']
 
     script_directory = os.path.dirname(os.path.abspath(__file__))
@@ -38,10 +38,8 @@ def run_capture_script(session, selected_streams, ip):
     command = [
         'python',
         capture_show_path,
-        session_path,
+        session_path
     ] + selected_streams
-
-    if ip is not None: command += ['--ip', ip]
 
     # Run the command as a subprocess
     try:
@@ -54,7 +52,7 @@ def run_capture_script(session, selected_streams, ip):
 
 
 # Function to create a Tkinter app with buttons for each session and stream selection
-def create_app(sessions, ip):
+def create_app(sessions):
     root = tk.Tk()
     root.title("Session Viewer")
 
@@ -94,7 +92,7 @@ def create_app(sessions, ip):
         button = tk.Button(
             root,
             text=button_label,
-            command=lambda s=session: run_capture_script(s, get_selected_streams(), ip),
+            command=lambda s=session: run_capture_script(s, get_selected_streams()),
             width=25,
             height=3
         )
@@ -117,10 +115,7 @@ def main():
 
     parser = argparse.ArgumentParser(description="Process folder path for session loading.")
     parser.add_argument('-p', '--path', type=str, help='Absolute path to the folder', default=None)
-    parser.add_argument('--ip', type=str, help='IP adress of device to use for replay', default=None)
     args = parser.parse_args()
-
-    ip = args.ip
 
     if args.path:
         folder_path = args.path
@@ -136,7 +131,7 @@ def main():
     if not sessions:
         print("No sessions found!")
     else:
-        create_app(sessions, ip)
+        create_app(sessions)
 
 
 if __name__ == "__main__":

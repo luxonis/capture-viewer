@@ -3,40 +3,40 @@ import json
 # todo - add filter parameter settings to config2settings
 
 setDepthAlign_dict = {
-    "Left": "dai.CameraBoardSocket.LEFT",
-    "Right": "dai.CameraBoardSocket.RIGHT",
-    "RecLeft": "dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_LEFT",
-    "RecRight": "dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_RIGHT",
-    "LEFT": "dai.CameraBoardSocket.LEFT",
-    "RIGHT": "dai.CameraBoardSocket.RIGHT",
-    "REC_LEFT": "dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_LEFT",
-    "REC_RIGHT": "dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_RIGHT",
-    "RGB": "dai.CameraBoardSocket.CAM_A",
+    "Left": "CameraBoardSocket.LEFT",
+    "Right": "CameraBoardSocket.RIGHT",
+    "RecLeft": "StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_LEFT",
+    "RecRight": "StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_RIGHT",
+    "LEFT": "CameraBoardSocket.LEFT",
+    "RIGHT": "CameraBoardSocket.RIGHT",
+    "REC_LEFT": "StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_LEFT",
+    "REC_RIGHT": "StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_RIGHT",
+    "RGB": "CameraBoardSocket.CAM_A",
 }
 
 profilePreset_dict = {
-    "HIGH_ACCURACY": "dai.node.StereoDepth.PresetMode.HIGH_ACCURACY",
-    "HIGH_DENSITY": "dai.node.StereoDepth.PresetMode.HIGH_DENSITY"
+    "HIGH_ACCURACY": "node.StereoDepth.PresetMode.HIGH_ACCURACY",
+    "HIGH_DENSITY": "node.StereoDepth.PresetMode.HIGH_DENSITY"
 }
 
 median_dict = {
-    "MEDIAN_OFF": "dai.MedianFilter.MEDIAN_OFF",
-    "MEDIAN_3x3": "dai.MedianFilter.KERNEL_3x3",
-    "MEDIAN_5x5": "dai.MedianFilter.KERNEL_5x5",
-    "MEDIAN_7x7": "dai.MedianFilter.KERNEL_7x7",
+    "MEDIAN_OFF": "MedianFilter.MEDIAN_OFF",
+    "MEDIAN_3x3": "MedianFilter.KERNEL_3x3",
+    "MEDIAN_5x5": "MedianFilter.KERNEL_5x5",
+    "MEDIAN_7x7": "MedianFilter.KERNEL_7x7",
 }
 
 decimation_set_dict = {
-    'NON_ZERO_MEAN': 'dai.StereoDepthConfig.PostProcessing.DecimationFilter.DecimationMode.NON_ZERO_MEAN',
-    'NON_ZERO_MEDIAN': 'dai.StereoDepthConfig.PostProcessing.DecimationFilter.DecimationMode.NON_ZERO_MEDIAN',
-    'PIXEL_SKIPPING': 'dai.StereoDepthConfig.PostProcessing.DecimationFilter.DecimationMode.PIXEL_SKIPPING'
+    'NON_ZERO_MEAN': 'StereoDepthConfig.PostProcessing.DecimationFilter.DecimationMode.NON_ZERO_MEAN',
+    'NON_ZERO_MEDIAN': 'StereoDepthConfig.PostProcessing.DecimationFilter.DecimationMode.NON_ZERO_MEDIAN',
+    'PIXEL_SKIPPING': 'StereoDepthConfig.PostProcessing.DecimationFilter.DecimationMode.PIXEL_SKIPPING'
 }
 
 CT_kernel_dict = {
-    "KERNEL_AUTO": "dai.StereoDepthConfig.CensusTransform.KernelSize.AUTO",
-    "KERNEL_5x5": "dai.StereoDepthConfig.CensusTransform.KernelSize.KERNEL_5x5",
-    "KERNEL_7x7": "dai.StereoDepthConfig.CensusTransform.KernelSize.KERNEL_7x7",
-    "KERNEL_7x9": "dai.StereoDepthConfig.CensusTransform.KernelSize.KERNEL_7x9"
+    "KERNEL_AUTO": "StereoDepthConfig.CensusTransform.KernelSize.AUTO",
+    "KERNEL_5x5": "StereoDepthConfig.CensusTransform.KernelSize.KERNEL_5x5",
+    "KERNEL_7x7": "StereoDepthConfig.CensusTransform.KernelSize.KERNEL_7x7",
+    "KERNEL_7x9": "StereoDepthConfig.CensusTransform.KernelSize.KERNEL_7x9"
 }
 
 
@@ -173,7 +173,7 @@ def config2settings(config, capture_data):
             "speckle_range": config.get('cfg.postProcessing.speckleFilter.speckleRange', 50),
 
             "median_filter": 'stereo.initialConfig.setMedianFilter' in config,
-            "median_size": handle_dict(config.get('stereo.initialConfig.setMedianFilter', "dai.MedianFilter.MEDIAN_OFF"),
+            "median_size": handle_dict(config.get('stereo.initialConfig.setMedianFilter', "MedianFilter.MEDIAN_OFF"),
                                        median_dict, reverse=True),
 
             "bilateral_filter": 'cfg.postProcessing.bilateralSigmaValue' in config,
