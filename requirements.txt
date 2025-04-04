@@ -1,7 +1,9 @@
-depthai==2.29.0.0
+depthai==2.30.0.0
 numpy==1.26
 opencv-python
 matplotlib==3.9.2
 open3d
 pyglet==2.0.18
 numba
+tenacity
+screeninfo
