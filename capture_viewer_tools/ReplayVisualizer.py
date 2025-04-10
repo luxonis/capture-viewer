@@ -143,20 +143,23 @@ class ReplayVisualizer:
 
         # ------------------------------------------------------ ADVANCED STEREO SETTINGS -------------------------------------------------------
         button_values['advanced_settings_enable'] = tk.BooleanVar(value=False)
-        button_values['mean_mode_enable'] = tk.BooleanVar(value=True)
-        button_values['CT_kernel_val'] = tk.StringVar(value='KERNEL_AUTO')
-        button_values['CT_threshold_val'] = tk.IntVar(value=0)
-        button_values['division_factor_val'] = tk.IntVar(value=1)
-        button_values['horizontal_penalty_p1_val'] = tk.IntVar(value=250)
-        button_values['horizontal_penalty_p2_val'] = tk.IntVar(value=500)
-        button_values['vertical_penalty_p1_val'] = tk.IntVar(value=250)
-        button_values['vertical_penalty_p2_val'] = tk.IntVar(value=500)
-        button_values['confidence_threshold_val'] = tk.IntVar(value=245)
-        button_values['CM_alpha_val'] = tk.IntVar(value=0)
-        button_values['CM_beta_val'] = tk.IntVar(value=2)
-        button_values['matching_threshold_val'] = tk.IntVar(value=127)
-        button_values['enableCompanding_val'] = tk.BooleanVar(value=False)
-        button_values['leftRightCheckThreshold_val'] = tk.IntVar(value=5)
+
+        button_values['mean_mode_enable'] = tk.BooleanVar(value=default_config['cfg.censusTransform.enableMeanMode'])
+        button_values['CT_kernel_val'] = tk.StringVar(value=handle_dict(default_config['cfg.censusTransform.kernelSize'], CT_kernel_dict, reverse=True))
+        button_values['CT_threshold_val'] = tk.IntVar(value=default_config['cfg.censusTransform.threshold'])
+
+        button_values['division_factor_val'] = tk.IntVar(value=default_config['cfg.costAggregation.divisionFactor'])
+        button_values['horizontal_penalty_p1_val'] = tk.IntVar(value=default_config['cfg.costAggregation.horizontalPenaltyCostP1'])
+        button_values['horizontal_penalty_p2_val'] = tk.IntVar(value=default_config['cfg.costAggregation.horizontalPenaltyCostP2'])
+        button_values['vertical_penalty_p1_val'] = tk.IntVar(value=default_config['cfg.costAggregation.verticalPenaltyCostP1'])
+        button_values['vertical_penalty_p2_val'] = tk.IntVar(value=default_config['cfg.costAggregation.verticalPenaltyCostP2'])
+
+        button_values['confidence_threshold_val'] = tk.IntVar(value=default_config['cfg.costMatching.confidenceThreshold'])
+        button_values['CM_alpha_val'] = tk.IntVar(value=default_config['cfg.costMatching.linearEquationParameters.alpha'])
+        button_values['CM_beta_val'] = tk.IntVar(value=default_config['cfg.costMatching.linearEquationParameters.beta'])
+        button_values['matching_threshold_val'] = tk.IntVar(value=default_config['cfg.costMatching.linearEquationParameters.threshold'])
+        button_values['enableCompanding_val'] = tk.BooleanVar(value=default_config['cfg.costMatching.enableCompanding'])
+        button_values['leftRightCheckThreshold_val'] = tk.IntVar(value=default_config['cfg.algorithmControl.leftRightCheckThreshold'])
 
     def update_button_values(self, new_config, button_values):
         button_values['depth_align'].set(new_config.get('stereo.setDepthAlign', default_config['stereo.setDepthAlign']))
@@ -211,6 +214,51 @@ class ReplayVisualizer:
         button_values['decimation_factor_val'].set(new_config.get('cfg.postProcessing.decimationFilter.decimationFactor', default_config['cfg.postProcessing.decimationFilter.decimationFactor']))
         button_values['decimation_mode_val'].set(
             handle_dict(new_config.get('cfg.postProcessing.decimationFilter.decimationMode', default_config['cfg.postProcessing.decimationFilter.decimationMode']), decimation_set_dict, reverse=True)
+        )
+
+        button_values['mean_mode_enable'].set(
+            new_config.get('cfg.censusTransform.enableMeanMode', default_config['cfg.censusTransform.enableMeanMode'])
+        )
+        button_values['CT_kernel_val'].set(
+            handle_dict(new_config.get('cfg.censusTransform.kernelSize', default_config['cfg.censusTransform.kernelSize']), CT_kernel_dict, reverse=True)
+        )
+        button_values['CT_threshold_val'].set(
+            new_config.get('cfg.censusTransform.threshold', default_config['cfg.censusTransform.threshold'])
+        )
+
+        button_values['division_factor_val'].set(
+            new_config.get('cfg.costAggregation.divisionFactor', default_config['cfg.costAggregation.divisionFactor'])
+        )
+        button_values['horizontal_penalty_p1_val'].set(
+            new_config.get('cfg.costAggregation.horizontalPenaltyCostP1', default_config['cfg.costAggregation.horizontalPenaltyCostP1'])
+        )
+        button_values['horizontal_penalty_p2_val'].set(
+            new_config.get('cfg.costAggregation.horizontalPenaltyCostP2', default_config['cfg.costAggregation.horizontalPenaltyCostP2'])
+        )
+        button_values['vertical_penalty_p1_val'].set(
+            new_config.get('cfg.costAggregation.verticalPenaltyCostP1', default_config['cfg.costAggregation.verticalPenaltyCostP1'])
+        )
+        button_values['vertical_penalty_p2_val'].set(
+            new_config.get('cfg.costAggregation.verticalPenaltyCostP2', default_config['cfg.costAggregation.verticalPenaltyCostP2'])
+        )
+
+        button_values['confidence_threshold_val'].set(
+            new_config.get('cfg.costMatching.confidenceThreshold', default_config['cfg.costMatching.confidenceThreshold'])
+        )
+        button_values['CM_alpha_val'].set(
+            new_config.get('cfg.costMatching.linearEquationParameters.alpha', default_config['cfg.costMatching.linearEquationParameters.alpha'])
+        )
+        button_values['CM_beta_val'].set(
+            new_config.get('cfg.costMatching.linearEquationParameters.beta', default_config['cfg.costMatching.linearEquationParameters.beta'])
+        )
+        button_values['matching_threshold_val'].set(
+            new_config.get('cfg.costMatching.linearEquationParameters.threshold', default_config['cfg.costMatching.linearEquationParameters.threshold'])
+        )
+        button_values['enableCompanding_val'].set(
+            new_config.get('cfg.costMatching.enableCompanding', default_config['cfg.costMatching.enableCompanding'])
+        )
+        button_values['leftRightCheckThreshold_val'].set(
+            new_config.get('cfg.algorithmControl.leftRightCheckThreshold', default_config['cfg.algorithmControl.leftRightCheckThreshold'])
         )
 
     def convert_current_button_values_to_config(self, button_values, frame):

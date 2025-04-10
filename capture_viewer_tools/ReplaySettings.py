@@ -34,7 +34,21 @@ default_config = {
     'cfg.postProcessing.thresholdFilter.maxRange': 65535,
     'cfg.postProcessing.decimationFilter.enable': False,
     'cfg.postProcessing.decimationFilter.decimationFactor': 1,
-    'cfg.postProcessing.decimationFilter.decimationMode': 'dai.StereoDepthConfig.PostProcessing.DecimationFilter.DecimationMode.PIXEL_SKIPPING'
+    'cfg.postProcessing.decimationFilter.decimationMode': 'dai.StereoDepthConfig.PostProcessing.DecimationFilter.DecimationMode.PIXEL_SKIPPING',
+    'cfg.censusTransform.enableMeanMode': True,
+    'cfg.censusTransform.kernelSize': "dai.StereoDepthConfig.CensusTransform.KernelSize.AUTO",
+    'cfg.censusTransform.threshold': 0,
+    'cfg.costAggregation.divisionFactor': 1,
+    'cfg.costAggregation.horizontalPenaltyCostP1': 250,
+    'cfg.costAggregation.horizontalPenaltyCostP2': 500,
+    'cfg.costAggregation.verticalPenaltyCostP1': 250,
+    'cfg.costAggregation.verticalPenaltyCostP2': 500,
+    'cfg.costMatching.confidenceThreshold': 245,
+    'cfg.costMatching.linearEquationParameters.alpha': 0,
+    'cfg.costMatching.linearEquationParameters.beta': 2,
+    'cfg.costMatching.linearEquationParameters.threshold': 127,
+    'cfg.costMatching.enableCompanding': False,
+    'cfg.algorithmControl.leftRightCheckThreshold': 5
 }
 
 
@@ -104,9 +118,8 @@ def create_settings_layout(frame, button_values):
 
     current_row = 0
 
-    # Add radiobuttons for left/right choice with a label
+    #
     ttk.Label(popup_window, text="setDepthAlign").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
-
     align_options = {
         "Left": "dai.CameraBoardSocket.LEFT",
         "Right": "dai.CameraBoardSocket.RIGHT",
@@ -114,12 +127,9 @@ def create_settings_layout(frame, button_values):
         "Rec Right": "dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_RIGHT",
         "RGB": "dai.CameraBoardSocket.CAM_A"
     }
-
     display_val_align = tk.StringVar(value={v: k for k, v in align_options.items()}.get(button_values['depth_align'].get(), "Left"))
-
     def on_select_align(*args):
         button_values['depth_align'].set(align_options[display_val_align.get()])
-
     dropdown(popup_window, current_row, 1, display_val_align, list(align_options.keys()))
     display_val_align.trace_add("write", on_select_align)
 
@@ -127,7 +137,6 @@ def create_settings_layout(frame, button_values):
 
     #
     ttk.Label(popup_window, text="setDefaultProfilePreset").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
-
     preset_options = {
         "DEFAULT": "dai.node.StereoDepth.PresetMode.DEFAULT",
         "HIGH_ACCURACY": "dai.node.StereoDepth.PresetMode.HIGH_ACCURACY",
@@ -137,12 +146,9 @@ def create_settings_layout(frame, button_values):
         "FACE": "dai.node.StereoDepth.PresetMode.FACE",
         "None": "None"
     }
-
     display_val_preset = tk.StringVar(value={v: k for k, v in preset_options.items()}.get(button_values['profile_preset'].get(), "DEFAULT"))
-
     def on_select_preset(*args):
         button_values['profile_preset'].set(preset_options[display_val_preset.get()])
-
     dropdown(popup_window, current_row, 1, display_val_preset, list(preset_options.keys()))
     display_val_preset.trace_add("write", on_select_preset)
 
