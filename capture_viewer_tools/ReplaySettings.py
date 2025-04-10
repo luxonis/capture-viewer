@@ -80,6 +80,24 @@ def create_settings_layout(frame, button_values):
                 widget.state(['!disabled'] if state else ['disabled'])
         frame.state(['!disabled'] if state else ['disabled'])
 
+    def dropdown(frame, row, col, val, options):
+        combo = ttk.Combobox(frame, textvariable=val, values=options, state="readonly")
+        combo.grid(row=row, column=col, padx=10, pady=10, sticky="w")
+        combo.bind("<MouseWheel>", lambda event: "break")
+        combo.bind("<Button-4>", lambda event: "break")
+        combo.bind("<Button-5>", lambda event: "break")
+
+    def spinbox(frame, row, col, slider, label, range_of_spinbox, is_float=False):
+        if is_float:
+            values = [f"{i / 10:.1f}" for i in range(int(range_of_spinbox[0] * 10), int(range_of_spinbox[1] * 10) + 1)]
+            spinbox = ttk.Spinbox(frame, values=values, textvariable=slider, command=lambda: update_label(slider, label, form="float"))
+        else:
+            spinbox = ttk.Spinbox(frame, from_=range_of_spinbox[0], to=range_of_spinbox[1], textvariable=slider, command=lambda: update_label(slider, label))
+        spinbox.grid(row=row, column=col, padx=10, pady=10, sticky="w")
+        spinbox.bind("<MouseWheel>", lambda event: "break")
+        spinbox.bind("<Button-4>", lambda event: "break")
+        spinbox.bind("<Button-5>", lambda event: "break")
+
     popup_window = frame
 
     # ----------------------------------------------------------------- BUTTONS -------------------------------------------------------------
@@ -88,35 +106,46 @@ def create_settings_layout(frame, button_values):
 
     # Add radiobuttons for left/right choice with a label
     ttk.Label(popup_window, text="setDepthAlign").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
-    left_radiobutton = ttk.Radiobutton(popup_window, text="Left", variable=button_values['depth_align'], value="dai.CameraBoardSocket.LEFT")
-    right_radiobutton = ttk.Radiobutton(popup_window, text="Right", variable=button_values['depth_align'], value="dai.CameraBoardSocket.RIGHT")
-    rec_left_radiobutton = ttk.Radiobutton(popup_window, text="Rec Left", variable=button_values['depth_align'], value='dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_LEFT')
-    rec_right_radiobutton = ttk.Radiobutton(popup_window, text="Rec Right", variable=button_values['depth_align'], value='dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_RIGHT')
-    rgb_radiobutton = ttk.Radiobutton(popup_window, text="RGB", variable=button_values['depth_align'], value="dai.CameraBoardSocket.CAM_A")
-    left_radiobutton.grid(row=current_row, column=1, padx=10, pady=5, sticky="w")
-    right_radiobutton.grid(row=current_row, column=2, padx=10, pady=5, sticky="w")
-    rec_left_radiobutton.grid(row=current_row, column=3, padx=10, pady=5, sticky="w")
-    rec_right_radiobutton.grid(row=current_row, column=4, padx=10, pady=5, sticky="w")
-    rgb_radiobutton.grid(row=current_row, column=5, padx=10, pady=5, sticky="w")
+
+    align_options = {
+        "Left": "dai.CameraBoardSocket.LEFT",
+        "Right": "dai.CameraBoardSocket.RIGHT",
+        "Rec Left": "dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_LEFT",
+        "Rec Right": "dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_RIGHT",
+        "RGB": "dai.CameraBoardSocket.CAM_A"
+    }
+
+    display_val_align = tk.StringVar(value={v: k for k, v in align_options.items()}.get(button_values['depth_align'].get(), "Left"))
+
+    def on_select_align(*args):
+        button_values['depth_align'].set(align_options[display_val_align.get()])
+
+    dropdown(popup_window, current_row, 1, display_val_align, list(align_options.keys()))
+    display_val_align.trace_add("write", on_select_align)
+
     current_row += 1
 
     #
     ttk.Label(popup_window, text="setDefaultProfilePreset").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
-    Hdef_radiobutton = ttk.Radiobutton(popup_window, text="DEFAULT", variable=button_values['profile_preset'], value="dai.node.StereoDepth.PresetMode.DEFAULT")
-    HA_radiobutton = ttk.Radiobutton(popup_window, text="HIGH_ACCURACY", variable=button_values['profile_preset'], value="dai.node.StereoDepth.PresetMode.HIGH_ACCURACY")
-    HD_radiobutton = ttk.Radiobutton(popup_window, text="HIGH_DENSITY", variable=button_values['profile_preset'], value="dai.node.StereoDepth.PresetMode.HIGH_DENSITY")
-    HR_radiobutton = ttk.Radiobutton(popup_window, text="ROBOTICS", variable=button_values['profile_preset'], value="dai.node.StereoDepth.PresetMode.ROBOTICS")
-    HDE_radiobutton = ttk.Radiobutton(popup_window, text="HIGH_DETAIL", variable=button_values['profile_preset'], value="dai.node.StereoDepth.PresetMode.HIGH_DETAIL")
-    HF_radiobutton = ttk.Radiobutton(popup_window, text="FACE", variable=button_values['profile_preset'], value="dai.node.StereoDepth.PresetMode.FACE")
-    HN_radiobutton = ttk.Radiobutton(popup_window, text="None", variable=button_values['profile_preset'], value="None")
-    Hdef_radiobutton.grid(row=current_row, column=1, padx=10, pady=5, sticky="w")
-    HR_radiobutton.grid(row=current_row, column=2, padx=10, pady=5, sticky="w")
-    HDE_radiobutton.grid(row=current_row, column=3, padx=10, pady=5, sticky="w")
-    HF_radiobutton.grid(row=current_row, column=4, padx=10, pady=5, sticky="w")
-    current_row += 1
-    HA_radiobutton.grid(row=current_row, column=1, padx=10, pady=5, sticky="w")
-    HD_radiobutton.grid(row=current_row, column=2, padx=10, pady=5, sticky="w")
-    HN_radiobutton.grid(row=current_row, column=3, padx=10, pady=5, sticky="w")
+
+    preset_options = {
+        "DEFAULT": "dai.node.StereoDepth.PresetMode.DEFAULT",
+        "HIGH_ACCURACY": "dai.node.StereoDepth.PresetMode.HIGH_ACCURACY",
+        "HIGH_DENSITY": "dai.node.StereoDepth.PresetMode.HIGH_DENSITY",
+        "ROBOTICS": "dai.node.StereoDepth.PresetMode.ROBOTICS",
+        "HIGH_DETAIL": "dai.node.StereoDepth.PresetMode.HIGH_DETAIL",
+        "FACE": "dai.node.StereoDepth.PresetMode.FACE",
+        "None": "None"
+    }
+
+    display_val_preset = tk.StringVar(value={v: k for k, v in preset_options.items()}.get(button_values['profile_preset'].get(), "DEFAULT"))
+
+    def on_select_preset(*args):
+        button_values['profile_preset'].set(preset_options[display_val_preset.get()])
+
+    dropdown(popup_window, current_row, 1, display_val_preset, list(preset_options.keys()))
+    display_val_preset.trace_add("write", on_select_preset)
+
     current_row += 1
 
     #
@@ -150,24 +179,6 @@ def create_settings_layout(frame, button_values):
     ttk.Label(custom_settings_frame, text="setSubpixel").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
     subbox = ttk.Checkbutton(custom_settings_frame, variable=button_values['subpixelBox_val'])
     subbox.grid(row=current_row, column=1, padx=10, pady=10, sticky="w")
-
-    def dropdown(frame, row, col, val, options):
-        combo = ttk.Combobox(frame, textvariable=val, values=options, state="readonly")
-        combo.grid(row=row, column=col, padx=10, pady=10, sticky="w")
-        combo.bind("<MouseWheel>", lambda event: "break")
-        combo.bind("<Button-4>", lambda event: "break")
-        combo.bind("<Button-5>", lambda event: "break")
-
-    def spinbox(frame, row, col, slider, label, range_of_spinbox, is_float=False):
-        if is_float:
-            values = [f"{i / 10:.1f}" for i in range(int(range_of_spinbox[0] * 10), int(range_of_spinbox[1] * 10) + 1)]
-            spinbox = ttk.Spinbox(frame, values=values, textvariable=slider, command=lambda: update_label(slider, label, form="float"))
-        else:
-            spinbox = ttk.Spinbox(frame, from_=range_of_spinbox[0], to=range_of_spinbox[1], textvariable=slider, command=lambda: update_label(slider, label))
-        spinbox.grid(row=row, column=col, padx=10, pady=10, sticky="w")
-        spinbox.bind("<MouseWheel>", lambda event: "break")
-        spinbox.bind("<Button-4>", lambda event: "break")
-        spinbox.bind("<Button-5>", lambda event: "break")
 
     # Add subpixelFractionalBits combobox
     ttk.Label(custom_settings_frame, text="subpixelFractionalBits").grid(row=current_row, column=2, padx=10, pady=10, sticky="w")
