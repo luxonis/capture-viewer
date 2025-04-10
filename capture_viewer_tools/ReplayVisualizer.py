@@ -155,6 +155,7 @@ class ReplayVisualizer:
         button_values['CM_alpha_val'] = tk.IntVar(value=0)
         button_values['CM_beta_val'] = tk.IntVar(value=2)
         button_values['matching_threshold_val'] = tk.IntVar(value=127)
+        button_values['enableCompanding_val'] = tk.BooleanVar(value=False)
 
     def update_button_values(self, new_config, button_values):
         button_values['depth_align'].set(new_config.get('stereo.setDepthAlign', default_config['stereo.setDepthAlign']))
@@ -307,6 +308,7 @@ class ReplayVisualizer:
             config["cfg.costMatching.linearEquationParameters.alpha"] = button_values['CM_alpha_val'].get()
             config["cfg.costMatching.linearEquationParameters.beta"] = button_values['CM_beta_val'].get()
             config["cfg.costMatching.linearEquationParameters.threshold"] = button_values['matching_threshold_val'].get()
+            config["cfg.costMatching.enableCompanding"] = button_values['enableCompanding_val'].get()
 
         return config
 
@@ -444,7 +446,6 @@ class ReplayVisualizer:
         if file_path:
             with open(file_path, 'r') as file:
                 loaded_config = json.load(file)
-                loaded_config = remove_depthai_from_config(loaded_config)  # to make it compatible with buttons
                 self.update_button_values(loaded_config, button_values)
 
     def create_depth_section(self, column_in_main_frame):
