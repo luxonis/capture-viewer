@@ -56,6 +56,9 @@ class ReplayVisualizer:
         self.config_json1 = None
         self.config_json2 = None
 
+        self.loaded_config_name1 = tk.StringVar(value="No config loaded")
+        self.loaded_config_name2 = tk.StringVar(value="No config loaded")
+
         self.last_config = None
 
         self.output_dir = os.path.join(view_info["capture_folder"], "replay_outputs")
@@ -470,6 +473,15 @@ class ReplayVisualizer:
                 loaded_config = json.load(file)
                 self.update_button_values(loaded_config, button_values)
 
+            filename = os.path.basename(file_path)
+
+            if button_values["settings_section_number"] == 1:
+                self.loaded_config_name1.set(f"Loaded: {filename}")
+            elif button_values["settings_section_number"] == 2:
+                self.loaded_config_name2.set(f"Loaded: {filename}")
+            else:
+                raise ValueError("Invalid settings section number")
+
     def create_depth_section(self, column_in_main_frame):
         generated_depth_frame = tk.Frame(self.main_frame)
         generated_depth_frame.grid(row=1, column=column_in_main_frame, padx=5, pady=5, sticky='nsew')
@@ -487,11 +499,14 @@ class ReplayVisualizer:
         if column_in_main_frame == 0:
             pointcloud_button = tk.Button(button_frame, text="Point Cloud", command=lambda: self.on_pointcloud_button(self.pcl_path1, self.config_json1))
             load_config_button = tk.Button(button_frame, text="Load Config", command=lambda: self.on_load_custom_config(self.toplLevel, self.button_values1))
+            config_label = tk.Label(button_frame, textvariable=self.loaded_config_name1)
         else:
             pointcloud_button = tk.Button(button_frame, text="Point Cloud", command=lambda: self.on_pointcloud_button(self.pcl_path2, self.config_json2))
             load_config_button = tk.Button(button_frame, text="Load Config", command=lambda: self.on_load_custom_config(self.toplLevel, self.button_values2))
+            config_label = tk.Label(button_frame, textvariable=self.loaded_config_name2)
         pointcloud_button.grid(row=1, column=2, sticky='ew', padx=10)
         load_config_button.grid(row=2, column=2, sticky='ew', padx=10)
+        config_label.grid(row=3, column=2, sticky='ew', padx=10)
 
         button_frame.rowconfigure((0, 3), weight=1)
         button_frame.columnconfigure(2, weight=1)
