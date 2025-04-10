@@ -216,50 +216,22 @@ class ReplayVisualizer:
             handle_dict(new_config.get('cfg.postProcessing.decimationFilter.decimationMode', default_config['cfg.postProcessing.decimationFilter.decimationMode']), decimation_set_dict, reverse=True)
         )
 
-        button_values['mean_mode_enable'].set(
-            new_config.get('cfg.censusTransform.enableMeanMode', default_config['cfg.censusTransform.enableMeanMode'])
-        )
-        button_values['CT_kernel_val'].set(
-            handle_dict(new_config.get('cfg.censusTransform.kernelSize', default_config['cfg.censusTransform.kernelSize']), CT_kernel_dict, reverse=True)
-        )
-        button_values['CT_threshold_val'].set(
-            new_config.get('cfg.censusTransform.threshold', default_config['cfg.censusTransform.threshold'])
-        )
+        button_values['mean_mode_enable'].set(new_config.get('cfg.censusTransform.enableMeanMode', default_config['cfg.censusTransform.enableMeanMode']))
+        button_values['CT_kernel_val'].set(handle_dict(new_config.get('cfg.censusTransform.kernelSize', default_config['cfg.censusTransform.kernelSize']), CT_kernel_dict, reverse=True))
+        button_values['CT_threshold_val'].set(new_config.get('cfg.censusTransform.threshold', default_config['cfg.censusTransform.threshold']))
 
-        button_values['division_factor_val'].set(
-            new_config.get('cfg.costAggregation.divisionFactor', default_config['cfg.costAggregation.divisionFactor'])
-        )
-        button_values['horizontal_penalty_p1_val'].set(
-            new_config.get('cfg.costAggregation.horizontalPenaltyCostP1', default_config['cfg.costAggregation.horizontalPenaltyCostP1'])
-        )
-        button_values['horizontal_penalty_p2_val'].set(
-            new_config.get('cfg.costAggregation.horizontalPenaltyCostP2', default_config['cfg.costAggregation.horizontalPenaltyCostP2'])
-        )
-        button_values['vertical_penalty_p1_val'].set(
-            new_config.get('cfg.costAggregation.verticalPenaltyCostP1', default_config['cfg.costAggregation.verticalPenaltyCostP1'])
-        )
-        button_values['vertical_penalty_p2_val'].set(
-            new_config.get('cfg.costAggregation.verticalPenaltyCostP2', default_config['cfg.costAggregation.verticalPenaltyCostP2'])
-        )
+        button_values['division_factor_val'].set(new_config.get('cfg.costAggregation.divisionFactor', default_config['cfg.costAggregation.divisionFactor']))
+        button_values['horizontal_penalty_p1_val'].set(new_config.get('cfg.costAggregation.horizontalPenaltyCostP1', default_config['cfg.costAggregation.horizontalPenaltyCostP1']))
+        button_values['horizontal_penalty_p2_val'].set(new_config.get('cfg.costAggregation.horizontalPenaltyCostP2', default_config['cfg.costAggregation.horizontalPenaltyCostP2']))
+        button_values['vertical_penalty_p1_val'].set(new_config.get('cfg.costAggregation.verticalPenaltyCostP1', default_config['cfg.costAggregation.verticalPenaltyCostP1']))
+        button_values['vertical_penalty_p2_val'].set(new_config.get('cfg.costAggregation.verticalPenaltyCostP2', default_config['cfg.costAggregation.verticalPenaltyCostP2']))
 
-        button_values['confidence_threshold_val'].set(
-            new_config.get('cfg.costMatching.confidenceThreshold', default_config['cfg.costMatching.confidenceThreshold'])
-        )
-        button_values['CM_alpha_val'].set(
-            new_config.get('cfg.costMatching.linearEquationParameters.alpha', default_config['cfg.costMatching.linearEquationParameters.alpha'])
-        )
-        button_values['CM_beta_val'].set(
-            new_config.get('cfg.costMatching.linearEquationParameters.beta', default_config['cfg.costMatching.linearEquationParameters.beta'])
-        )
-        button_values['matching_threshold_val'].set(
-            new_config.get('cfg.costMatching.linearEquationParameters.threshold', default_config['cfg.costMatching.linearEquationParameters.threshold'])
-        )
-        button_values['enableCompanding_val'].set(
-            new_config.get('cfg.costMatching.enableCompanding', default_config['cfg.costMatching.enableCompanding'])
-        )
-        button_values['leftRightCheckThreshold_val'].set(
-            new_config.get('cfg.algorithmControl.leftRightCheckThreshold', default_config['cfg.algorithmControl.leftRightCheckThreshold'])
-        )
+        button_values['confidence_threshold_val'].set(new_config.get('cfg.costMatching.confidenceThreshold', default_config['cfg.costMatching.confidenceThreshold']))
+        button_values['CM_alpha_val'].set(new_config.get('cfg.costMatching.linearEquationParameters.alpha', default_config['cfg.costMatching.linearEquationParameters.alpha']))
+        button_values['CM_beta_val'].set(new_config.get('cfg.costMatching.linearEquationParameters.beta', default_config['cfg.costMatching.linearEquationParameters.beta']))
+        button_values['matching_threshold_val'].set(new_config.get('cfg.costMatching.linearEquationParameters.threshold', default_config['cfg.costMatching.linearEquationParameters.threshold']))
+        button_values['enableCompanding_val'].set(new_config.get('cfg.costMatching.enableCompanding', default_config['cfg.costMatching.enableCompanding']))
+        button_values['leftRightCheckThreshold_val'].set(new_config.get('cfg.algorithmControl.leftRightCheckThreshold', default_config['cfg.algorithmControl.leftRightCheckThreshold']))
 
     def convert_current_button_values_to_config(self, button_values, frame):
         config = {}
