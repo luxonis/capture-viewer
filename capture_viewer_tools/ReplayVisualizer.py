@@ -156,6 +156,7 @@ class ReplayVisualizer:
         button_values['CM_beta_val'] = tk.IntVar(value=2)
         button_values['matching_threshold_val'] = tk.IntVar(value=127)
         button_values['enableCompanding_val'] = tk.BooleanVar(value=False)
+        button_values['leftRightCheckThreshold_val'] = tk.IntVar(value=5)
 
     def update_button_values(self, new_config, button_values):
         button_values['depth_align'].set(new_config.get('stereo.setDepthAlign', default_config['stereo.setDepthAlign']))
@@ -309,6 +310,7 @@ class ReplayVisualizer:
             config["cfg.costMatching.linearEquationParameters.beta"] = button_values['CM_beta_val'].get()
             config["cfg.costMatching.linearEquationParameters.threshold"] = button_values['matching_threshold_val'].get()
             config["cfg.costMatching.enableCompanding"] = button_values['enableCompanding_val'].get()
+            config["cfg.algorithmControl.leftRightCheckThreshold"] = button_values['leftRightCheckThreshold_val'].get()
 
         return config
 

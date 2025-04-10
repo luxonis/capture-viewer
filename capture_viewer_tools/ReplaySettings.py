@@ -491,12 +491,15 @@ def create_settings_layout(frame, button_values):
 
     inner_row += 1
 
-
-    print(button_values)
-
-    ttk.Label(advanced_stereo_setting_frame, text="costMatching.enableCompanding").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
+    ttk.Label(advanced_stereo_setting_frame, text="costMatching.enableCompanding").grid(row=inner_row, column=0, padx=10, pady=10, sticky="w")
     companding_checkbox = ttk.Checkbutton(advanced_stereo_setting_frame, variable=button_values['enableCompanding_val'])
-    companding_checkbox.grid(row=current_row, column=1, padx=10, pady=10, sticky="w")
+    companding_checkbox.grid(row=inner_row, column=1, padx=10, pady=10, sticky="w")
+
+    inner_row += 1
+
+    ttk.Label(advanced_stereo_setting_frame, text="algorithmControl.leftRightCheckThreshold").grid(row=inner_row, column=0, padx=10, pady=10, sticky="w")
+    spinbox(advanced_stereo_setting_frame, inner_row, 1, button_values['leftRightCheckThreshold_val'], None, [0, 255])
+    ttk.Label(advanced_stereo_setting_frame, text="(0, 255)").grid(row=inner_row, column=2, padx=10, pady=10, sticky="w")
 
     current_row += 1
 
