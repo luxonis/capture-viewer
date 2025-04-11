@@ -1,0 +1,6 @@
+{
+    "stereo.setConfidenceThreshold": 200,
+    "stereo.setLeftRightCheck": true,
+    "cfg.algorithmControl.leftRightCheckThreshold": 5,
+    "stereo.initialConfig.setMedianFilter": "dai.MedianFilter.KERNEL_5x5"
+}

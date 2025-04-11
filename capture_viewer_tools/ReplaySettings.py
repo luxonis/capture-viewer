@@ -1,5 +1,10 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, Tk, filedialog
+
+import json
+import os
+
+from capture_viewer_tools.convertor_capture2replay_json import handle_dict, decimation_set_dict, CT_kernel_dict
 
 # Define a dictionary of default settings
 default_config = {
@@ -34,8 +39,98 @@ default_config = {
     'cfg.postProcessing.thresholdFilter.maxRange': 65535,
     'cfg.postProcessing.decimationFilter.enable': False,
     'cfg.postProcessing.decimationFilter.decimationFactor': 1,
-    'cfg.postProcessing.decimationFilter.decimationMode': 'dai.StereoDepthConfig.PostProcessing.DecimationFilter.DecimationMode.PIXEL_SKIPPING'
+    'cfg.postProcessing.decimationFilter.decimationMode': 'dai.StereoDepthConfig.PostProcessing.DecimationFilter.DecimationMode.PIXEL_SKIPPING',
+    'cfg.censusTransform.enableMeanMode': True,
+    'cfg.censusTransform.kernelSize': "dai.StereoDepthConfig.CensusTransform.KernelSize.AUTO",
+    'cfg.censusTransform.threshold': 0,
+    'cfg.costAggregation.divisionFactor': 1,
+    'cfg.costAggregation.horizontalPenaltyCostP1': 250,
+    'cfg.costAggregation.horizontalPenaltyCostP2': 500,
+    'cfg.costAggregation.verticalPenaltyCostP1': 250,
+    'cfg.costAggregation.verticalPenaltyCostP2': 500,
+    # 'cfg.costMatching.confidenceThreshold': 245,
+    'stereo.setConfidenceThreshold': 245,
+    'cfg.costMatching.linearEquationParameters.alpha': 0,
+    'cfg.costMatching.linearEquationParameters.beta': 2,
+    'cfg.costMatching.linearEquationParameters.threshold': 127,
+    'cfg.costMatching.enableCompanding': False,
+    'cfg.algorithmControl.leftRightCheckThreshold': 5
 }
+
+
+def update_button_values(new_config, button_values):
+    button_values['depth_align'].set(new_config.get('stereo.setDepthAlign', default_config['stereo.setDepthAlign']))
+    button_values['profile_preset'].set(new_config.get('stereo.setDefaultProfilePreset', default_config['stereo.setDefaultProfilePreset']))
+
+    button_values['rectificationBox_val'].set(new_config.get('stereo.setRectification', True))
+    button_values['LRBox_val'].set(new_config.get('stereo.setLeftRightCheck', default_config['stereo.setLeftRightCheck']))
+    button_values['extendedBox_val'].set(new_config.get('stereo.setExtendedDisparity', default_config['stereo.setExtendedDisparity']))
+    button_values['subpixelBox_val'].set(new_config.get('stereo.setSubpixel', default_config['stereo.setSubpixel']))
+    button_values['fractional_bits_val'].set(new_config.get('stereo.setSubpixelFractionalBits', default_config['stereo.setSubpixelFractionalBits']))
+
+    filter_order_enabled = 'cfg.postProcessing.filteringOrder' in new_config
+    button_values['filtering_order_enable'].set(filter_order_enabled)
+
+    if filter_order_enabled:
+        initial_filter_order = get_filter_order_back(new_config['cfg.postProcessing.filteringOrder'])
+    else:
+        initial_filter_order = get_filter_order_back(default_config['cfg.postProcessing.filteringOrder'])
+
+    button_values['decimation_order'].set(initial_filter_order[0])
+    button_values['median_order'].set(initial_filter_order[1])
+    button_values['speckle_order'].set(initial_filter_order[2])
+    button_values['spatial_order'].set(initial_filter_order[3])
+    button_values['temporal_order'].set(initial_filter_order[4])
+
+    button_values['median_filter_enable'].set(new_config.get('stereo.initialConfig.setMedianFilter', "MedianFilter.MEDIAN_OFF") != "MedianFilter.MEDIAN_OFF")
+    button_values['median_val'].set(new_config.get('stereo.initialConfig.setMedianFilter', default_config['stereo.initialConfig.setMedianFilter']))
+
+    button_values['brightness_filter_enable'].set(new_config.get('cfg.postProcessing.brightnessFilter.enable', False))
+    button_values['min_brightness_slider'].set(new_config.get('cfg.postProcessing.brightnessFilter.minBrightness', default_config['cfg.postProcessing.brightnessFilter.minBrightness']))
+    button_values['max_brightness_slider'].set(new_config.get('cfg.postProcessing.brightnessFilter.maxBrightness', default_config['cfg.postProcessing.brightnessFilter.maxBrightness']))
+
+    button_values['speckle_filter_enable'].set(new_config.get('cfg.postProcessing.speckleFilter.enable', False))
+    button_values['speckle_range_slider'].set(new_config.get('cfg.postProcessing.speckleFilter.speckleRange', default_config['cfg.postProcessing.speckleFilter.speckleRange']))
+    button_values['speckle_difference_threshold'].set(new_config.get('cfg.postProcessing.speckleFilter.differenceThreshold', default_config['cfg.postProcessing.speckleFilter.differenceThreshold']))
+
+    button_values['spatial_filter_enable'].set(new_config.get('cfg.postProcessing.spatialFilter.enable', False))
+    button_values['hole_filling_radius_slider'].set(new_config.get('cfg.postProcessing.spatialFilter.holeFillingRadius', default_config['cfg.postProcessing.spatialFilter.holeFillingRadius']))
+    button_values['num_iterations_slider'].set(new_config.get('cfg.postProcessing.spatialFilter.numIterations', default_config['cfg.postProcessing.spatialFilter.numIterations']))
+    button_values['alpha_slider'].set(new_config.get('cfg.postProcessing.spatialFilter.alpha', default_config['cfg.postProcessing.spatialFilter.alpha']))
+    button_values['delta_slider'].set(new_config.get('cfg.postProcessing.spatialFilter.delta', default_config['cfg.postProcessing.spatialFilter.delta']))
+
+    button_values['temporal_filter_enable'].set(new_config.get('cfg.postProcessing.temporalFilter.enable', False))
+    button_values['temporal_alpha_slider'].set(new_config.get('cfg.postProcessing.temporalFilter.alpha', default_config['cfg.postProcessing.temporalFilter.alpha']))
+    button_values['temporal_delta_slider'].set(new_config.get('cfg.postProcessing.temporalFilter.delta', default_config['cfg.postProcessing.temporalFilter.delta']))
+
+    button_values['threshold_filter_enable'].set('cfg.postProcessing.thresholdFilter.minRange' in new_config)
+    button_values['min_range_val'].set(new_config.get('cfg.postProcessing.thresholdFilter.minRange', default_config['cfg.postProcessing.thresholdFilter.minRange']))
+    button_values['max_range_val'].set(new_config.get('cfg.postProcessing.thresholdFilter.maxRange', default_config['cfg.postProcessing.thresholdFilter.maxRange']))
+
+    button_values['decimation_filter_enable'].set('cfg.postProcessing.decimationFilter.decimationFactor' in new_config)
+    button_values['decimation_factor_val'].set(new_config.get('cfg.postProcessing.decimationFilter.decimationFactor', default_config['cfg.postProcessing.decimationFilter.decimationFactor']))
+    button_values['decimation_mode_val'].set(
+        handle_dict(new_config.get('cfg.postProcessing.decimationFilter.decimationMode', default_config['cfg.postProcessing.decimationFilter.decimationMode']), decimation_set_dict, reverse=True)
+    )
+
+    button_values['mean_mode_enable'].set(new_config.get('cfg.censusTransform.enableMeanMode', default_config['cfg.censusTransform.enableMeanMode']))
+    button_values['CT_kernel_val'].set(handle_dict(new_config.get('cfg.censusTransform.kernelSize', default_config['cfg.censusTransform.kernelSize']), CT_kernel_dict, reverse=True))
+    button_values['CT_threshold_val'].set(new_config.get('cfg.censusTransform.threshold', default_config['cfg.censusTransform.threshold']))
+
+    button_values['division_factor_val'].set(new_config.get('cfg.costAggregation.divisionFactor', default_config['cfg.costAggregation.divisionFactor']))
+    button_values['horizontal_penalty_p1_val'].set(new_config.get('cfg.costAggregation.horizontalPenaltyCostP1', default_config['cfg.costAggregation.horizontalPenaltyCostP1']))
+    button_values['horizontal_penalty_p2_val'].set(new_config.get('cfg.costAggregation.horizontalPenaltyCostP2', default_config['cfg.costAggregation.horizontalPenaltyCostP2']))
+    button_values['vertical_penalty_p1_val'].set(new_config.get('cfg.costAggregation.verticalPenaltyCostP1', default_config['cfg.costAggregation.verticalPenaltyCostP1']))
+    button_values['vertical_penalty_p2_val'].set(new_config.get('cfg.costAggregation.verticalPenaltyCostP2', default_config['cfg.costAggregation.verticalPenaltyCostP2']))
+
+    # button_values['confidence_threshold_val'].set(new_config.get('cfg.costMatching.confidenceThreshold', default_config['cfg.costMatching.confidenceThreshold']))
+    button_values['confidence_threshold_val'].set(new_config.get('stereo.setConfidenceThreshold', default_config['stereo.setConfidenceThreshold']))
+
+    button_values['CM_alpha_val'].set(new_config.get('cfg.costMatching.linearEquationParameters.alpha', default_config['cfg.costMatching.linearEquationParameters.alpha']))
+    button_values['CM_beta_val'].set(new_config.get('cfg.costMatching.linearEquationParameters.beta', default_config['cfg.costMatching.linearEquationParameters.beta']))
+    button_values['matching_threshold_val'].set(new_config.get('cfg.costMatching.linearEquationParameters.threshold', default_config['cfg.costMatching.linearEquationParameters.threshold']))
+    button_values['enableCompanding_val'].set(new_config.get('cfg.costMatching.enableCompanding', default_config['cfg.costMatching.enableCompanding']))
+    button_values['leftRightCheckThreshold_val'].set(new_config.get('cfg.algorithmControl.leftRightCheckThreshold', default_config['cfg.algorithmControl.leftRightCheckThreshold']))
 
 
 def create_settings_layout(frame, button_values):
@@ -80,43 +175,91 @@ def create_settings_layout(frame, button_values):
                 widget.state(['!disabled'] if state else ['disabled'])
         frame.state(['!disabled'] if state else ['disabled'])
 
+    def dropdown(frame, row, col, val, options):
+        combo = ttk.Combobox(frame, textvariable=val, values=options, state="readonly")
+        combo.grid(row=row, column=col, padx=10, pady=10, sticky="w")
+        combo.bind("<MouseWheel>", lambda event: "break")
+        combo.bind("<Button-4>", lambda event: "break")
+        combo.bind("<Button-5>", lambda event: "break")
+
+    def spinbox(frame, row, col, slider, label, range_of_spinbox, is_float=False):
+        if is_float:
+            values = [f"{i / 10:.1f}" for i in range(int(range_of_spinbox[0] * 10), int(range_of_spinbox[1] * 10) + 1)]
+            spinbox = ttk.Spinbox(frame, values=values, textvariable=slider, command=lambda: update_label(slider, label, form="float"))
+        else:
+            spinbox = ttk.Spinbox(frame, from_=range_of_spinbox[0], to=range_of_spinbox[1], textvariable=slider, command=lambda: update_label(slider, label))
+        spinbox.grid(row=row, column=col, padx=10, pady=10, sticky="w")
+        spinbox.bind("<MouseWheel>", lambda event: "break")
+        spinbox.bind("<Button-4>", lambda event: "break")
+        spinbox.bind("<Button-5>", lambda event: "break")
+
+    def on_load_custom_config(parent, button_values):
+        dialog_window = tk.Toplevel(parent)
+        dialog_window.withdraw()
+
+        file_path = filedialog.askopenfilename(parent=dialog_window, filetypes=[("JSON files", "*.json")])
+        dialog_window.destroy()
+
+        if file_path:
+            with open(file_path, 'r') as file:
+                loaded_config = json.load(file)
+                update_button_values(loaded_config, button_values)
+
+            filename = os.path.basename(file_path)
+            button_values['loaded_config'].set(filename)
+
+            if not button_values['custom_settings_val'].get():
+                cust_box.invoke()
+            if not button_values['advanced_settings_enable'].get():
+                advanced_settings_checkbox.invoke()
+
     popup_window = frame
 
     # ----------------------------------------------------------------- BUTTONS -------------------------------------------------------------
 
     current_row = 0
 
-    # Add radiobuttons for left/right choice with a label
+    #
     ttk.Label(popup_window, text="setDepthAlign").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
-    left_radiobutton = ttk.Radiobutton(popup_window, text="Left", variable=button_values['depth_align'], value="dai.CameraBoardSocket.LEFT")
-    right_radiobutton = ttk.Radiobutton(popup_window, text="Right", variable=button_values['depth_align'], value="dai.CameraBoardSocket.RIGHT")
-    rec_left_radiobutton = ttk.Radiobutton(popup_window, text="Rec Left", variable=button_values['depth_align'], value='dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_LEFT')
-    rec_right_radiobutton = ttk.Radiobutton(popup_window, text="Rec Right", variable=button_values['depth_align'], value='dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_RIGHT')
-    rgb_radiobutton = ttk.Radiobutton(popup_window, text="RGB", variable=button_values['depth_align'], value="dai.CameraBoardSocket.CAM_A")
-    left_radiobutton.grid(row=current_row, column=1, padx=10, pady=5, sticky="w")
-    right_radiobutton.grid(row=current_row, column=2, padx=10, pady=5, sticky="w")
-    rec_left_radiobutton.grid(row=current_row, column=3, padx=10, pady=5, sticky="w")
-    rec_right_radiobutton.grid(row=current_row, column=4, padx=10, pady=5, sticky="w")
-    rgb_radiobutton.grid(row=current_row, column=5, padx=10, pady=5, sticky="w")
+    align_options = {
+        "Left": "dai.CameraBoardSocket.LEFT",
+        "Right": "dai.CameraBoardSocket.RIGHT",
+        "Rec Left": "dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_LEFT",
+        "Rec Right": "dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_RIGHT",
+        "RGB": "dai.CameraBoardSocket.CAM_A"
+    }
+    display_val_align = tk.StringVar(value={v: k for k, v in align_options.items()}.get(button_values['depth_align'].get(), "Left"))
+    def on_select_align(*args):
+        button_values['depth_align'].set(align_options[display_val_align.get()])
+    dropdown(popup_window, current_row, 1, display_val_align, list(align_options.keys()))
+    display_val_align.trace_add("write", on_select_align)
+
     current_row += 1
 
     #
     ttk.Label(popup_window, text="setDefaultProfilePreset").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
-    Hdef_radiobutton = ttk.Radiobutton(popup_window, text="DEFAULT", variable=button_values['profile_preset'], value="dai.node.StereoDepth.PresetMode.DEFAULT")
-    HA_radiobutton = ttk.Radiobutton(popup_window, text="HIGH_ACCURACY", variable=button_values['profile_preset'], value="dai.node.StereoDepth.PresetMode.HIGH_ACCURACY")
-    HD_radiobutton = ttk.Radiobutton(popup_window, text="HIGH_DENSITY", variable=button_values['profile_preset'], value="dai.node.StereoDepth.PresetMode.HIGH_DENSITY")
-    HR_radiobutton = ttk.Radiobutton(popup_window, text="ROBOTICS", variable=button_values['profile_preset'], value="dai.node.StereoDepth.PresetMode.ROBOTICS")
-    HDE_radiobutton = ttk.Radiobutton(popup_window, text="HIGH_DETAIL", variable=button_values['profile_preset'], value="dai.node.StereoDepth.PresetMode.HIGH_DETAIL")
-    HF_radiobutton = ttk.Radiobutton(popup_window, text="FACE", variable=button_values['profile_preset'], value="dai.node.StereoDepth.PresetMode.FACE")
-    HN_radiobutton = ttk.Radiobutton(popup_window, text="None", variable=button_values['profile_preset'], value="None")
-    Hdef_radiobutton.grid(row=current_row, column=1, padx=10, pady=5, sticky="w")
-    HR_radiobutton.grid(row=current_row, column=2, padx=10, pady=5, sticky="w")
-    HDE_radiobutton.grid(row=current_row, column=3, padx=10, pady=5, sticky="w")
-    HF_radiobutton.grid(row=current_row, column=4, padx=10, pady=5, sticky="w")
+    preset_options = {
+        "DEFAULT": "dai.node.StereoDepth.PresetMode.DEFAULT",
+        "HIGH_ACCURACY": "dai.node.StereoDepth.PresetMode.HIGH_ACCURACY",
+        "HIGH_DENSITY": "dai.node.StereoDepth.PresetMode.HIGH_DENSITY",
+        "ROBOTICS": "dai.node.StereoDepth.PresetMode.ROBOTICS",
+        "HIGH_DETAIL": "dai.node.StereoDepth.PresetMode.HIGH_DETAIL",
+        "FACE": "dai.node.StereoDepth.PresetMode.FACE",
+        "None": "None"
+    }
+    display_val_preset = tk.StringVar(value={v: k for k, v in preset_options.items()}.get(button_values['profile_preset'].get(), "DEFAULT"))
+    def on_select_preset(*args):
+        button_values['profile_preset'].set(preset_options[display_val_preset.get()])
+    dropdown(popup_window, current_row, 1, display_val_preset, list(preset_options.keys()))
+    display_val_preset.trace_add("write", on_select_preset)
+
     current_row += 1
-    HA_radiobutton.grid(row=current_row, column=1, padx=10, pady=5, sticky="w")
-    HD_radiobutton.grid(row=current_row, column=2, padx=10, pady=5, sticky="w")
-    HN_radiobutton.grid(row=current_row, column=3, padx=10, pady=5, sticky="w")
+
+    load_config_button = tk.Button(popup_window, text="Load Config", command=lambda: on_load_custom_config(popup_window, button_values))
+    load_config_button.grid(row=current_row, column=1, sticky='ew', padx=10)
+    config_label = tk.Label(popup_window, textvariable=button_values['loaded_config'])
+    config_label.grid(row=current_row, column=2, sticky='ew', padx=10)
+
     current_row += 1
 
     #
@@ -150,24 +293,6 @@ def create_settings_layout(frame, button_values):
     ttk.Label(custom_settings_frame, text="setSubpixel").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
     subbox = ttk.Checkbutton(custom_settings_frame, variable=button_values['subpixelBox_val'])
     subbox.grid(row=current_row, column=1, padx=10, pady=10, sticky="w")
-
-    def dropdown(frame, row, col, val, options):
-        combo = ttk.Combobox(frame, textvariable=val, values=options, state="readonly")
-        combo.grid(row=row, column=col, padx=10, pady=10, sticky="w")
-        combo.bind("<MouseWheel>", lambda event: "break")
-        combo.bind("<Button-4>", lambda event: "break")
-        combo.bind("<Button-5>", lambda event: "break")
-
-    def spinbox(frame, row, col, slider, label, range_of_spinbox, is_float=False):
-        if is_float:
-            values = [f"{i / 10:.1f}" for i in range(int(range_of_spinbox[0] * 10), int(range_of_spinbox[1] * 10) + 1)]
-            spinbox = ttk.Spinbox(frame, values=values, textvariable=slider, command=lambda: update_label(slider, label, form="float"))
-        else:
-            spinbox = ttk.Spinbox(frame, from_=range_of_spinbox[0], to=range_of_spinbox[1], textvariable=slider, command=lambda: update_label(slider, label))
-        spinbox.grid(row=row, column=col, padx=10, pady=10, sticky="w")
-        spinbox.bind("<MouseWheel>", lambda event: "break")
-        spinbox.bind("<Button-4>", lambda event: "break")
-        spinbox.bind("<Button-5>", lambda event: "break")
 
     # Add subpixelFractionalBits combobox
     ttk.Label(custom_settings_frame, text="subpixelFractionalBits").grid(row=current_row, column=2, padx=10, pady=10, sticky="w")
@@ -490,6 +615,16 @@ def create_settings_layout(frame, button_values):
     ttk.Label(advanced_stereo_setting_frame, text="(0, 255)").grid(row=inner_row, column=2, padx=10, pady=10, sticky="w")
 
     inner_row += 1
+
+    ttk.Label(advanced_stereo_setting_frame, text="costMatching.enableCompanding").grid(row=inner_row, column=0, padx=10, pady=10, sticky="w")
+    companding_checkbox = ttk.Checkbutton(advanced_stereo_setting_frame, variable=button_values['enableCompanding_val'])
+    companding_checkbox.grid(row=inner_row, column=1, padx=10, pady=10, sticky="w")
+
+    inner_row += 1
+
+    ttk.Label(advanced_stereo_setting_frame, text="algorithmControl.leftRightCheckThreshold").grid(row=inner_row, column=0, padx=10, pady=10, sticky="w")
+    spinbox(advanced_stereo_setting_frame, inner_row, 1, button_values['leftRightCheckThreshold_val'], None, [0, 255])
+    ttk.Label(advanced_stereo_setting_frame, text="(0, 255)").grid(row=inner_row, column=2, padx=10, pady=10, sticky="w")
 
     current_row += 1
 

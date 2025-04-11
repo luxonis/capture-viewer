@@ -1,0 +1,21 @@
+{
+    "stereo.setSubpixel": true,
+    "stereo.setSubpixelFractionalBits": 4,
+    "stereo.setConfidenceThreshold": 200,
+    "stereo.setLeftRightCheck": true,
+    "cfg.algorithmControl.leftRightCheckThreshold": 5,
+    "stereo.enableDistortionCorrection": true,
+    "stereo.setAlphaScaling": 0,
+    "stereo.initialConfig.setMedianFilter": "dai.MedianFilter.KERNEL_7x7",
+    "cfg.censusTransform.kernelSize": "dai.StereoDepthConfig.CensusTransform.KernelSize.KERNEL_7x9",
+    "cfg.censusTransform.kernelMask": "0X5092A28C5152428",
+    "cfg.costMatching.disparityWidth": "dai.StereoDepthConfig.CostMatching.DisparityWidth.DISPARITY_64",
+    "cfg.costMatching.enableCompanding": true,
+    "cfg.costMatching.linearEquationParameters.alpha": 2,
+    "cfg.costMatching.linearEquationParameters.beta": 4,
+    "cfg.costAggregation.horizontalPenaltyCostP1": 100,
+    "cfg.costAggregation.horizontalPenaltyCostP2": 500,
+    "cfg.costAggregation.verticalPenaltyCostP1": 100,
+    "cfg.costAggregation.verticalPenaltyCostP2": 500,
+    "cfg.postProcessing.brightnessFilter.maxBrightness": 255
+}
