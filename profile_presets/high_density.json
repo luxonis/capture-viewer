@@ -2,7 +2,5 @@
     "stereo.setConfidenceThreshold": 245,
     "stereo.setLeftRightCheck": true,
     "cfg.algorithmControl.leftRightCheckThreshold": 10,
-    "stereo.setExtendedDisparity": true,
-    "stereo.setSubpixel": true,
-    "stereo.setSubpixelFractionalBits": 3
+    "stereo.initialConfig.setMedianFilter": "dai.MedianFilter.KERNEL_5x5"
 }
