@@ -1,266 +1,64 @@
 """
-Replay on RVC2 devices
+Replay on RVC2 and RVC4 devices
 """
-import copy
+import datetime
+import more_itertools
 import json
-import signal
+import time
 from typing import Set
 import cv2
 import depthai as dai
 import numpy as np
 import tenacity
+from .timeout import timeout
+from depth.stereo_config import StereoConfig
 
+__is_dai3 = dai.__version__.startswith('3.')
 
-# Custom Stereo pipeline configurations
-STEREO_PRESETS = {
-    # https://github.com/luxonis/depthai-core/blob/main/src/pipeline/node/StereoDepth.cpp
-    'HIGH_DENSITY': {
-        'stereo.setConfidenceThreshold': 245,
-        'stereo.setLeftRightCheck': True,
-        'cfg.algorithmControl.leftRightCheckThreshold': 10,
-    },
-    'HIGH_ACCURACY': {
-        'stereo.setConfidenceThreshold': 200,
-        'stereo.setLeftRightCheck': True,
-        'cfg.algorithmControl.leftRightCheckThreshold': 5,
-    },
-    'default': {
-        'stereo.setLeftRightCheck': True,
-        'stereo.setExtendedDisparity': False,
-        'stereo.setSubpixel': True,
-        'stereo.setSubpixelFractionalBits': 3,
-        'stereo.initialConfig.setMedianFilter': 'dai.MedianFilter.KERNEL_7x7',
-        # HIGH DENSITY preset
-        'stereo.setConfidenceThreshold': 245,
-        'stereo.setLeftRightCheck': True,
-        'cfg.algorithmControl.leftRightCheckThreshold': 10,
-        # end of HIGH DENSITY preset
-        'cfg.postProcessing.filteringOrder': 'dai.StereoDepthConfig.PostProcessing.Filter.DECIMATION,dai.StereoDepthConfig.PostProcessing.Filter.MEDIAN,dai.StereoDepthConfig.PostProcessing.Filter.SPECKLE,dai.StereoDepthConfig.PostProcessing.Filter.SPATIAL,dai.StereoDepthConfig.PostProcessing.Filter.TEMPORAL',
-        'cfg.postProcessing.decimationFilter.decimationFactor': 2,
-        'cfg.postProcessing.decimationFilter.decimationMode': 'dai.StereoDepthConfig.PostProcessing.DecimationFilter.DecimationMode.NON_ZERO_MEAN',
-        'cfg.postProcessing.spatialFilter.enable': True,
-        'cfg.postProcessing.spatialFilter.holeFillingRadius': 1,
-        'cfg.postProcessing.spatialFilter.numIterations': 2,
-        'cfg.postProcessing.spatialFilter.alpha': 0.5,
-        'cfg.postProcessing.spatialFilter.delta': 3,
-        'cfg.postProcessing.temporalFilter.enable': True,
-        'cfg.postProcessing.temporalFilter.alpha': 0.5,
-        'cfg.postProcessing.temporalFilter.delta': 3,
-        'cfg.postProcessing.speckleFilter.enable': True,
-        'cfg.postProcessing.speckleFilter.speckleRange': 200,
-        'cfg.postProcessing.speckleFilter.differenceThreshold': 2,
-        'cfg.postProcessing.thresholdFilter.minRange': 0,
-        'cfg.postProcessing.thresholdFilter.maxRange': 15000,
-    },
-    'face': {
-        'stereo.setLeftRightCheck': True,
-        'stereo.setExtendedDisparity': True,
-        'stereo.setSubpixel': True,
-        'stereo.setSubpixelFractionalBits': 5,
-        'stereo.initialConfig.setMedianFilter': 'dai.MedianFilter.MEDIAN_OFF',
-        # HIGH DENSITY preset
-        'stereo.setConfidenceThreshold': 245,
-        'stereo.setLeftRightCheck': True,
-        'cfg.algorithmControl.leftRightCheckThreshold': 10,
-        # end of HIGH DENSITY preset
-        'cfg.postProcessing.filteringOrder': 'dai.StereoDepthConfig.PostProcessing.Filter.DECIMATION,dai.StereoDepthConfig.PostProcessing.Filter.MEDIAN,dai.StereoDepthConfig.PostProcessing.Filter.SPECKLE,dai.StereoDepthConfig.PostProcessing.Filter.SPATIAL,dai.StereoDepthConfig.PostProcessing.Filter.TEMPORAL',
-        'cfg.postProcessing.decimationFilter.decimationFactor': 2,
-        'cfg.postProcessing.decimationFilter.decimationMode': 'dai.StereoDepthConfig.PostProcessing.DecimationFilter.DecimationMode.NON_ZERO_MEAN',
-        'cfg.postProcessing.spatialFilter.enable': True,
-        'cfg.postProcessing.spatialFilter.holeFillingRadius': 1,
-        'cfg.postProcessing.spatialFilter.numIterations': 1,
-        'cfg.postProcessing.spatialFilter.alpha': 0.5,
-        'cfg.postProcessing.spatialFilter.delta': 3,
-        'cfg.postProcessing.temporalFilter.enable': True,
-        'cfg.postProcessing.temporalFilter.alpha': 0.5,
-        'cfg.postProcessing.temporalFilter.delta': 3,
-        'cfg.postProcessing.speckleFilter.enable': True,
-        'cfg.postProcessing.speckleFilter.speckleRange': 200,
-        'cfg.postProcessing.speckleFilter.differenceThreshold': 2,
-        'cfg.postProcessing.thresholdFilter.minRange': 30,
-        'cfg.postProcessing.thresholdFilter.maxRange': 3000,
-    },
-    'high_detail': {
-        'stereo.setLeftRightCheck': True,
-        'stereo.setExtendedDisparity': True,
-        'stereo.setSubpixel': True,
-        'stereo.setSubpixelFractionalBits': 5,
-        'stereo.initialConfig.setMedianFilter': 'dai.MedianFilter.MEDIAN_OFF',
-        # HIGH ACCURACY preset
-        'stereo.setConfidenceThreshold': 200,
-        'stereo.setLeftRightCheck': True,
-        'cfg.algorithmControl.leftRightCheckThreshold': 5,
-        # end of HIGH ACCURACY preset
-        'cfg.postProcessing.filteringOrder': 'dai.StereoDepthConfig.PostProcessing.Filter.DECIMATION,dai.StereoDepthConfig.PostProcessing.Filter.MEDIAN,dai.StereoDepthConfig.PostProcessing.Filter.SPECKLE,dai.StereoDepthConfig.PostProcessing.Filter.SPATIAL,dai.StereoDepthConfig.PostProcessing.Filter.TEMPORAL',
-        'cfg.postProcessing.decimationFilter.decimationFactor': 1,
-        'cfg.postProcessing.decimationFilter.decimationMode': 'dai.StereoDepthConfig.PostProcessing.DecimationFilter.DecimationMode.NON_ZERO_MEAN',
-        'cfg.postProcessing.spatialFilter.enable': True,
-        'cfg.postProcessing.spatialFilter.holeFillingRadius': 1,
-        'cfg.postProcessing.spatialFilter.numIterations': 3,
-        'cfg.postProcessing.spatialFilter.alpha': 0.7,
-        'cfg.postProcessing.spatialFilter.delta': 3,
-        'cfg.postProcessing.temporalFilter.enable': True,
-        'cfg.postProcessing.temporalFilter.alpha': 0.5,
-        'cfg.postProcessing.temporalFilter.delta': 3,
-        'cfg.postProcessing.speckleFilter.enable': True,
-        'cfg.postProcessing.speckleFilter.speckleRange': 200,
-        'cfg.postProcessing.speckleFilter.differenceThreshold': 2,
-        'cfg.postProcessing.thresholdFilter.minRange': 0,
-        'cfg.postProcessing.thresholdFilter.maxRange': 15000,
-    },
-    'high_fps': {
-        'stereo.setLeftRightCheck': True,
-        'stereo.setExtendedDisparity': False,
-        'stereo.setSubpixel': True,
-        'stereo.setSubpixelFractionalBits': 3,
-        'stereo.initialConfig.setMedianFilter': 'dai.MedianFilter.KERNEL_3x3',
-        # HIGH DENSITY preset
-        'stereo.setConfidenceThreshold': 245,
-        'stereo.setLeftRightCheck': True,
-        'cfg.algorithmControl.leftRightCheckThreshold': 10,
-        # end of HIGH DENSITY preset
-        'cfg.postProcessing.filteringOrder': 'dai.StereoDepthConfig.PostProcessing.Filter.DECIMATION,dai.StereoDepthConfig.PostProcessing.Filter.MEDIAN,dai.StereoDepthConfig.PostProcessing.Filter.SPECKLE,dai.StereoDepthConfig.PostProcessing.Filter.SPATIAL,dai.StereoDepthConfig.PostProcessing.Filter.TEMPORAL',
-        'cfg.postProcessing.decimationFilter.decimationFactor': 2,
-        'cfg.postProcessing.decimationFilter.decimationMode': 'dai.StereoDepthConfig.PostProcessing.DecimationFilter.DecimationMode.NON_ZERO_MEAN',
-        'cfg.postProcessing.spatialFilter.enable': True,
-        'cfg.postProcessing.spatialFilter.holeFillingRadius': 1,
-        'cfg.postProcessing.spatialFilter.numIterations': 2,
-        'cfg.postProcessing.spatialFilter.alpha': 0.5,
-        'cfg.postProcessing.spatialFilter.delta': 3,
-        'cfg.postProcessing.temporalFilter.enable': False,
-        'cfg.postProcessing.temporalFilter.alpha': 0.5,
-        'cfg.postProcessing.temporalFilter.delta': 3,
-        'cfg.postProcessing.speckleFilter.enable': True,
-        'cfg.postProcessing.speckleFilter.speckleRange': 50,
-        'cfg.postProcessing.speckleFilter.differenceThreshold': 2,
-        'cfg.postProcessing.thresholdFilter.minRange': 0,
-        'cfg.postProcessing.thresholdFilter.maxRange': 15000,
-    },
-    'high_accuracy': {
-        'stereo.setLeftRightCheck': True,
-        'stereo.setExtendedDisparity': True,
-        'stereo.setSubpixel': True,
-        'stereo.setSubpixelFractionalBits': 5,
-        'stereo.initialConfig.setMedianFilter': 'dai.MedianFilter.MEDIAN_OFF',
-        # HIGH ACCURACY preset
-        'stereo.setConfidenceThreshold': 200,
-        'stereo.setLeftRightCheck': True,
-        'cfg.algorithmControl.leftRightCheckThreshold': 5,
-        # end of HIGH ACCURACY preset
-        'cfg.postProcessing.filteringOrder': 'dai.StereoDepthConfig.PostProcessing.Filter.DECIMATION,dai.StereoDepthConfig.PostProcessing.Filter.MEDIAN,dai.StereoDepthConfig.PostProcessing.Filter.SPECKLE,dai.StereoDepthConfig.PostProcessing.Filter.SPATIAL,dai.StereoDepthConfig.PostProcessing.Filter.TEMPORAL',
-        'cfg.postProcessing.decimationFilter.decimationFactor': 2,
-        'cfg.postProcessing.decimationFilter.decimationMode': 'dai.StereoDepthConfig.PostProcessing.DecimationFilter.DecimationMode.NON_ZERO_MEAN',
-        'cfg.postProcessing.spatialFilter.enable': True,
-        'cfg.postProcessing.spatialFilter.holeFillingRadius': 1,
-        'cfg.postProcessing.spatialFilter.numIterations': 3,
-        'cfg.postProcessing.spatialFilter.alpha': 0.5,
-        'cfg.postProcessing.spatialFilter.delta': 3,
-        'cfg.postProcessing.temporalFilter.enable': True,
-        'cfg.postProcessing.temporalFilter.alpha': 0.5,
-        'cfg.postProcessing.temporalFilter.delta': 3,
-        'cfg.postProcessing.speckleFilter.enable': True,
-        'cfg.postProcessing.speckleFilter.speckleRange': 200,
-        'cfg.postProcessing.speckleFilter.differenceThreshold': 2,
-        'cfg.postProcessing.thresholdFilter.minRange': 0,
-        'cfg.postProcessing.thresholdFilter.maxRange': 15000,
-    },
-    'robotics': {
-        'stereo.setLeftRightCheck': True,
-        'stereo.setExtendedDisparity': False,
-        'stereo.setSubpixel': True,
-        'stereo.setSubpixelFractionalBits': 3,
-        'stereo.initialConfig.setMedianFilter': 'dai.MedianFilter.KERNEL_7x7',
-        # HIGH DENSITY preset
-        'stereo.setConfidenceThreshold': 245,
-        'stereo.setLeftRightCheck': True,
-        'cfg.algorithmControl.leftRightCheckThreshold': 10,
-        # end of HIGH DENSITY preset
-        'cfg.postProcessing.filteringOrder': 'dai.StereoDepthConfig.PostProcessing.Filter.DECIMATION,dai.StereoDepthConfig.PostProcessing.Filter.MEDIAN,dai.StereoDepthConfig.PostProcessing.Filter.SPECKLE,dai.StereoDepthConfig.PostProcessing.Filter.SPATIAL,dai.StereoDepthConfig.PostProcessing.Filter.TEMPORAL',
-        'cfg.postProcessing.decimationFilter.decimationFactor': 2,
-        'cfg.postProcessing.decimationFilter.decimationMode': 'dai.StereoDepthConfig.PostProcessing.DecimationFilter.DecimationMode.NON_ZERO_MEAN',
-        'cfg.postProcessing.spatialFilter.enable': True,
-        'cfg.postProcessing.spatialFilter.holeFillingRadius': 2,
-        'cfg.postProcessing.spatialFilter.numIterations': 1,
-        'cfg.postProcessing.spatialFilter.alpha': 0.5,
-        'cfg.postProcessing.spatialFilter.delta': 20,
-        'cfg.postProcessing.temporalFilter.enable': False,
-        'cfg.postProcessing.temporalFilter.alpha': 0.5,
-        'cfg.postProcessing.temporalFilter.delta': 3,
-        'cfg.postProcessing.speckleFilter.enable': True,
-        'cfg.postProcessing.speckleFilter.speckleRange': 200,
-        'cfg.postProcessing.speckleFilter.differenceThreshold': 2,
-        'cfg.postProcessing.thresholdFilter.minRange': 0,
-        'cfg.postProcessing.thresholdFilter.maxRange': 10000,
-    }
-}
-
-
-def _configure_stereo(stereo: dai.Node, config_json: str):
-    """
-    Given a configuration `config_json` as a json string, configure `dai.node.StereoDepth` by calling its functions and settings its properties.
-    The keys starting with 'stereo.' are applied first, the keys starting with 'cfg.' are applied second.
-    Thus the 'cfg.' keys override the 'stereo.'.
-    """
-    config = json.loads(config_json)
-
+@tenacity.retry(
+        stop=tenacity.stop_after_attempt(7),
+        wait=tenacity.wait_exponential(multiplier=2, min=4, max=20),
+        retry=tenacity.retry_if_exception_type((
+            RuntimeError,
+            ValueError  # Device not in Gate state
+        )),
+        reraise=True)
+def get_device(device_info=None):
+    """Get dai.Device() based on optional device_info, retry 5 times and wait between each retry."""
     try:
-        # Split filtering cfg.postProcessing.filteringOrder if composed of a single string
-        config['cfg.postProcessing.filteringOrder'] = config['cfg.postProcessing.filteringOrder'].split(',')
-    except (KeyError, AttributeError):
-        pass
+        if device_info is None:
+            return dai.Device()
+        else:
+            return dai.Device(device_info)
+    except RuntimeError as e:
+        raise RuntimeError(f'Failed to get device ({device_info}) {e}')
 
-    if 'setDefaultProfilePreset' in config:
-        default_config = copy.deepcopy(STEREO_PRESETS[config['setDefaultProfilePreset']])
-        del config['setDefaultProfilePreset']
-        default_config.update(config)
-        config = default_config
-        print('INFO: Applying preset and possibly overriding it with other specific settings.')
+@timeout(8)
+def _send_images(input_queues, frames, *, ts=None):
+    """
+    Send left, right and rgb images to appropriate pipeline input queues.
 
-    cfg = None
-    # We need to set the stereo params first, then initial config (cfg)
-    for key_prefix in ('stereo.', 'cfg.'):
-        for k, v in config.items():
-            if not k.startswith(key_prefix):
-                continue
-            # print(f'{k} -> {v}')
-            k0, _, kN = k.partition('.')
-            if k0 == 'cfg' and cfg is None:
-                cfg = stereo.initialConfig.get()
-                # workaround for versions 2.28.0.0 and lower
-                if not hasattr(cfg.postProcessing, 'filteringOrder') and 'cfg.postProcessing.filteringOrder' in config:
-                    print('WARNING: Ignoring cfg.postProcessing.filteringOrder settings, since it is not implemented in this version of depthai')
-                    del config['cfg.postProcessing.filteringOrder']
+    Args:
+     - input_queues: mapping from name to input queue, where name is one of 'left', 'right', or 'rgb'
+     - frame: mapping from name to image, where name is one of 'left', 'right', or 'rgb'
+     - ts: optional timestamp to assign to the sent data
+    """
+    if ts is None:
+        ts = dai.Clock.now()
 
-                # print(' - stereo.initialConfig.get()')
-            if isinstance(v, (list, tuple)):
-                v = ','.join(v)
-            try:
-                # print(f' - trying calling {k} as a function')
-                eval(f'{k}({v})')
-                # fn(v)
-            except (TypeError,SyntaxError):  # not callable, try setting it directly
-                # print(f' - trying setting {k} as a variable')
-                # rsetattr(locals()[k0], kN, v)
-                # print(f' - {k}={v}')
-                exec(f'{k}={v}')
-                # print('  => ', rgetattr(locals()[k0], kN))
-    if not cfg is None:
-        stereo.initialConfig.set(cfg)
-
-def _send_images(device, frames):
-    input_queues = {
-        "left": device.getInputQueue("left"),
-        "right": device.getInputQueue("right"),
-        'rgb': device.getInputQueue('rgb'),
-    }
-    ts = dai.Clock.now()
     for name, frame in frames.items():
         h, w, *_ = frame.shape
-        number = {'rgb': int(0), 'left': int(1), 'right': int(2)}[name]
+        number = {'rgb': dai.CameraBoardSocket.CAM_A,
+                  'left': dai.CameraBoardSocket.CAM_B,
+                  'right': dai.CameraBoardSocket.CAM_C}[name]
         img = dai.ImgFrame()
         img.setData(frame.flatten())
         img.setTimestamp(ts)
         img.setWidth(w)
+        try:
+            img.setStride(w)
+        except AttributeError:
+            pass
         img.setHeight(h)
         img.setInstanceNum(number)
         img.setType({
@@ -270,6 +68,17 @@ def _send_images(device, frames):
         }[name])
         input_queues[name].send(img)
 
+def _convert(name, data):
+    """Convert data from xlink to numpy based on name."""
+    if name == 'pcl':
+        return data.getPoints().astype(np.float64)
+    if name == 'disparity_cost_dump':
+        return np.array(data.getData(), dtype=np.uint8)
+    return data.getCvFrame().astype(float)
+
+@timeout(8)
+def _get_data(output_queues):
+    return {name: _convert(name, queue.get()) for name, queue in output_queues.items()}
 
 def replay_depth(depth_on, *args, **kwargs):
     if depth_on == 'device':
@@ -298,38 +107,32 @@ def replay_depth(depth_on, *args, **kwargs):
                 'depth': depth_map,
             }
 
-def replay(frames, *, calib=None, stereo_config:str='', fps:int=30, outputs:Set[str]={'depth',}, timeout_s:int = 2, device_info=None):
-    """
-    Args:
-    - frames: iterable of (left, right[, rgb]) images as numpy arrays
-    - calib: device calibration. If None the currently attached device' calibration is used.
-    - stereo_config: device pipeline configuration
-    - fps: device frames per second
-    - outputs: choose which outputs you want: 'depth', 'rectified_left', 'rectified_right', 'pcl'
-    - timeout_s: raise TimeoutError if getting a single queue item from pipeline takes longer than given time in seconds
-    - device_info: optional depthai.DeviceInfo to use specified device
-    """
-    @tenacity.retry(
-            stop=tenacity.stop_after_attempt(5),
-            wait=tenacity.wait_exponential(multiplier=1, min=4, max=10),
-            retry=tenacity.retry_if_exception_type(RuntimeError),
-            reraise=True)
-    def get_device(device_info=None):
-        """Get any dai.Device(), retry 5 times and wait between each retry."""
-        if device_info is None:
-            return dai.Device()
-        else:
-            return dai.Device(device_info)
 
-    if not outputs:
-        raise ValueError('No output specified')
+def replay(frames, *, calib=None, stereo_config=StereoConfig({}), outputs:Set[str]={'depth',}, device_info=None):
+    replayer = Replay(calib=calib, stereo_config=stereo_config, outputs=outputs)
+    yield from replayer.replay(frames, device_info=device_info)
 
-    with get_device(device_info) as device:
-        pipeline = dai.Pipeline()
+
+class ReplayV2:
+    def __init__(self, calib=None, stereo_config=None, outputs:Set[str]={'depth',}):
+        """
+        Args:
+        - frames: iterable of (left, right[, rgb]) images as numpy arrays
+        - calib: device calibration. If None the currently attached device' calibration is used.
+        - stereo_config: device pipeline configuration
+        - outputs: choose which outputs you want: 'depth', 'rectified_left', 'rectified_right', 'pcl'
+        - timeout_s: raise TimeoutError if getting a single queue item from pipeline takes longer than given time in seconds
+        - device_info: optional depthai.DeviceInfo to use specified device
+        """
+        if not outputs:
+            raise ValueError('No output specified')
+
+        self._pipeline = dai.Pipeline()
 
         # all dependencies of given output
         dependencies = {
             'depth': {},
+            'disparity': {'depth',},
             'rectified_left': {'depth',},
             'rectified_right': {'depth',},
             'pcl': {'depth',},
@@ -340,7 +143,7 @@ def replay(frames, *, calib=None, stereo_config:str='', fps:int=30, outputs:Set[
             all_outputs.update(dependencies[out])
         # print(f'Pipeline dependencies {outputs} -> {all_outputs}')
 
-        # camRgb = pipeline.create(dai.node.ColorCamera)
+        # camRgb = self._pipeline.create(dai.node.ColorCamera)
         # camRgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_800_P)
         # camRgb.setBoardSocket(dai.CameraBoardSocket.CAM_A)
         # camRgb.setIspScale(1, 3) # (1, 3) => (427, 267), (1, 2) => (640, 400)
@@ -350,101 +153,249 @@ def replay(frames, *, calib=None, stereo_config:str='', fps:int=30, outputs:Set[
         # camRgb.setFps(fps)
 
         # Pipeline inputs
-        xin_left = pipeline.create(dai.node.XLinkIn)
+        xin_left = self._pipeline.create(dai.node.XLinkIn)
         xin_left.setStreamName("left")
-        xin_right = pipeline.create(dai.node.XLinkIn)
+        xin_right = self._pipeline.create(dai.node.XLinkIn)
         xin_right.setStreamName("right")
-        xin_rgb = pipeline.create(dai.node.XLinkIn)
-        xin_rgb.setStreamName("rgb")
-        xin_rgb.setMaxDataSize(1920*1080*3)
+        # xin_rgb = self._pipeline.create(dai.node.XLinkIn)
+        # xin_rgb.setStreamName("rgb")
+        # xin_rgb.setMaxDataSize(1920*1080*3)
 
         # Workaround RGB camera to fix depth alignment
-        cam_rgb = pipeline.create(dai.node.ColorCamera)
-        cam_rgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_800_P)
-        cam_rgb.setBoardSocket(dai.CameraBoardSocket.CAM_A)
+        if not stereo_config is None and stereo_config.get('stereo.setDepthAlign', '') == 'dai.CameraBoardSocket.CAM_A':
+            cam_rgb = self._pipeline.create(dai.node.ColorCamera)
+            cam_rgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_1080_P)
+            cam_rgb.setBoardSocket(dai.CameraBoardSocket.CAM_A)
+        # cam_rgb.setIspScale(1, 3)
 
-        xOut = {}
-        xOut['depth'] = pipeline.create(dai.node.XLinkOut)
-        xOut['depth'].setStreamName("depth")
-        stereo = pipeline.create(dai.node.StereoDepth)
+        self._xOut = {}
+        self._xOut['depth'] = self._pipeline.create(dai.node.XLinkOut)
+        self._xOut['depth'].setStreamName("depth")
+        stereo = self._pipeline.create(dai.node.StereoDepth)
 
         xin_left.out.link(stereo.left)
         xin_right.out.link(stereo.right)
-        stereo.depth.link(xOut['depth'].input)
+        stereo.depth.link(self._xOut['depth'].input)
 
-        if stereo_config:
-            _configure_stereo(stereo, stereo_config)
+        if not stereo_config is None:
+            stereo_config.configure_stereo_node(stereo)
 
         # TODO remove hardcoded postprocessing hardware resources
-        stereo.setPostProcessingHardwareResources(3, 3)
+        stereo.setPostProcessingHardwareResources(5, 5)
 
         if 'disparity_cost_dump' in all_outputs:
-            xOut['disparity_cost_dump'] = pipeline.create(dai.node.XLinkOut)
-            xOut['disparity_cost_dump'].setStreamName("disparity_cost_dump")
-            stereo.debugDispCostDump.link(xOut['disparity_cost_dump'].input)
+            self._xOut['disparity_cost_dump'] = self._pipeline.create(dai.node.XLinkOut)
+            self._xOut['disparity_cost_dump'].setStreamName("disparity_cost_dump")
+            stereo.debugDispCostDump.link(self._xOut['disparity_cost_dump'].input)
 
         if 'rectified_left' in all_outputs:
-            xOut['rectified_left'] = pipeline.create(dai.node.XLinkOut)
-            xOut['rectified_left'].setStreamName('rectified_left')
-            stereo.rectifiedLeft.link(xOut['rectified_left'].input)
+            self._xOut['rectified_left'] = self._pipeline.create(dai.node.XLinkOut)
+            self._xOut['rectified_left'].setStreamName('rectified_left')
+            stereo.rectifiedLeft.link(self._xOut['rectified_left'].input)
 
         if 'rectified_right' in all_outputs:
-            xOut['rectified_right'] = pipeline.create(dai.node.XLinkOut)
-            xOut['rectified_right'].setStreamName('rectified_right')
-            stereo.rectifiedRight.link(xOut['rectified_right'].input)
+            self._xOut['rectified_right'] = self._pipeline.create(dai.node.XLinkOut)
+            self._xOut['rectified_right'].setStreamName('rectified_right')
+            stereo.rectifiedRight.link(self._xOut['rectified_right'].input)
 
-        if 'pcl' in outputs:
-            xOut['pcl'] = pipeline.create(dai.node.XLinkOut)
-            xOut['pcl'].setStreamName('pcl')
-            pcl = pipeline.create(dai.node.PointCloud)
+        if 'pcl' in all_outputs:
+            self._xOut['pcl'] = self._pipeline.create(dai.node.XLinkOut)
+            self._xOut['pcl'].setStreamName('pcl')
+            pcl = self._pipeline.create(dai.node.PointCloud)
             stereo.depth.link(pcl.inputDepth)
-            pcl.outputPointCloud.link(xOut['pcl'].input)
+            pcl.outputPointCloud.link(self._xOut['pcl'].input)
+
+        if 'disparity' in all_outputs:
+            self._xOut['disparity'] = self._pipeline.create(dai.node.XLinkOut)
+            self._xOut['disparity'].setStreamName('disparity')
+            stereo.disparity.link(self._xOut['disparity'].input)
 
         if calib is None:
             print('Warning: using device calibration!')
             # calib = device.readCalibration()
         else:
-            pipeline.setCalibrationData(calib)
+            self._pipeline.setCalibrationData(calib)
 
-        device.startPipeline(pipeline)
-        queues = {name: device.getOutputQueue(name, maxSize=4, blocking=False) for name in xOut.keys()}
+        self._pipeline.setXLinkChunkSize(0)  # Increase throughput for large data transfers. Effectively disables xlink chunking - increasing the max fps
 
-        def _convert(name, data):
-            """Convert data from xlink to numpy based on name."""
-            if name == 'pcl':
-                return data.getPoints().astype(np.float64)
-            if name == 'disparity_cost_dump':
-                return np.array(data.getData(), dtype=np.uint8)
-            return data.getCvFrame().astype(float)
+        self._runtime_statistics = {}
+
+
+    def runtime_stats(self, key=None):
+        if not self._runtime_statistics:
+            raise RuntimeError('No statistics, run `replay()` first.')
+        if key is None:
+            return self._runtime_statistics
+        else:
+            return self._runtime_statistics[key]
         
-        # workaround for postProcessing.decimationFilter.factor > 1, where the first returned frame is garbage
-        frame = frames[0]
-        left_frame, right_frame, *_ = frame
-        _send_images(device, {
-            "left": left_frame,
-            "right": right_frame,
-            "rgb": np.stack((left_frame, left_frame, np.zeros_like(left_frame)), axis=-1).astype(np.uint8)
-        })
-        _ = [queue.get() for _, queue in queues.items()]
 
-        # timeout on pipeline not returning results
-        def handler(signum, frame):
-            signame = signal.Signals(signum).name
-            print(f"Timeout error. signal: {signame} ({signum}), frame: {frame}")
-            raise TimeoutError()
+    def replay(self, frames, device_info=None, *, workaround_decimation_filter=True):
+        with get_device(device_info=device_info) as device:
+            device.startPipeline(self._pipeline)
 
-        # signal.signal(signal.SIGALRM, handler)
+            input_queues = {
+                "left": device.getInputQueue("left"),
+                "right": device.getInputQueue("right"),
+                # 'rgb': device.getInputQueue('rgb'),
+            }
+            output_queues = {name: device.getOutputQueue(name, maxSize=4, blocking=False) for name in self._xOut.keys()}
 
-        for frame in frames:
-            if len(frame) == 2:
-                left_frame, right_frame = frame
-                rgb_frame = np.stack((left_frame, left_frame, np.zeros_like(left_frame)), axis=-1).astype(np.uint8)
-            elif len(frame) == 3:
-                left_frame, right_frame, rgb_frame = frame
+            # workaround for postProcessing.decimationFilter.factor > 1, where the first returned frame is garbage
+            # TODO is this workaround still needed?
+            if workaround_decimation_filter:
+                frames = more_itertools.peekable(frames)
+                frame = frames.peek()
+                left_frame, right_frame, *_ = frame
+                _send_images(input_queues, {
+                    "left": left_frame,
+                    "right": right_frame,
+                    # "rgb": np.stack((left_frame, left_frame, np.zeros_like(left_frame)), axis=-1).astype(np.uint8)
+                })
+                _ = [queue.get() for _, queue in output_queues.items()]
+
+            start = time.perf_counter()
+            sent_frames = 0
+            frames_count = 0
+            wait_offset = 3  # send N frames before expecting results from the first
+            for idx, frame in enumerate(frames):
+                frames_count += 1
+                if len(frame) == 2:
+                    left_frame, right_frame = frame
+                    # rgb_frame = np.stack((left_frame, left_frame, np.zeros_like(left_frame)), axis=-1).astype(np.uint8)
+                elif len(frame) == 3:
+                    left_frame, right_frame, rgb_frame = frame
+                else:
+                    raise ValueError(f'Unexpected length of frame {len(frame)}. Expected 2 or 3.')
+                _send_images(input_queues, {"left": left_frame, "right": right_frame})  # , 'rgb': rgb_frame})
+                sent_frames += 1
+                if idx >= wait_offset:
+                    yield _get_data(output_queues)
+                    sent_frames -= 1
+            for _ in range(sent_frames):
+                yield _get_data(output_queues)
+            end = time.perf_counter()
+        self._runtime_statistics = {
+            'spf': (end - start) / frames_count,  # seconds per frame
+            'total_time': end - start,
+        }
+
+
+class ReplayV3:
+    def __init__(self, calib=None, stereo_config={}, outputs:Set[str]={'depth',}):
+        self._calib = calib
+        self._stereo_config = stereo_config
+        self._outputs = outputs
+        self._runtime_statistics = {}
+
+    def runtime_stats(self, key=None):
+        if not self._runtime_statistics:
+            raise RuntimeError('No statistics, run `replay()` first.')
+        if key is None:
+            return self._runtime_statistics
+        else:
+            return self._runtime_statistics[key]
+
+    def replay(self, frames, device_info=None):
+        """
+        Args:
+        - frames: iterable of (left, right[, rgb]) images as numpy arrays
+        - calib: device calibration. If None the currently attached device calibration is used.
+        - stereo_config: device pipeline configuration
+        - fps: device frames per second
+        - timeout_s: raise TimeoutError if getting a single queue item from pipeline takes longer than given time in seconds
+        - outputs: choose which outputs you want: 'depth', 'disparity', 'rectified_left', 'rectified_right'
+        """
+        if not self._outputs:
+            raise ValueError('No output specified')
+
+        with dai.Pipeline(get_device(device_info)) as pipeline:
+            stereo = pipeline.create(dai.node.StereoDepth)
+            mono_left = stereo.left.createInputQueue()
+            mono_right = stereo.right.createInputQueue()
+            out_depth = stereo.depth.createOutputQueue()
+            out_depth.setName('depth')
+            out_q = [out_depth, ]
+
+            # Workaround RGB camera to fix depth alignment
+            if not self._stereo_config is None and self._stereo_config.get('stereo.setDepthAlign', '') == 'dai.CameraBoardSocket.CAM_A':
+                cam_rgb = pipeline.create(dai.node.ColorCamera)
+                cam_rgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_800_P)
+                cam_rgb.setBoardSocket(dai.CameraBoardSocket.CAM_A)
+                # cam_rgb.setIspScale(1, 3)
+
+            if 'disparity' in self._outputs:
+                out_disparity = stereo.disparity.createOutputQueue()
+                out_disparity.setName('disparity')
+                out_q.append(out_disparity)
+
+            if 'rectified_left' in self._outputs:
+                out_rectified_left = stereo.rectifiedLeft.createOutputQueue()
+                out_rectified_left.setName('rectified_left')
+                out_q.append(out_rectified_left)
+
+            if 'rectified_right' in self._outputs:
+                out_rectified_right = stereo.rectifiedRight.createOutputQueue()
+                out_rectified_right.setName('rectified_right')
+                out_q.append(out_rectified_right)
+
+            if 'pcl' in self._outputs:
+                raise NotImplementedError('Generating a pointcloud on the device is not implemented')
+
+            if not self._stereo_config is None:
+                self._stereo_config.configure_stereo_node(stereo)
+
+            if self._calib is None:
+                print('Warning: using device calibration!')
             else:
-                raise ValueError(f'Unexpected length of frame {len(frame)}. Expected 2 or 3.')
-            _send_images(device, {"left": left_frame, "right": right_frame, 'rgb': rgb_frame})
-            # signal.alarm(timeout_s)
-            data = {name: queue.get() for name, queue in queues.items()}
-            # signal.alarm(0)
-            yield {name: _convert(name, datum) for name, datum in data.items()}
+                pipeline.setCalibrationData(self._calib)
+
+            pipeline.start()
+            in_q = {
+                'left': mono_left,
+                'right': mono_right
+            }
+
+            output_queues = {q.getName(): q for q in out_q}
+
+            timestamp_ms = 0  # needed for sync stage in Stereo node
+            frame_interval_ms = 50
+            start = time.perf_counter()
+            frames_count = 0
+            sent_frames = 0
+            wait_offset = 3  # send N frames before expecting results from the first
+            for idx, frame in enumerate(frames):
+                frames_count += 1
+                if len(frame) == 2:
+                    left_frame, right_frame = frame
+                    rgb_frame = np.stack((left_frame, left_frame, np.zeros_like(left_frame)), axis=-1).astype(np.uint8)
+                elif len(frame) == 3:
+                    left_frame, right_frame, rgb_frame = frame
+                else:
+                    raise ValueError(f'Unexpected length of frame {len(frame)}. Expected 2 or 3.')
+                tstamp = datetime.timedelta(seconds = timestamp_ms // 1000,
+                            milliseconds = timestamp_ms % 1000)
+                # TODO send RGB as well (, 'rgb': rgb_frame)
+                _send_images(in_q, {'left': left_frame.astype(np.uint8), 'right': right_frame.astype(np.uint8)}, ts=tstamp)
+                sent_frames += 1
+                timestamp_ms += frame_interval_ms
+
+                if not pipeline.isRunning():
+                    raise RuntimeError('Pipeline stopped before all frames were processed')
+                if idx >= wait_offset:
+                    yield _get_data(output_queues)
+                    sent_frames -= 1
+            for _ in range(sent_frames):
+                yield _get_data(output_queues)
+            end = time.perf_counter()
+
+        self._runtime_statistics = {
+            'spf': (end - start) / frames_count,  # seconds per frame
+            'total_time': end - start,
+        }
+
+
+if __is_dai3:
+    Replay = ReplayV3
+else:
+    Replay = ReplayV2

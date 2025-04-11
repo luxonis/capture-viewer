@@ -7,3 +7,6 @@ pyglet==2.0.18
 numba
 tenacity
 screeninfo
+more-itertools
+timeout
+optuna

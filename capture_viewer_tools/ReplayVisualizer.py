@@ -23,6 +23,7 @@ from capture_viewer_tools.convertor_capture2replay_json import settings2config, 
 from capture_viewer_tools.popup_info import show_popup
 
 from depth.replay_depth import replay
+from depth.stereo_config import StereoConfig
 
 class ReplayVisualizer:
     def __init__(self, root, view_info, current_view):
@@ -670,7 +671,7 @@ class ReplayVisualizer:
                 (left, right, color)),
             outputs={'depth', 'pcl'},
             calib=calib,
-            stereo_config=json.dumps(config),
+            stereo_config=StereoConfig(config), # todo
             device_info=self.device_info
         ))
         depth = replayed[1]['depth']
