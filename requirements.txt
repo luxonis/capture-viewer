@@ -8,5 +8,4 @@ numba
 tenacity
 screeninfo
 more-itertools
-timeout
 optuna
