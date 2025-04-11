@@ -4,6 +4,7 @@ import cv2
 import matplotlib.pyplot as plt
 import open3d as o3d
 from capture_viewer_tools.pointcloud import rotate_pointcloud
+from tkinter import *
 
 def extract_calibration_values_old(json_data, width=None, height=None):
     depthSize = (1280, 800)
@@ -287,3 +288,25 @@ def process_pointcloud(pcl, depth, color=None, aligned_to_rgb=False):
 
         pcd.colors = o3d.utility.Vector3dVector(aligned_colors / 255.0)  # Normalize to [0, 1]
     return pcd
+
+def create_depth_range_frame(root, label_text, update_function):
+    default_min, default_max = 0, 15000
+
+    frame = Frame(root)
+
+    Label(frame, text=label_text + " range").pack()
+
+    min_var = StringVar(value=str(default_min))
+    max_var = StringVar(value=str(default_max))
+
+    Entry(frame, textvariable=min_var, width=6).pack(side=LEFT)
+    Entry(frame, textvariable=max_var, width=6).pack(side=LEFT)
+
+    Button(
+        frame, text=f"Colorize\n{label_text}",
+        bg="#FFFF00", activebackground="#FFFF90",
+        command=lambda: update_function(int(min_var.get()), int(max_var.get())
+        )
+    ).pack(side=RIGHT, padx=10)
+
+    return frame

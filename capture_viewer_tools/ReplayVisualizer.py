@@ -22,6 +22,8 @@ from capture_viewer_tools.ReplaySettings import *
 from capture_viewer_tools.convertor_capture2replay_json import settings2config, handle_dict, decimation_set_dict, CT_kernel_dict
 from capture_viewer_tools.popup_info import show_popup
 
+from capture_viewer_tools.capture_tools import create_depth_range_frame
+
 from depth.replay_depth import replay
 from depth.stereo_config import StereoConfig
 
@@ -52,6 +54,10 @@ class ReplayVisualizer:
 
         self.generated_depth_image1 = None
         self.generated_depth_image2 = None
+
+        self.fixed_depth_range = False
+        self.fixed_depth_range_min = 0
+        self.fixed_depth_range_max = 15000
 
         self.config_json = None
         self.config_json1 = None
@@ -515,6 +521,22 @@ class ReplayVisualizer:
 
         return difference_frame, difference_image
 
+    def update_depth_range(self, min, max):
+        self.fixed_depth_range_max = max
+        self.fixed_depth_range_min = min
+
+        self.fixed_depth_range = True
+
+        self.refresh_generated_depth_or_placeholder(self.generated_depth1, self.generated_depth_image1, "Recolor")
+        self.refresh_generated_depth_or_placeholder(self.generated_depth2, self.generated_depth_image2, "Recolor")
+
+    def create_edits_section(self, collumn_in_main_frame):
+        edits_frame = tk.Frame(self.main_frame)
+        edits_frame.grid(row=2, column=collumn_in_main_frame, padx=5, pady=5, sticky='nsew')
+        depth_frame = create_depth_range_frame(edits_frame, 'Depth', self.update_depth_range)
+        depth_frame.grid(row=0, column=2, sticky='ew', padx=10)
+        return edits_frame
+
     def create_layout(self):
         self.main_frame = tk.Frame(self.toplLevel)
         self.main_frame.grid(row=0, column=0, sticky="nsew")
@@ -533,13 +555,18 @@ class ReplayVisualizer:
         self.generated_json_text1, self.config_frame1, self.config_canvas1 = self.create_config_section(0, "config_frame1")
         self.generated_json_text2, self.config_frame2, self.config_canvas2 = self.create_config_section(1, "config_frame2")
 
+        self.edits_frame = self.create_edits_section(2)
+
         self.bind_scrolling()
 
     def refresh_generated_depth_or_placeholder(self, generated_depth, generated_depth_image, label):
         if generated_depth is None:
             colorized_generated_depth = create_placeholder_frame(self.scaled_original_size, label)
         else:
-            colorized_generated_depth, _, _ = colorize_depth(generated_depth, min_val=self.depth_range_min, max_val=self.depth_range_max, type="depth", label=0)
+            if self.fixed_depth_range:
+                colorized_generated_depth, _, _ = colorize_depth(generated_depth, min_val=self.fixed_depth_range_min, max_val=self.fixed_depth_range_max, type="depth", label=0)
+            else:
+                colorized_generated_depth, _, _ = colorize_depth(generated_depth, min_val=self.depth_range_min, max_val=self.depth_range_max, type="depth", label=0)
         # update generated depth
         resized_generated_depth = cv2.resize(colorized_generated_depth, self.scaled_original_size, interpolation=cv2.INTER_AREA)
 
@@ -671,7 +698,7 @@ class ReplayVisualizer:
                 (left, right, color)),
             outputs={'depth', 'pcl'},
             calib=calib,
-            stereo_config=StereoConfig(config), # todo
+            stereo_config=StereoConfig(config),
             device_info=self.device_info
         ))
         depth = replayed[1]['depth']

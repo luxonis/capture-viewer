@@ -1,7 +1,7 @@
 import argparse
 import re
 
-from capture_viewer_tools.capture_tools import extract_calibration_values
+from capture_viewer_tools.capture_tools import extract_calibration_values, create_depth_range_frame
 from capture_viewer_tools.button_functions import *
 from capture_viewer_tools.popup_info import show_popup
 
@@ -188,34 +188,15 @@ class MainApp():
                              command=lambda: show_popup("Metadata", str(self.view_info["metadata"])))
         info_button.pack(side="left")
 
-        if 'disparity' in self.view_info["types"] or 'neural_disparity' in self.view_info["types"]:
-            label_text = "Disparity"
-        else:
-            label_text = "Depth"
+        # --------------------
 
-        default_min, default_max = 0, 15000
+        def update_depth_colorization(min, max):
+            display_images(root, canvas, self.view_info, self.current_view, min, max)
 
-        depth_frame = Frame(root)
-
-        depth_label = Label(depth_frame, text=label_text + " range")
-        depth_label.pack()
-
-        min_var = StringVar(value=str(default_min))
-        max_var = StringVar(value=str(default_max))
-
-        min_entry = Entry(depth_frame, textvariable=min_var, width=6)
-        max_entry = Entry(depth_frame, textvariable=max_var, width=6)
-
-        min_entry.pack(side=LEFT)
-        max_entry.pack(side=LEFT)
-
-        update_button = Button(root, text=f"Colorize\n{label_text}",
-            bg="#FFFF00", activebackground="#FFFF90", command=lambda: display_images(
-            root, canvas, self.view_info, self.current_view,
-            int(min_var.get()), int(max_var.get())
-        ))
-        update_button.pack(side="right")
+        label_text = "Disparity" if 'disparity' in self.view_info["types"] or 'neural_disparity' in self.view_info["types"] else "Depth"
+        depth_frame = create_depth_range_frame(root, label_text, update_depth_colorization)
         depth_frame.pack(side=RIGHT, padx=10)
+        # ----------
     
         display_images(root, canvas, self.view_info, self.current_view)
     
