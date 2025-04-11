@@ -30,13 +30,12 @@ def count_output_streams(output_streams):
     return stream_names
 
 def parseArguments():
-    # PARSE ARGUMENTS
     parser = argparse.ArgumentParser()
     parser.add_argument("settings_file_path", help="Path to settings JSON")
     parser.add_argument("view_name", help="Name of the capture")
     parser.add_argument("--output", default=root_path_default, help="Custom output folder")
-    parser.add_argument("--autostart", default=-1, type=int, help='Automatically start capturing after given number of seconds (-1 to disable)')
-    parser.add_argument("--devices", default=[], dest="mxids", nargs="+", help="MXIDS or IPs of devices to connect to")
+    parser.add_argument("--autostart", default=-1, type=int, help="Automatically start capturing after given number of seconds (-1 to disable)")
+    parser.add_argument("--devices", default=[], dest="devices", nargs="+", help="MXIDS or IPs of devices to connect to")
     parser.add_argument("--ram", default=2, type=float, help="Maximum RAM to be used while saving, in GB")
 
     args = parser.parse_args()
@@ -44,7 +43,6 @@ def parseArguments():
     view_name = args.view_name
     root_path = args.output
 
-    # SETTINGS loading
     if not os.path.exists(settings_path):
         settings_path_1 = f"settings_jsons/{settings_path}.json"
         settings_path_2 = f"settings_jsons/{settings_path}"
@@ -52,15 +50,19 @@ def parseArguments():
             settings_path = settings_path_1
         elif os.path.exists(settings_path_2):
             settings_path = settings_path_2
-        else: raise FileNotFoundError(f"Settings file '{settings_path}' does not exist.")
+        else:
+            raise FileNotFoundError(f"Settings file '{settings_path}' does not exist.")
 
-    return settings_path, view_name, args.mxids, args.autostart, args.ram, root_path
+    devices = [d.upper() for d in args.devices]
+
+    return settings_path, view_name, devices, args.autostart, args.ram, root_path
 
 def worker(mxid, stack, devices, settings, num, shared_devices, exception_queue):
     try:
         openvino_version = dai.OpenVINO.Version.VERSION_2021_4
         usb2_mode = False
         device_info = dai.DeviceInfo(mxid)
+        print(device_info)
         device = stack.enter_context(dai.Device(openvino_version, device_info, usb2_mode))
 
         shared_devices[mxid] = device
@@ -162,13 +164,14 @@ def visualize_frame(name, frame, timestamp, mxid):
         depth_vis = cv2.putText(depth_vis, f"{timestamp} ms", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
         cv2.imshow(f"{mxid} {name}", depth_vis)
 
-def attempt_connection(mxids, attempts=10):
-    if len(mxids) == 0:
+def attempt_connection(devices, attempts=10):
+    mxids = []
+    if len(devices) == 0:
         for i in range(attempts):
             devices = dai.Device.getAllAvailableDevices()
             if len(devices) > 0:
                 mxids = [dai.Device.getAllAvailableDevices()[0].mxid]  # connect the first one discovered
-                print(f"Found device, MxID: {mxids[0]}")
+                print(f"Found device, MXID: {mxids[0]}")
                 return mxids
             else:
                 print(f"Waiting for devices to become available..., currently available devices: 0")
@@ -177,17 +180,18 @@ def attempt_connection(mxids, attempts=10):
     for attempt in range(attempts):  # try to connect to the correct cameras
         count = 0
         for device in dai.Device.getAllAvailableDevices():
-            if device.mxid in mxids or device.name in mxids:
+            if device.mxid in devices or device.name in devices:
                 count += 1
-                print(f"Found {device.mxid}, count: {count}")
-        if count < len(mxids):
+                print(f"Found {device.mxid} with {device.name}, count: {count}")
+                mxids.append(device.mxid)
+        if count < len(devices):
             print(f"Waiting for devices to become available..., currently available devices: {count}")
             time.sleep(5)
         else:
             return mxids
 
 if __name__ == "__main__":
-    settings_path, view_name, mxids, autostart, ram, root_path = parseArguments()
+    settings_path, view_name, devices, autostart, ram, root_path = parseArguments()
 
     # mxids = ['14442C1091F5D9E700', '14442C10F10AC8D600']
     # mxids = ['1944301031664E1300']
@@ -198,7 +202,7 @@ if __name__ == "__main__":
     # view_name = "name"
 
     with contextlib.ExitStack() as stack:
-        mxids = attempt_connection(mxids)
+        mxids = attempt_connection(devices)
 
         devices, shared_devices, output_folders = {}, {}, {}
         num_captures = {mxid: 0 for mxid in mxids}
