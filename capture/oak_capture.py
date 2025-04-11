@@ -76,7 +76,6 @@ def worker(mxid, stack, devices, settings, num, shared_devices, exception_queue)
             pipeline_output = get_pipeline(settings)
 
         device.startPipeline(pipeline_output["pipeline"])
-        # device.setIrLaserDotProjectorIntensity(1)
 
         # Output queue will be used to get the rgb frames from the output defined above
         if settings['output_settings']['sync']:
@@ -192,14 +191,6 @@ def attempt_connection(devices, attempts=10):
 
 if __name__ == "__main__":
     settings_path, view_name, devices, autostart, ram, root_path = parseArguments()
-
-    # mxids = ['14442C1091F5D9E700', '14442C10F10AC8D600']
-    # mxids = ['1944301031664E1300']
-    # mxids = []
-    # settings_path = '/home/katka/PycharmProjects/capture-viewer/settings_jsons/sr_poe_settings_default.json'
-    # # settings_path = '/home/katka/PycharmProjects/capture-viewer/settings_jsons/default.json'
-    # autostart = -1
-    # view_name = "name"
 
     with contextlib.ExitStack() as stack:
         mxids = attempt_connection(devices)
