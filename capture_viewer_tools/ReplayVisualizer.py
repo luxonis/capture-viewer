@@ -32,12 +32,13 @@ class ReplayVisualizer:
         self.toplLevel = tk.Toplevel(root)
         self.toplLevel.title("REPLAY")
 
-        screen_width, screen_height = get_current_monitor_size(self.toplLevel)
-        self.toplLevel.geometry(f"{screen_width}x{screen_height}")
+        self.screen_width, self.screen_height = get_current_monitor_size(self.toplLevel)
+        print(self.screen_width, self.screen_height)
+        self.toplLevel.geometry(f"{self.screen_width}x{self.screen_height}")
         self.toplLevel.resizable(True, True)
 
-        max_image_width = int(screen_width / 3) - 100
-        max_image_height = int(screen_height / 3) - 100
+        max_image_width = int(self.screen_width / 3) - 100
+        max_image_height = int(self.screen_height / 3) - 100
         self.scaled_original_size = calculate_scaled_dimensions(view_info['depth_size'], max_image_width, max_image_height)
 
         self.view_info = view_info
@@ -359,8 +360,8 @@ class ReplayVisualizer:
         settings_frame_custom = tk.Frame(self.main_frame, name=frame_name)
         settings_frame_custom.grid(row=2, column=collumn_in_main_frame, sticky="nsew")
 
-        settings_frame_custom.grid_rowconfigure(0, weight=1)
-        settings_frame_custom.grid_columnconfigure(0, weight=1, minsize=850)
+        settings_frame_custom.grid_rowconfigure(0, weight=1, minsize=self.screen_height/2)
+        settings_frame_custom.grid_columnconfigure(0, weight=1, minsize=self.screen_width/3)
 
         settings_canvas = tk.Canvas(settings_frame_custom)
         settings_canvas.grid(row=0, column=0, sticky="nsew")
@@ -396,12 +397,15 @@ class ReplayVisualizer:
         return settings_frame_custom, settings_canvas
     def create_config_section(self, collumn_in_main_frame, config_frame_name):
         config_frame = tk.Frame(self.main_frame, name=config_frame_name)
-        config_frame.grid(row=3, column=collumn_in_main_frame, padx=5, pady=5, sticky='nsew')
+        config_frame.grid(row=3, column=collumn_in_main_frame, sticky='nsew')
 
         config_frame.grid_rowconfigure(0, weight=1)
-        config_frame.grid_columnconfigure(0, weight=1, minsize=850)
+        config_frame.grid_columnconfigure(0, weight=1, minsize=self.screen_width/3)
 
-        config_canvas = tk.Canvas(config_frame, height=150) # set max height
+        height = int(self.screen_height/7)
+        width = int(self.screen_width/3)
+
+        config_canvas = tk.Canvas(config_frame, height=height, width=width)
         config_canvas.grid(row=0, column=0, sticky="nsew")
 
         v_scrollbar = tk.Scrollbar(config_frame, orient="vertical", command=config_canvas.yview)
@@ -421,10 +425,8 @@ class ReplayVisualizer:
         generated_json_text = tk.Text(config_json_frame,
                                       bg="white",
                                       fg="black",
-                                      font=("Courier", 8),
-                                      wrap="word",  # Enables text wrapping
-                                      height=20,  # Adjust based on needs
-                                      width=64)  # Adjust width as necessary
+                                      font=("Courier", 12),
+                                      wrap="word") # fix width so it matches
         generated_json_text.insert(tk.END, generated_json_str)
         generated_json_text.config(state=tk.DISABLED)  # Disable editing
         generated_json_text.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
