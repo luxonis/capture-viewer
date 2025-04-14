@@ -1,7 +1,7 @@
 import argparse
 import re
 
-from capture_viewer_tools.capture_tools import extract_calibration_values, create_depth_range_frame
+from capture_viewer_tools.capture_tools import extract_calibration_values, create_depth_range_frame, get_current_monitor_size
 from capture_viewer_tools.button_functions import *
 from capture_viewer_tools.popup_info import show_popup
 
@@ -113,8 +113,8 @@ class MainApp():
             "data": data,
             "metadata": metadata,
             "calib": calib,
-            "canvas_width": canvas_width,
-            "canvas_height": canvas_height,
+            "canvas_width": 0,
+            "canvas_height": 0,
             "depth_size": (width, height),
             "rgb_size": (rgb_width, rgb_height),
             "mono_size": (width, height),
@@ -150,7 +150,16 @@ class MainApp():
             
         root = Tk()
         root.title(f"Capture Viewer: {self.view_info['capture_folder']}")
-        canvas = Canvas(root, width=canvas_width, height=canvas_height, bg="black")
+
+        monitor_width, monitor_height = get_current_monitor_size(root)
+
+        root.geometry(f"{monitor_width}x{monitor_height}")
+        root.resizable(True, True)
+
+        self.view_info["canvas_width"] = monitor_width - monitor_width  * 0.01
+        self.view_info["canvas_height"] = monitor_height - monitor_height * 0.15
+
+        canvas = Canvas(root, width=self.view_info["canvas_width"], height=self.view_info["canvas_height"], bg="black")
         canvas.pack()
     
         prev_button = Button(root, text="<-", bg="orange", activebackground="#FFB84D",

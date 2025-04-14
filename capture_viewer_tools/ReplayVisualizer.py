@@ -31,9 +31,13 @@ class ReplayVisualizer:
     def __init__(self, root, view_info, current_view):
         self.toplLevel = tk.Toplevel(root)
         self.toplLevel.title("REPLAY")
-        self.toplLevel.geometry("2450x1250")
 
-        max_image_width = 840
+        screen_width = root.winfo_screenwidth()
+        screen_height = root.winfo_screenheight()
+        self.toplLevel.geometry(f"{screen_width}x{screen_height}")
+        self.toplLevel.resizable(True, True)
+
+        max_image_width = 840 
         max_image_height = 400
         self.scaled_original_size = calculate_scaled_dimensions(view_info['depth_size'], max_image_width, max_image_height)
 

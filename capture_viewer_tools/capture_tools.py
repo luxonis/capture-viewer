@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import open3d as o3d
 from capture_viewer_tools.pointcloud import rotate_pointcloud
 from tkinter import *
+import tkinter as tk
 
 def extract_calibration_values_old(json_data, width=None, height=None):
     depthSize = (1280, 800)
@@ -307,3 +308,20 @@ def create_depth_range_frame(root, label_text, update_function):
     ).pack(side=RIGHT, padx=10)
 
     return frame
+
+from screeninfo import get_monitors
+
+def get_current_monitor_size(root):
+    root.update_idletasks()
+    win_x = root.winfo_rootx()
+    win_y = root.winfo_rooty()
+
+    for monitor in get_monitors():
+        if (monitor.x <= win_x < monitor.x + monitor.width and
+            monitor.y <= win_y < monitor.y + monitor.height):
+            return monitor.width, monitor.height
+
+    # fallback to primary if not matched
+    primary = get_monitors()[0]
+    return primary.width, primary.height
+
