@@ -368,7 +368,10 @@ class ReplayVisualizer:
         scrollbar = tk.Scrollbar(settings_frame_custom, orient="vertical", command=settings_canvas.yview)
         scrollbar.grid(row=0, column=1, sticky="ns")
 
-        settings_canvas.configure(yscrollcommand=scrollbar.set)
+        scrollbar_h = tk.Scrollbar(settings_frame_custom, orient="horizontal", command=settings_canvas.xview)
+        scrollbar_h.grid(row=1, column=0, sticky="ew")
+
+        settings_canvas.configure(yscrollcommand=scrollbar.set, xscrollcommand=scrollbar_h.set)
 
         content_frame = tk.Frame(settings_canvas)
         initial_config = self.get_initial_config(original_config=None)
@@ -381,7 +384,7 @@ class ReplayVisualizer:
         settings_canvas.config(scrollregion=settings_canvas.bbox("all"))
 
         content_frame2 = tk.Frame(settings_frame_custom)
-        content_frame2.grid(row=1, column=0, sticky="n")
+        content_frame2.grid(row=2, column=0, sticky="n")
 
         generate_button = tk.Button(content_frame2, text="GENERATE batch", bg="green2", activebackground="green4", command=lambda: self.on_generate_button_keydown(button_values,
                                                                                                                                                                     batch_generation=True,
@@ -517,14 +520,14 @@ class ReplayVisualizer:
 
     def refresh_generated_depth_or_placeholder(self, generated_depth, generated_depth_image, label):
         if generated_depth is None:
-            colorized_generated_depth = create_placeholder_frame(self.scaled_original_size, label)
+            resized_generated_depth = create_placeholder_frame(self.scaled_original_size, label)
         else:
             if self.fixed_depth_range:
                 colorized_generated_depth, _, _ = colorize_depth(generated_depth, min_val=self.fixed_depth_range_min, max_val=self.fixed_depth_range_max, colormap=self.get_colormap(), type="depth", label=0)
             else:
                 colorized_generated_depth, _, _ = colorize_depth(generated_depth, min_val=self.depth_range_min, max_val=self.depth_range_max, colormap=self.get_colormap(), type="depth", label=0)
-        # update generated depth
-        resized_generated_depth = cv2.resize(colorized_generated_depth, self.scaled_original_size, interpolation=cv2.INTER_AREA)
+            # update generated depth
+            resized_generated_depth = cv2.resize(colorized_generated_depth, self.scaled_original_size, interpolation=cv2.INTER_AREA)
 
         tk_image = ImageTk.PhotoImage(image=Image.fromarray(resized_generated_depth))
         generated_depth_image.configure(image=tk_image)
