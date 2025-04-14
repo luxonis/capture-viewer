@@ -221,8 +221,9 @@ def create_placeholder_frame(size, text):
                                 dtype=np.uint8) * 255  # size[1] is height, size[0] is width
     # Set font, scale, and thickness for the text
     font = cv2.FONT_HERSHEY_SIMPLEX
-    font_scale = 1
-    thickness = 2
+    base_scale = size[1] / 300  # Adjust 300 as needed for your preferred sizing
+    font_scale = max(base_scale, 0.3)
+    thickness = max(int(size[1] / 150), 1)
     # Calculate the text size and position
     text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
     text_x = (size[0] - text_size[0]) // 2  # Center the text horizontally
