@@ -58,6 +58,88 @@ default_config = {
 }
 
 
+def inicialize_button_values(current_config, button_values):
+    # ----------------------------------- Initialize the UI elements with default values from current_config -----------------------------------
+    # Initialize tkinter variables, falling back to default_config if a key is missing in current_config
+    button_values['depth_align'] = tk.StringVar(value=current_config.get('stereo.setDepthAlign', default_config['stereo.setDepthAlign']))
+    button_values['profile_preset'] = tk.StringVar(value=current_config.get('stereo.setDefaultProfilePreset', default_config['stereo.setDefaultProfilePreset']))
+
+    button_values['custom_settings_val'] = tk.BooleanVar(value=False)
+
+    button_values['rectificationBox_val'] = tk.BooleanVar(value=current_config.get('stereo.setRectification', True))  # Default to True if not found
+    button_values['LRBox_val'] = tk.BooleanVar(value=current_config.get('stereo.setLeftRightCheck', default_config['stereo.setLeftRightCheck']))
+    button_values['extendedBox_val'] = tk.BooleanVar(value=current_config.get('stereo.setExtendedDisparity', default_config['stereo.setExtendedDisparity']))
+    button_values['subpixelBox_val'] = tk.BooleanVar(value=current_config.get('stereo.setSubpixel', default_config['stereo.setSubpixel']))
+    button_values['fractional_bits_val'] = tk.IntVar(value=current_config.get('stereo.setSubpixelFractionalBits', default_config['stereo.setSubpixelFractionalBits']))
+
+    # FILTERS -----------------------------------------------------------------------------------
+    button_values['filtering_order_enable'] = tk.BooleanVar(value=False)
+    if 'cfg.postProcessing.filteringOrder' in current_config:
+        button_values['initial_filter_order'] = get_filter_order_back(current_config['cfg.postProcessing.filteringOrder'])
+    else:
+        button_values['initial_filter_order'] = get_filter_order_back(default_config['cfg.postProcessing.filteringOrder'])
+
+    button_values['decimation_order'] = tk.IntVar(value=button_values['initial_filter_order'][0])
+    button_values['median_order'] = tk.IntVar(value=button_values['initial_filter_order'][1])
+    button_values['speckle_order'] = tk.IntVar(value=button_values['initial_filter_order'][2])
+    button_values['spatial_order'] = tk.IntVar(value=button_values['initial_filter_order'][3])
+    button_values['temporal_order'] = tk.IntVar(value=button_values['initial_filter_order'][4])
+
+    button_values['median_filter_enable'] = tk.BooleanVar(value=(current_config.get('stereo.initialConfig.setMedianFilter', "dai.MedianFilter.MEDIAN_OFF") != "dai.MedianFilter.MEDIAN_OFF"))
+    button_values['median_val'] = tk.StringVar(value=current_config.get('stereo.initialConfig.setMedianFilter', default_config['stereo.initialConfig.setMedianFilter']))
+
+    # bilateral_filter_enable = tk.BooleanVar(value=current_config.get('cfg.postProcessing.bilateralFilter.enable', False))
+    # bilateral_sigma_val = tk.IntVar(value=current_config.get('cfg.postProcessing.bilateralSigmaValue', default_config['cfg.postProcessing.bilateralSigmaValue']))
+
+    button_values['brightness_filter_enable'] = tk.BooleanVar(value=current_config.get('cfg.postProcessing.brightnessFilter.enable', False))
+    button_values['min_brightness_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.brightnessFilter.minBrightness', default_config['cfg.postProcessing.brightnessFilter.minBrightness']))
+    button_values['max_brightness_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.brightnessFilter.maxBrightness', default_config['cfg.postProcessing.brightnessFilter.maxBrightness']))
+
+    button_values['speckle_filter_enable'] = tk.BooleanVar(value=current_config.get('cfg.postProcessing.speckleFilter.enable', False))
+    button_values['speckle_range_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.speckleFilter.speckleRange', default_config['cfg.postProcessing.speckleFilter.speckleRange']))
+    button_values['speckle_difference_threshold'] = tk.IntVar(value=current_config.get('cfg.postProcessing.speckleFilter.differenceThreshold', default_config['cfg.postProcessing.speckleFilter.differenceThreshold']))
+
+    button_values['spatial_filter_enable'] = tk.BooleanVar(value=current_config.get('cfg.postProcessing.spatialFilter.enable', False))
+    button_values['hole_filling_radius_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.spatialFilter.holeFillingRadius', default_config['cfg.postProcessing.spatialFilter.holeFillingRadius']))
+    button_values['num_iterations_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.spatialFilter.numIterations', default_config['cfg.postProcessing.spatialFilter.numIterations']))
+    button_values['alpha_slider'] = tk.DoubleVar(value=current_config.get('cfg.postProcessing.spatialFilter.alpha', default_config['cfg.postProcessing.spatialFilter.alpha']))
+    button_values['delta_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.spatialFilter.delta', default_config['cfg.postProcessing.spatialFilter.delta']))
+
+    button_values['temporal_filter_enable'] = tk.BooleanVar(value=current_config.get('cfg.postProcessing.temporalFilter.enable', False))
+    button_values['temporal_alpha_slider'] = tk.DoubleVar(value=current_config.get('cfg.postProcessing.temporalFilter.alpha', default_config['cfg.postProcessing.temporalFilter.alpha']))
+    button_values['temporal_delta_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.temporalFilter.delta', default_config['cfg.postProcessing.temporalFilter.delta']))
+
+    button_values['threshold_filter_enable'] = tk.BooleanVar(value=False)
+    button_values['min_range_val'] = tk.IntVar(value=current_config.get('cfg.postProcessing.thresholdFilter.minRange', default_config['cfg.postProcessing.thresholdFilter.minRange']))
+    button_values['max_range_val'] = tk.IntVar(value=current_config.get('cfg.postProcessing.thresholdFilter.maxRange', default_config['cfg.postProcessing.thresholdFilter.maxRange']))
+
+    button_values['decimation_filter_enable'] = tk.BooleanVar(value=(True if (current_config.get('cfg.postProcessing.decimationFilter.decimationFactor', 1) > 1) else False))
+    button_values['decimation_factor_val'] = tk.IntVar(value=current_config.get('cfg.postProcessing.decimationFilter.decimationFactor', default_config['cfg.postProcessing.decimationFilter.decimationFactor']))
+    button_values['decimation_mode_val'] = tk.StringVar(
+        value=handle_dict(current_config.get('cfg.postProcessing.decimationFilter.decimationMode', default_config['cfg.postProcessing.decimationFilter.decimationMode']), decimation_set_dict, reverse=True))
+
+    # ------------------------------------------------------ ADVANCED STEREO SETTINGS -------------------------------------------------------
+    button_values['advanced_settings_enable'] = tk.BooleanVar(value=False)
+
+    button_values['mean_mode_enable'] = tk.BooleanVar(value=default_config['cfg.censusTransform.enableMeanMode'])
+    button_values['CT_kernel_val'] = tk.StringVar(value=handle_dict(default_config['cfg.censusTransform.kernelSize'], CT_kernel_dict, reverse=True))
+    button_values['CT_threshold_val'] = tk.IntVar(value=default_config['cfg.censusTransform.threshold'])
+
+    button_values['division_factor_val'] = tk.IntVar(value=default_config['cfg.costAggregation.divisionFactor'])
+    button_values['horizontal_penalty_p1_val'] = tk.IntVar(value=default_config['cfg.costAggregation.horizontalPenaltyCostP1'])
+    button_values['horizontal_penalty_p2_val'] = tk.IntVar(value=default_config['cfg.costAggregation.horizontalPenaltyCostP2'])
+    button_values['vertical_penalty_p1_val'] = tk.IntVar(value=default_config['cfg.costAggregation.verticalPenaltyCostP1'])
+    button_values['vertical_penalty_p2_val'] = tk.IntVar(value=default_config['cfg.costAggregation.verticalPenaltyCostP2'])
+
+    button_values['confidence_threshold_val'] = tk.IntVar(value=default_config['stereo.setConfidenceThreshold'])
+    button_values['CM_alpha_val'] = tk.IntVar(value=default_config['cfg.costMatching.linearEquationParameters.alpha'])
+    button_values['CM_beta_val'] = tk.IntVar(value=default_config['cfg.costMatching.linearEquationParameters.beta'])
+    button_values['matching_threshold_val'] = tk.IntVar(value=default_config['cfg.costMatching.linearEquationParameters.threshold'])
+    button_values['enableCompanding_val'] = tk.BooleanVar(value=default_config['cfg.costMatching.enableCompanding'])
+    button_values['leftRightCheckThreshold_val'] = tk.IntVar(value=default_config['cfg.algorithmControl.leftRightCheckThreshold'])
+
+    button_values['loaded_config'] = tk.StringVar(value='')
+
 def update_button_values(new_config, button_values):
     button_values['depth_align'].set(new_config.get('stereo.setDepthAlign', default_config['stereo.setDepthAlign']))
     button_values['profile_preset'].set(new_config.get('stereo.setDefaultProfilePreset', default_config['stereo.setDefaultProfilePreset']))

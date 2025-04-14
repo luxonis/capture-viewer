@@ -59,6 +59,8 @@ class ReplayVisualizer:
         self.fixed_depth_range_min = 0
         self.fixed_depth_range_max = 15000
 
+        self.selected_colormap = tk.StringVar(value="JET")
+
         self.config_json = None
         self.config_json1 = None
         self.config_json2 = None
@@ -90,88 +92,6 @@ class ReplayVisualizer:
         else:
             current_config = default_config
         return current_config
-
-    def inicialize_button_values(self, current_config, button_values):
-        # ----------------------------------- Initialize the UI elements with default values from current_config -----------------------------------
-        # Initialize tkinter variables, falling back to default_config if a key is missing in current_config
-        button_values['depth_align'] = tk.StringVar(value=current_config.get('stereo.setDepthAlign', default_config['stereo.setDepthAlign']))
-        button_values['profile_preset'] = tk.StringVar(value=current_config.get('stereo.setDefaultProfilePreset', default_config['stereo.setDefaultProfilePreset']))
-
-        button_values['custom_settings_val'] = tk.BooleanVar(value=False)
-
-        button_values['rectificationBox_val'] = tk.BooleanVar(value=current_config.get('stereo.setRectification', True))  # Default to True if not found
-        button_values['LRBox_val'] = tk.BooleanVar(value=current_config.get('stereo.setLeftRightCheck', default_config['stereo.setLeftRightCheck']))
-        button_values['extendedBox_val'] = tk.BooleanVar(value=current_config.get('stereo.setExtendedDisparity', default_config['stereo.setExtendedDisparity']))
-        button_values['subpixelBox_val'] = tk.BooleanVar(value=current_config.get('stereo.setSubpixel', default_config['stereo.setSubpixel']))
-        button_values['fractional_bits_val'] = tk.IntVar(value=current_config.get('stereo.setSubpixelFractionalBits', default_config['stereo.setSubpixelFractionalBits']))
-
-        # FILTERS -----------------------------------------------------------------------------------
-        button_values['filtering_order_enable'] = tk.BooleanVar(value=False)
-        if 'cfg.postProcessing.filteringOrder' in current_config:
-            button_values['initial_filter_order'] = get_filter_order_back(current_config['cfg.postProcessing.filteringOrder'])
-        else:
-            button_values['initial_filter_order'] = get_filter_order_back(default_config['cfg.postProcessing.filteringOrder'])
-
-        button_values['decimation_order'] = tk.IntVar(value=button_values['initial_filter_order'][0])
-        button_values['median_order'] = tk.IntVar(value=button_values['initial_filter_order'][1])
-        button_values['speckle_order'] = tk.IntVar(value=button_values['initial_filter_order'][2])
-        button_values['spatial_order'] = tk.IntVar(value=button_values['initial_filter_order'][3])
-        button_values['temporal_order'] = tk.IntVar(value=button_values['initial_filter_order'][4])
-
-        button_values['median_filter_enable'] = tk.BooleanVar(value=(current_config.get('stereo.initialConfig.setMedianFilter', "dai.MedianFilter.MEDIAN_OFF") != "dai.MedianFilter.MEDIAN_OFF"))
-        button_values['median_val'] = tk.StringVar(value=current_config.get('stereo.initialConfig.setMedianFilter', default_config['stereo.initialConfig.setMedianFilter']))
-
-        # bilateral_filter_enable = tk.BooleanVar(value=current_config.get('cfg.postProcessing.bilateralFilter.enable', False))
-        # bilateral_sigma_val = tk.IntVar(value=current_config.get('cfg.postProcessing.bilateralSigmaValue', default_config['cfg.postProcessing.bilateralSigmaValue']))
-
-        button_values['brightness_filter_enable'] = tk.BooleanVar(value=current_config.get('cfg.postProcessing.brightnessFilter.enable', False))
-        button_values['min_brightness_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.brightnessFilter.minBrightness', default_config['cfg.postProcessing.brightnessFilter.minBrightness']))
-        button_values['max_brightness_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.brightnessFilter.maxBrightness', default_config['cfg.postProcessing.brightnessFilter.maxBrightness']))
-
-        button_values['speckle_filter_enable'] = tk.BooleanVar(value=current_config.get('cfg.postProcessing.speckleFilter.enable', False))
-        button_values['speckle_range_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.speckleFilter.speckleRange', default_config['cfg.postProcessing.speckleFilter.speckleRange']))
-        button_values['speckle_difference_threshold'] = tk.IntVar(value=current_config.get('cfg.postProcessing.speckleFilter.differenceThreshold', default_config['cfg.postProcessing.speckleFilter.differenceThreshold']))
-
-        button_values['spatial_filter_enable'] = tk.BooleanVar(value=current_config.get('cfg.postProcessing.spatialFilter.enable', False))
-        button_values['hole_filling_radius_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.spatialFilter.holeFillingRadius', default_config['cfg.postProcessing.spatialFilter.holeFillingRadius']))
-        button_values['num_iterations_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.spatialFilter.numIterations', default_config['cfg.postProcessing.spatialFilter.numIterations']))
-        button_values['alpha_slider'] = tk.DoubleVar(value=current_config.get('cfg.postProcessing.spatialFilter.alpha', default_config['cfg.postProcessing.spatialFilter.alpha']))
-        button_values['delta_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.spatialFilter.delta', default_config['cfg.postProcessing.spatialFilter.delta']))
-
-        button_values['temporal_filter_enable'] = tk.BooleanVar(value=current_config.get('cfg.postProcessing.temporalFilter.enable', False))
-        button_values['temporal_alpha_slider'] = tk.DoubleVar(value=current_config.get('cfg.postProcessing.temporalFilter.alpha', default_config['cfg.postProcessing.temporalFilter.alpha']))
-        button_values['temporal_delta_slider'] = tk.IntVar(value=current_config.get('cfg.postProcessing.temporalFilter.delta', default_config['cfg.postProcessing.temporalFilter.delta']))
-
-        button_values['threshold_filter_enable'] = tk.BooleanVar(value=False)
-        button_values['min_range_val'] = tk.IntVar(value=current_config.get('cfg.postProcessing.thresholdFilter.minRange', default_config['cfg.postProcessing.thresholdFilter.minRange']))
-        button_values['max_range_val'] = tk.IntVar(value=current_config.get('cfg.postProcessing.thresholdFilter.maxRange', default_config['cfg.postProcessing.thresholdFilter.maxRange']))
-
-        button_values['decimation_filter_enable'] = tk.BooleanVar(value=(True if (current_config.get('cfg.postProcessing.decimationFilter.decimationFactor', 1) > 1 ) else False))
-        button_values['decimation_factor_val'] = tk.IntVar(value=current_config.get('cfg.postProcessing.decimationFilter.decimationFactor', default_config['cfg.postProcessing.decimationFilter.decimationFactor']))
-        button_values['decimation_mode_val'] = tk.StringVar(
-            value=handle_dict(current_config.get('cfg.postProcessing.decimationFilter.decimationMode', default_config['cfg.postProcessing.decimationFilter.decimationMode']), decimation_set_dict, reverse=True))
-
-        # ------------------------------------------------------ ADVANCED STEREO SETTINGS -------------------------------------------------------
-        button_values['advanced_settings_enable'] = tk.BooleanVar(value=False)
-
-        button_values['mean_mode_enable'] = tk.BooleanVar(value=default_config['cfg.censusTransform.enableMeanMode'])
-        button_values['CT_kernel_val'] = tk.StringVar(value=handle_dict(default_config['cfg.censusTransform.kernelSize'], CT_kernel_dict, reverse=True))
-        button_values['CT_threshold_val'] = tk.IntVar(value=default_config['cfg.censusTransform.threshold'])
-
-        button_values['division_factor_val'] = tk.IntVar(value=default_config['cfg.costAggregation.divisionFactor'])
-        button_values['horizontal_penalty_p1_val'] = tk.IntVar(value=default_config['cfg.costAggregation.horizontalPenaltyCostP1'])
-        button_values['horizontal_penalty_p2_val'] = tk.IntVar(value=default_config['cfg.costAggregation.horizontalPenaltyCostP2'])
-        button_values['vertical_penalty_p1_val'] = tk.IntVar(value=default_config['cfg.costAggregation.verticalPenaltyCostP1'])
-        button_values['vertical_penalty_p2_val'] = tk.IntVar(value=default_config['cfg.costAggregation.verticalPenaltyCostP2'])
-
-        button_values['confidence_threshold_val'] = tk.IntVar(value=default_config['stereo.setConfidenceThreshold'])
-        button_values['CM_alpha_val'] = tk.IntVar(value=default_config['cfg.costMatching.linearEquationParameters.alpha'])
-        button_values['CM_beta_val'] = tk.IntVar(value=default_config['cfg.costMatching.linearEquationParameters.beta'])
-        button_values['matching_threshold_val'] = tk.IntVar(value=default_config['cfg.costMatching.linearEquationParameters.threshold'])
-        button_values['enableCompanding_val'] = tk.BooleanVar(value=default_config['cfg.costMatching.enableCompanding'])
-        button_values['leftRightCheckThreshold_val'] = tk.IntVar(value=default_config['cfg.algorithmControl.leftRightCheckThreshold'])
-
-        button_values['loaded_config'] = tk.StringVar(value='')
 
     def convert_current_button_values_to_config(self, button_values, frame):
         config = {}
@@ -439,7 +359,7 @@ class ReplayVisualizer:
 
         content_frame = tk.Frame(settings_canvas)
         initial_config = self.get_initial_config(original_config=None)
-        self.inicialize_button_values(initial_config, button_values)
+        inicialize_button_values(initial_config, button_values)
         create_settings_layout(content_frame, button_values)
 
         settings_canvas.create_window((0, 0), window=content_frame, anchor="nw")
@@ -534,7 +454,19 @@ class ReplayVisualizer:
         edits_frame = tk.Frame(self.main_frame)
         edits_frame.grid(row=2, column=collumn_in_main_frame, padx=5, pady=5, sticky='nsew')
         depth_frame = create_depth_range_frame(edits_frame, 'Depth', self.update_depth_range)
-        depth_frame.grid(row=0, column=2, sticky='ew', padx=10)
+        depth_frame.grid(row=0, column=0, sticky='ew', padx=10)
+
+        def on_colormap_change(event):
+            self.refresh_generated_depth_or_placeholder(self.generated_depth1, self.generated_depth_image1, "Colormap Change")
+            self.refresh_generated_depth_or_placeholder(self.generated_depth2, self.generated_depth_image2, "Colormap Change")
+            self.refresh_difference_or_placeholder(self.generated_depth1, self.generated_depth2, self.difference_image)
+
+        options = ["JET", "DEEPGREEN", "HSV", "HOT", "OCEAN", "BONE"]
+        colormap_selection_dropdown = ttk.Combobox(edits_frame, textvariable=self.selected_colormap, values=options, state="readonly")
+        colormap_selection_dropdown.grid(row=1, column=0, sticky="nsew")
+
+        colormap_selection_dropdown.bind("<<ComboboxSelected>>", on_colormap_change)
+
         return edits_frame
 
     def create_layout(self):
@@ -559,19 +491,23 @@ class ReplayVisualizer:
 
         self.bind_scrolling()
 
+    def get_colormap(self):
+        colormap_name = f"COLORMAP_{self.selected_colormap.get()}"
+        colormap = getattr(cv2, colormap_name)
+        return colormap
+
     def refresh_generated_depth_or_placeholder(self, generated_depth, generated_depth_image, label):
         if generated_depth is None:
             colorized_generated_depth = create_placeholder_frame(self.scaled_original_size, label)
         else:
             if self.fixed_depth_range:
-                colorized_generated_depth, _, _ = colorize_depth(generated_depth, min_val=self.fixed_depth_range_min, max_val=self.fixed_depth_range_max, type="depth", label=0)
+                colorized_generated_depth, _, _ = colorize_depth(generated_depth, min_val=self.fixed_depth_range_min, max_val=self.fixed_depth_range_max, colormap=self.get_colormap(), type="depth", label=0)
             else:
-                colorized_generated_depth, _, _ = colorize_depth(generated_depth, min_val=self.depth_range_min, max_val=self.depth_range_max, type="depth", label=0)
+                colorized_generated_depth, _, _ = colorize_depth(generated_depth, min_val=self.depth_range_min, max_val=self.depth_range_max, colormap=self.get_colormap(), type="depth", label=0)
         # update generated depth
         resized_generated_depth = cv2.resize(colorized_generated_depth, self.scaled_original_size, interpolation=cv2.INTER_AREA)
 
         tk_image = ImageTk.PhotoImage(image=Image.fromarray(resized_generated_depth))
-
         generated_depth_image.configure(image=tk_image)
         generated_depth_image.image = tk_image
     def refresh_difference_or_placeholder(self, depth1, depth2, difference_image):
@@ -585,7 +521,7 @@ class ReplayVisualizer:
         if difference is None:
             colorized_difference = create_placeholder_frame(self.scaled_original_size, label)
         else:
-            colorized_difference, _, _ = colorize_depth(difference, min_val=self.depth_range_min, max_val=self.depth_range_max, type="depth", label=0)
+            colorized_difference, _, _ = colorize_depth(difference, min_val=self.depth_range_min, max_val=self.depth_range_max, colormap=self.get_colormap(), type="depth", label=0)
 
         resized_difference = cv2.resize(colorized_difference, self.scaled_original_size, interpolation=cv2.INTER_AREA)
 
