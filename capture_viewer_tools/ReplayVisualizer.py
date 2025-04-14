@@ -634,6 +634,11 @@ class ReplayVisualizer:
         print("Generating depth for ONE timestamp")
         left = self.current_view["left"]
         right = self.current_view["right"]
+
+        if len(left.shape) == 3 and len(right.shape) == 3:
+            left = cv2.cvtColor(left, cv2.COLOR_BGR2GRAY)
+            right = cv2.cvtColor(right, cv2.COLOR_BGR2GRAY)
+
         color = self.current_view["rgb"]
         config = self.config_json
         calib = self.view_info["calib"]
@@ -685,9 +690,12 @@ class ReplayVisualizer:
                 frames[timestamp] = {}
                 images = data[timestamp]
                 image_path = images['left']
-                frames[timestamp]['left'] = np.load(image_path)
+                frames[timestamp]['left'] = np.load(image_path), cv2.COLOR_BGR2GRAY
                 image_path = images['right']
-                frames[timestamp]['right'] = np.load(image_path)
+                frames[timestamp]['right'] = np.load(image_path), cv2.COLOR_BGR2GRAY
+                if len(frames[timestamp]['left'].shape) == 3 and len(frames[timestamp]['right'].shape) == 3:
+                    frames[timestamp]['left'] = cv2.cvtColor(frames[timestamp]['left'], cv2.COLOR_BGR2GRAY)
+                    frames[timestamp]['right'] = cv2.cvtColor(frames[timestamp]['right'], cv2.COLOR_BGR2GRAY)
                 if 'rgb' not in images:
                     continue
                 image_path = images['rgb']
@@ -718,7 +726,8 @@ class ReplayVisualizer:
                 tuple(batch_frames),
                 outputs={'depth', 'pcl'},
                 calib=calib,
-                stereo_config=json.dumps(config)
+                stereo_config=StereoConfig(config),
+                device_info=self.device_info
             ))
 
             for i in range(1, len(batch_frames)): # dropping first frame as incorrectly processed
