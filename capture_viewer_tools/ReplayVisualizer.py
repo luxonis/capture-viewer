@@ -483,7 +483,7 @@ class ReplayVisualizer:
             self.refresh_generated_depth_or_placeholder(self.generated_depth2, self.generated_depth_image2, "Colormap Change")
             self.refresh_difference_or_placeholder(self.generated_depth1, self.generated_depth2, self.difference_image)
 
-        options = ["JET", "DEEPGREEN", "HSV", "HOT", "OCEAN", "BONE"]
+        options = ["JET", "DEEPGREEN", "GREYSCALE"]
         colormap_selection_dropdown = ttk.Combobox(edits_frame, textvariable=self.selected_colormap, values=options, state="readonly")
         colormap_selection_dropdown.grid(row=1, column=0, sticky="nsew")
 
@@ -514,6 +514,9 @@ class ReplayVisualizer:
         self.bind_scrolling()
 
     def get_colormap(self):
+        print(self.selected_colormap.get())
+        if self.selected_colormap.get() == "GREYSCALE":
+            return None
         colormap_name = f"COLORMAP_{self.selected_colormap.get()}"
         colormap = getattr(cv2, colormap_name)
         return colormap

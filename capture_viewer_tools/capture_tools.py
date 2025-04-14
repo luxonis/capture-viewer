@@ -143,6 +143,11 @@ def generate_color_scale_with_annotations_v2(range_min, range_max, image_height)
     return scale_image
 
 def colorize_depth(image, type, label=True, min_val=None, max_val=None, colormap=cv2.COLORMAP_JET, color_noise_percent_removal=1):
+    if colormap is None:
+        range_min, range_max = np.percentile(image[image > 0], [0, 100 - color_noise_percent_removal])
+        normalized_image = np.clip(image, range_min, range_max)
+        normalized_image = ((normalized_image - range_min) / (range_max - range_min) * 255).astype(np.uint8)
+        return normalized_image, range_min, range_max
     if type == "depth" or type == "tof_depth":
         if (np.any(image > 0)):
             range_min, range_max = np.percentile(image[image > 0], [0, 100-color_noise_percent_removal])
