@@ -22,7 +22,7 @@ from capture_viewer_tools.ReplaySettings import *
 from capture_viewer_tools.convertor_capture2replay_json import settings2config, handle_dict, decimation_set_dict, CT_kernel_dict
 from capture_viewer_tools.popup_info import show_popup
 
-from capture_viewer_tools.capture_tools import create_depth_range_frame
+from capture_viewer_tools.capture_tools import create_depth_range_frame, get_current_monitor_size
 
 from depth.replay_depth import replay
 from depth.stereo_config import StereoConfig
@@ -32,13 +32,12 @@ class ReplayVisualizer:
         self.toplLevel = tk.Toplevel(root)
         self.toplLevel.title("REPLAY")
 
-        screen_width = root.winfo_screenwidth()
-        screen_height = root.winfo_screenheight()
+        screen_width, screen_height = get_current_monitor_size(self.toplLevel)
         self.toplLevel.geometry(f"{screen_width}x{screen_height}")
         self.toplLevel.resizable(True, True)
 
-        max_image_width = 840 
-        max_image_height = 400
+        max_image_width = int(screen_width / 3) - 100
+        max_image_height = int(screen_height / 3) - 100
         self.scaled_original_size = calculate_scaled_dimensions(view_info['depth_size'], max_image_width, max_image_height)
 
         self.view_info = view_info
