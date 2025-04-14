@@ -68,6 +68,9 @@ class ReplayVisualizer:
         self.loaded_config_name1 = tk.StringVar(value="No config loaded")
         self.loaded_config_name2 = tk.StringVar(value="No config loaded")
 
+        self.depth_resolution1 = tk.StringVar(value="")
+        self.depth_resolution2 = tk.StringVar(value="")
+
         self.last_config = None
 
         self.output_dir = os.path.join(view_info["capture_folder"], "replay_outputs")
@@ -334,9 +337,15 @@ class ReplayVisualizer:
 
         if column_in_main_frame == 0:
             pointcloud_button = tk.Button(button_frame, text="Point Cloud", command=lambda: self.on_pointcloud_button(self.pcl_path1, self.config_json1))
+            depth_resolution = tk.Label(button_frame, textvariable=self.depth_resolution1, font=("Helvetica", 12, "bold"))
         else:
             pointcloud_button = tk.Button(button_frame, text="Point Cloud", command=lambda: self.on_pointcloud_button(self.pcl_path2, self.config_json2))
-        pointcloud_button.grid(row=1, column=2, sticky='ew', padx=10)
+            depth_resolution = tk.Label(button_frame, textvariable=self.depth_resolution2, font=("Helvetica", 12, "bold"))
+
+        depth_text = tk.Label(button_frame, text="Resolution:", font=("Helvetica", 12, "bold"))
+        pointcloud_button.grid(row=2, column=0, sticky='ew')
+        depth_text.grid(row=0, column=0, sticky='w')
+        depth_resolution.grid(row=0, column=1, sticky='w')
 
         button_frame.rowconfigure((0, 3), weight=1)
         button_frame.columnconfigure(2, weight=1)
@@ -449,6 +458,11 @@ class ReplayVisualizer:
 
         self.refresh_generated_depth_or_placeholder(self.generated_depth1, self.generated_depth_image1, "Recolor")
         self.refresh_generated_depth_or_placeholder(self.generated_depth2, self.generated_depth_image2, "Recolor")
+    def update_resolution(self):
+        if self.generated_depth1 is not None:
+            self.depth_resolution1.set(f"{self.generated_depth1.shape}")
+        if self.generated_depth2 is not None:
+            self.depth_resolution2.set(f"{self.generated_depth2.shape}")
 
     def create_edits_section(self, collumn_in_main_frame):
         edits_frame = tk.Frame(self.main_frame)
@@ -546,6 +560,8 @@ class ReplayVisualizer:
 
         self.refresh_json_text(self.generated_json_text1, self.config_json1)
         self.refresh_json_text(self.generated_json_text2, self.config_json2)
+
+        self.update_resolution()
 
 
     def get_or_create_output_folder(self):
