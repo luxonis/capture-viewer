@@ -1,0 +1,10 @@
+{
+    "output_settings": {
+        "rgb": true,
+        "rgb_png": true,
+        "thermal": true
+    },
+
+    "FPS": 30,
+    "num_captures": 20
+}
