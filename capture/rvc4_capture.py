@@ -46,14 +46,17 @@ def initialize_pipeline(pipeline, settings):
         cap.fps.fixed(fps)
         return cam.requestOutput(cap, True)
     queues = {}
+    input_queues = {}
     output_settings = settings["output_settings"]
 
     if output_settings["left"] or output_settings["left_raw"]:
         monoLeft = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_B)
+        input_queues["left_input_control"] = monoLeft.inputControl.createInputQueue()
         monoLeftOut = configure_cam(monoLeft, settings["stereoResolution"]["x"], settings["stereoResolution"]["y"], settings["FPS"])
 
     if output_settings["right"] or output_settings["right_raw"]:
         monoRight = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_C)
+        input_queues["right_input_control"] = monoRight.inputControl.createInputQueue()
         monoRightOut = configure_cam(monoRight, settings["stereoResolution"]["x"], settings["stereoResolution"]["y"], settings["FPS"])
 
     if output_settings["rgb"] or output_settings["rgb_png"]:
@@ -103,7 +106,7 @@ def initialize_pipeline(pipeline, settings):
             queues["rgb"] = colorOut.createOutputQueue()
 
 
-    return pipeline, queues
+    return pipeline, queues, input_queues
 
 def parseArguments():
     # PARSE ARGUMENTS
@@ -132,6 +135,20 @@ def parseArguments():
         else: raise FileNotFoundError(f"Settings file '{settings_path}' does not exist.")
 
     return settings_path, view_name, ip, args.autostart
+
+def controlQueueSend(input_queues, ctrl):
+    for queue in input_queues.values():
+        queue.send(ctrl)
+
+def initialize_mono_control(settings):
+    mono_settings = settings["monoSettings"]
+    ctrl = dai.CameraControl()
+
+    ctrl.setLumaDenoise(mono_settings["luma_denoise"])
+    ctrl.setSharpness(mono_settings["sharpness"])
+    ctrl.setContrast(mono_settings["contrast"])
+
+    return ctrl
 
 if __name__ == "__main__":
     settings_path, view_name, ip, autostart = parseArguments()
@@ -167,9 +184,11 @@ if __name__ == "__main__":
     initialize_capture_time = initial_time + autostart
 
     with dai.Pipeline(device) as pipeline:
-        pipeline, q = initialize_pipeline(pipeline, settings)
+        pipeline, q, input_queues = initialize_pipeline(pipeline, settings)
         pipeline.start()
 
+        control = initialize_mono_control(settings)
+        controlQueueSend(input_queues, control)
 
         if settings['ir']: pipeline.getDefaultDevice().setIrLaserDotProjectorIntensity(settings['ir_value'])
         if settings['flood_light']: pipeline.getDefaultDevice().setIrFloodLightIntensity(settings['flood_light_intensity'])

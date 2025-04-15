@@ -5,6 +5,11 @@
     "flood_light_intensity": 1,
     "stereoResolution": {"x": 1280, "y": 800},
     "rgbResolution": {"x": 640, "y": 480},
+    "monoSettings": {
+        "luma_denoise": false,
+        "sharpness": 2,
+        "contrast": 0
+    },
 
     "output_settings": {
         "left": true,
