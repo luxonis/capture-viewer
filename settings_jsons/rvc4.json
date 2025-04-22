@@ -6,7 +6,7 @@
     "stereoResolution": {"x": 1280, "y": 800},
     "rgbResolution": {"x": 640, "y": 480},
     "monoSettings": {
-        "luma_denoise": false,
+        "luma_denoise": 1,
         "sharpness": 2,
         "contrast": 0
     },
@@ -24,6 +24,6 @@
     "LRcheck": true,
     "extendedDisparity": true,
 
-    "FPS": 30,
+    "FPS": 5,
     "num_captures": 20
 }
