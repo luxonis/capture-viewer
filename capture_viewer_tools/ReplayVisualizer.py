@@ -638,9 +638,9 @@ class ReplayVisualizer:
         left = self.current_view["left"]
         right = self.current_view["right"]
 
-        if len(left.shape) == 3 and len(right.shape) == 3:
-            left = cv2.cvtColor(left, cv2.COLOR_BGR2GRAY)
-            right = cv2.cvtColor(right, cv2.COLOR_BGR2GRAY)
+        # if len(left.shape) == 3 and len(right.shape) == 3:
+        #     left = cv2.cvtColor(left, cv2.COLOR_BGR2GRAY)
+        #     right = cv2.cvtColor(right, cv2.COLOR_BGR2GRAY)
 
         color = self.current_view["rgb"]
         config = self.config_json

@@ -212,17 +212,23 @@ if __name__ == "__main__":
                 msgGrp = q['sync'].get()
                 for name, msg in msgGrp:
                     timestamp = int(msg.getTimestamp().total_seconds() * 1000)
-                    frame = msg.getCvFrame()
+                    cvFrame = msg.getCvFrame()
                     if save:
-                        np.save(f'{output_folders[mxid]}/{name}_{timestamp}.npy', frame)
+                        if name in ['left', 'right']:
+                            if len(cvFrame.shape) == 3:
+                                cvFrame = cv2.cvtColor(cvFrame, cv2.COLOR_BGR2GRAY)
+                        np.save(f'{output_folders[mxid]}/{name}_{timestamp}.npy', cvFrame)
                         num_captures[mxid] += 1
-                    visualize_frame(name, frame, timestamp, mxid)
+                    visualize_frame(name, cvFrame, timestamp, mxid)
             else:
                 for name in q.keys():
                     frame = q[name].get()
                     cvFrame = frame.getCvFrame()
                     timestamp = int(frame.getTimestamp().total_seconds() * 1000)
                     if save:
+                        if name in ['left', 'right']:
+                            if len(cvFrame.shape) == 3:
+                                cvFrame = cv2.cvtColor(cvFrame, cv2.COLOR_BGR2GRAY)
                         np.save(f'{output_folders[mxid]}/{name}_{timestamp}.npy', cvFrame)
                         num_captures[mxid] += 1
                     visualize_frame(name, cvFrame, timestamp, mxid)
