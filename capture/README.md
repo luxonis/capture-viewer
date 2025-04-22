@@ -96,6 +96,47 @@ Profiles `HIGH_ACCURACY` and `HIGH_DENSITY` are also available but will be remov
 
 These are the basic information about the capture. Settings for the capture can be edited and re-applied using the **Replay** feature 
 in the capture viewer. 
+---
+## RVC4 capture
+To make a capture with OAK4 devices, use `rvc4_capture.py` script.
+
+```bash
+python capture/rvc4_capture.py rvc4 <view_name> --ip <ip>
+```
+
+the available settings for rvc4 are the following:
+```json
+{
+    "ir": true,
+    "ir_value": 1,
+    "flood_light": false,
+    "flood_light_intensity": 1,
+    "stereoResolution": {"x": 1280, "y": 800},
+    "rgbResolution": {"x": 640, "y": 480},
+    "monoSettings": {
+        "luma_denoise": 1,  // levels are 0, 1, 2, 3, 4 but the difference is only between 1 (off) and 2 (on)
+        "sharpness": 2,
+        "contrast": 0
+    },
+
+    "output_settings": {
+        "left": true,
+        "right": true,
+        "rgb": true,
+        "depth": true,
+        "disparity": true,
+        "sync": true
+    },
+
+    "profilePreset": "DEFAULT",
+    "LRcheck": true,
+    "extendedDisparity": true,
+
+    "FPS": 5,
+    "num_captures": 20
+}
+
+```
 
 
 ---
@@ -115,6 +156,18 @@ configure the appropriate fsync settings. Trying to run multiple TOFs without fs
 ```bash
 python capture/oak_capture.py <appropriate_tof_config> <capture_name> --devices <mxids_of_tofs>
 ```
+
+---
+## Thermal capture
+
+To make a capture with thermal devices, use `thermal_capture.py` script.
+
+```bash
+python capture/thermal_capture.py default_thermal <view_name> --device-ip <ip>
+```
+
+Most of the settings are not implemented yet.
+
 
 ---
 
