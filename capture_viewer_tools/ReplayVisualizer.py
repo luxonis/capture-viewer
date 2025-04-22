@@ -24,7 +24,7 @@ from capture_viewer_tools.popup_info import show_popup
 
 from capture_viewer_tools.capture_tools import create_depth_range_frame, get_current_monitor_size
 
-from depth.replay_depth import replay
+from depth.replay_depth import Replay
 from depth.stereo_config import StereoConfig
 
 class ReplayVisualizer:
@@ -90,6 +90,8 @@ class ReplayVisualizer:
         self.depth_generate_thread2 = threading.Thread(target=lambda: None)
 
         self.batch_generation = True
+
+        self.replayer = Replay(device_info=self.device_info, outputs={'depth', 'pcl'}, stereo_config=StereoConfig({}))
 
     def get_initial_config(self, original_config):
         if self.last_config is None and original_config is not None:
@@ -660,14 +662,12 @@ class ReplayVisualizer:
             color = left
 
         # FIXED - sends two frames and takes the second, works with decimation filter
-        replayed = tuple(replay(
+        replayed = tuple(self.replayer.replay(
             (
                 (left, right, color),
                 (left, right, color)),
-            outputs={'depth', 'pcl'},
             calib=calib,
-            stereo_config=StereoConfig(config),
-            device_info=self.device_info
+            stereo_config=StereoConfig(config)
         ))
         depth = replayed[1]['depth']
         pcl = replayed[1]['pcl']
@@ -725,12 +725,10 @@ class ReplayVisualizer:
             batch_frames = ([(frames[timestamps[batch]]["left"], frames[timestamps[batch]]["right"], frames[timestamps[batch]].get("rgb", frames[timestamps[batch]]["left"]))] +
                             [(frames[t]["left"], frames[t]["right"], frames[t].get("rgb", frames[t]["left"]))
                             for t in timestamps[batch:batch + batch_size]])
-            replayed = tuple(replay(
+            replayed = tuple(self.replayer.replay(
                 tuple(batch_frames),
-                outputs={'depth', 'pcl'},
                 calib=calib,
-                stereo_config=StereoConfig(config),
-                device_info=self.device_info
+                stereo_config=StereoConfig(config)
             ))
 
             for i in range(1, len(batch_frames)): # dropping first frame as incorrectly processed

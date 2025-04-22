@@ -6,16 +6,17 @@ import optuna
 
 class StereoConfig:
     '''Class for managing dai.node.StereoDepth node configuration.'''
+
     def __init__(self, cfg={}):
         self._cfg = cfg
-    
+
     @classmethod
     def load(cls, filename):
         '''Load dai.node.StereoDepth node configuration from a file.'''
         with open(filename, 'r') as f:
             cfg = json.load(f)
             return cls(cfg)
-        
+
     @classmethod
     def from_optuna(cls, storage=None, study=None, study_name=None, trial_id=0):
         '''Create StereoConfig from an optuna study.'''
@@ -24,12 +25,12 @@ class StereoConfig:
             study = optuna.load_study(study_name=study_name, storage=storage)
         elif storage is None:
             raise ValueError('Either `storage` or `study` must be given')
-            
+
         cfg = study.trials[trial_id].params
         return cls(cfg)
 
     @classmethod
-    def from_json(cls, params, trial: optuna.Trial):
+    def sample_from_json(cls, params, trial: optuna.Trial):
         """
         Create a config by sampling using from optuna.Trial
         params is an iterable with the following content:
@@ -37,6 +38,7 @@ class StereoConfig:
         TODO: add support for permutations over an list of values
         """
         cfg = {}
+
         def suggest(cfg, trial, key, type, *args, **kwargs):
             cfg[key] = getattr(trial, 'suggest_' + type)(key, *args, **kwargs)
 
@@ -62,11 +64,11 @@ class StereoConfig:
     def from_jsonfile(cls, json_filename, trial: optuna.Trial):
         """Create StereoConfig using configuration from a json file using optuna.Trial to sample from the parameter space."""
         params = json.load(json_filename)
-        return cls.from_json(params, trial)
+        return cls.sample_from_json(params, trial)
 
     def __delitem__(self, key):
         del self._cfg[key]
-    
+
     def update(self, a_cfg: 'StereoConfig'):
         '''Update configuration with another instance of StereoConfig, same as dictionary.update().'''
         self._cfg.update(a_cfg._cfg)
@@ -74,7 +76,7 @@ class StereoConfig:
     def copy(self):
         '''Return deep copy of the StereoConfig.'''
         return StereoConfig(copy.deepcopy(self._cfg))
-    
+
     def save(self, filename):
         '''Save dai.node.StereoDepth node configuration to a file.'''
         with open(filename, 'w') as f:
@@ -82,21 +84,21 @@ class StereoConfig:
 
     def __str__(self):
         return 'StereoConfig:' + pprint.pformat(self._cfg)
-    
+
     def configure_stereo_node(self, stereo):
         '''Apply configuration to a dai.node.StereoDepth node.'''
         config = copy.deepcopy(self._cfg)
-        import depthai as dai
+        import depthai as dai  # This is needed for the eval and exec calls below.
 
         # Typos in previous version of optimize_depth_params
         try:
             config['stereo.initialConfig.costAggregation.p1Config.enableAdaptive'] = config['stereo.initialConfig.costAggregation.p1Config,enableAdaptive']
-            del(config['stereo.initialConfig.costAggregation.p1Config,enableAdaptive'])
+            del (config['stereo.initialConfig.costAggregation.p1Config,enableAdaptive'])
         except KeyError:
             pass
         try:
             config['stereo.initialConfig.costAggregation.p2Config.edgeValue'] = config['stereo.initialConfig.costAggregation.p2Config.edegeValue']
-            del(config['stereo.initialConfig.costAggregation.p2Config.edegeValue'])
+            del (config['stereo.initialConfig.costAggregation.p2Config.edegeValue'])
         except KeyError:
             pass
 
@@ -163,7 +165,7 @@ class StereoConfig:
             raise ValueError('Unused configuration keys:', unused_keys)
 
     def __setitem__(self, key, value):
-          self._cfg[key] = value
+        self._cfg[key] = value
 
     def __getitem__(self, key):
         return self._cfg[key]
