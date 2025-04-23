@@ -692,10 +692,11 @@ class ReplayVisualizer:
             for timestamp in timestamps:
                 frames[timestamp] = {}
                 images = data[timestamp]
+                # todo fix     image_path = images['left'] KeyError: 'left'
                 image_path = images['left']
-                frames[timestamp]['left'] = np.load(image_path), cv2.COLOR_BGR2GRAY
+                frames[timestamp]['left'] = np.load(image_path)
                 image_path = images['right']
-                frames[timestamp]['right'] = np.load(image_path), cv2.COLOR_BGR2GRAY
+                frames[timestamp]['right'] = np.load(image_path)
                 if len(frames[timestamp]['left'].shape) == 3 and len(frames[timestamp]['right'].shape) == 3:
                     frames[timestamp]['left'] = cv2.cvtColor(frames[timestamp]['left'], cv2.COLOR_BGR2GRAY)
                     frames[timestamp]['right'] = cv2.cvtColor(frames[timestamp]['right'], cv2.COLOR_BGR2GRAY)
@@ -761,32 +762,72 @@ class ReplayVisualizer:
         self.last_generated_pcl_path = os.path.join(self.output_folder, f"pcl_{current_timestamp.split('.npy')[0]}.ply")
 
 if __name__ == '__main__':
+    import depthai as dai
+    from oak_capture_show import load_data, extract_timestamps
+
     root = tk.Tk()
     root.title("Main Application")
     root.geometry("300x200")
 
-    # Example data for the depth visualization
-    metadata_settings = {
-        "config2settings": {"example_key": "config_value"},  # Add more example config values as needed
-        "settings": {"parameter1": "value1", "parameter2": "value2"}  # Replace with actual settings values
-    }
+    ip = None
+
+    parent_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    capture_folder = os.path.join(parent_path, "example_data/OAK-D-S2_194430105176F91200_20250423162047")
+
+    selected_types = ['left', 'right', 'depth', 'rgb']
+
+    data, height, width, rgb_width, rgb_height = load_data(capture_folder, selected_types)
+    timestamps = extract_timestamps(data)
+
+    metadata_file = os.path.join(capture_folder, 'metadata.json')
+    if os.path.exists(metadata_file):
+        with open(metadata_file, 'r') as f:
+            metadata = json.load(f)
+
+    calib = ''
+    if os.path.exists(f'{capture_folder}/calib.json'):
+        calib = dai.CalibrationHandler(f'{capture_folder}/calib.json')
 
     view_info = {
-        'depth': np.random.rand(400, 200),  # Original depth array
-        'depth_size': (400, 200),  # Depth image size
-        'metadata': metadata_settings,  # Metadata settings included
-        'capture_folder': '/mnt/nas/calibration/datasets/20240905_office4/20240905_scene_lady/OAK-D-PRO_20240905143124'
+        "capture_folder": capture_folder,
+        "types": selected_types,
+        "timestamps": timestamps,
+        "current_index": 0,
+        "data": data,
+        "metadata": metadata,
+        "calib": calib,
+        "canvas_width": 0,
+        "canvas_height": 0,
+        "depth_size": (width, height),
+        "rgb_size": (rgb_width, rgb_height),
+        "mono_size": (width, height),
+        # "stereoAlign_used_in_capture": check_settings(capture_folder),
+        # "calibration_parameters": datas,
+        "RGB_SOCKET": dai.CameraBoardSocket.CAM_A,
+        "LEFT_SOCKET": dai.CameraBoardSocket.CAM_B,
+        "RIGHT_SOCKET": dai.CameraBoardSocket.CAM_C,
+        "device_connected": False,
+        "device_info": dai.DeviceInfo(ip) if ip else None,
     }
-    # generated_depth = np.random.rand(400, 200)  # Generated depth array
-    generated_depth = None
 
-    # Button to open the depth visualization pop-up window
-    def on_open_popup():
-        repVis = ReplayVisualizer(root, view_info, view_info)
-        repVis.create_layout()
-        repVis.refresh_display(label="Generate Depth")
+    current_view = {
+        "rgb": None,
+        "depth": None,
+        "disparity": None,
+        "left": None,
+        "right": None,
+        "alignSocket": "COLOR"
+    }
 
-    open_popup_button = ttk.Button(root, text="Open Depth Visualization", command=on_open_popup)
-    open_popup_button.pack(pady=50)
+    timestamp = '1441065.npy'
+    for key in selected_types:
+        image_path = os.path.join(capture_folder, f"{key}_{timestamp}")
+        image = np.load(image_path)
+        current_view[key] = image.copy()
+
+    print("initialization...")
+    repVis = ReplayVisualizer(root, view_info, current_view)
+    repVis.create_layout()
+    repVis.refresh_display(label="Generate Depth")
 
     root.mainloop()
