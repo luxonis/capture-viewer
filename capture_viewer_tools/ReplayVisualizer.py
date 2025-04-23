@@ -89,8 +89,6 @@ class ReplayVisualizer:
         self.depth_generate_thread1 = threading.Thread(target=lambda: None)
         self.depth_generate_thread2 = threading.Thread(target=lambda: None)
 
-        self.batch_generation = True
-
         self.replayer = Replay(device_info=self.device_info, outputs={'depth', 'pcl'}, stereo_config=StereoConfig({}))
 
     def get_initial_config(self, original_config):
@@ -203,13 +201,11 @@ class ReplayVisualizer:
 
         return config
 
-    def on_generate_button_keydown(self, button_values, batch_generation=True, frame=None):
+    def on_generate_button_keydown(self, button_values, frame=None):
         if self.depth_generate_thread1.is_alive() or self.depth_generate_thread2.is_alive():
             print("Depth Thread is already running")
             show_popup("Warning", "Depth processing thread is already running, please wait for replay on camera to finish.", frame)
             return
-
-        self.batch_generation = batch_generation
 
         if button_values["settings_section_number"] == 1:
             self.depth_generate_thread1 = threading.Thread(target=self.on_generate, args=(button_values, frame,))
@@ -388,15 +384,9 @@ class ReplayVisualizer:
         content_frame2 = tk.Frame(settings_frame_custom)
         content_frame2.grid(row=2, column=0, sticky="n")
 
-        generate_button = tk.Button(content_frame2, text="GENERATE batch", bg="green2", activebackground="green4", command=lambda: self.on_generate_button_keydown(button_values,
-                                                                                                                                                                    batch_generation=True,
-                                                                                                                                                                    frame=settings_frame_custom))
-        generate_button.grid(row=0, column=0, sticky="nsew")
-
         generate_button2 = tk.Button(content_frame2, text="GENERATE single", bg="SeaGreen1", activebackground="SeaGreen3", command=lambda: self.on_generate_button_keydown(button_values,
-                                                                                                                                                                    batch_generation=False,
                                                                                                                                                                     frame=settings_frame_custom))
-        generate_button2.grid(row=0, column=1, sticky="n")
+        generate_button2.grid(row=0, column=0, sticky="n")
 
 
         return settings_frame_custom, settings_canvas
@@ -686,75 +676,12 @@ class ReplayVisualizer:
 
         print("GENERATED")
         return output_folder
-    def generate_and_save_depth_replay_batch(self):
-        def load_all_frames(data, timestamps):
-            frames = {}
-            for timestamp in timestamps:
-                frames[timestamp] = {}
-                images = data[timestamp]
-                # todo fix     image_path = images['left'] KeyError: 'left'
-                image_path = images['left']
-                frames[timestamp]['left'] = np.load(image_path)
-                image_path = images['right']
-                frames[timestamp]['right'] = np.load(image_path)
-                if len(frames[timestamp]['left'].shape) == 3 and len(frames[timestamp]['right'].shape) == 3:
-                    frames[timestamp]['left'] = cv2.cvtColor(frames[timestamp]['left'], cv2.COLOR_BGR2GRAY)
-                    frames[timestamp]['right'] = cv2.cvtColor(frames[timestamp]['right'], cv2.COLOR_BGR2GRAY)
-                if 'rgb' not in images:
-                    continue
-                image_path = images['rgb']
-                frames[timestamp]['rgb'] = np.load(image_path)
-            return frames
-
-        print("Generating NEW outputs for the whole folder")
-        print("Lading data for generation")
-        timestamps = self.view_info['timestamps']
-        data = self.view_info['data']
-        config = self.config_json
-        calib = self.view_info["calib"]
-        if calib is None: raise ValueError("No calibration provided")
-
-        aligned_to_rgb = self.config_json['stereo.setDepthAlign'] == "dai.CameraBoardSocket.CAM_A"
-
-        batch_size = 100
-
-        for batch in range(0, len(timestamps), batch_size):
-            frames = load_all_frames(data, timestamps[batch:batch + batch_size])
-            print("Processing by batches:", len(frames))
-
-            # sending first frame twice because it used to cause some error when using decimation filter
-            batch_frames = ([(frames[timestamps[batch]]["left"], frames[timestamps[batch]]["right"], frames[timestamps[batch]].get("rgb", frames[timestamps[batch]]["left"]))] +
-                            [(frames[t]["left"], frames[t]["right"], frames[t].get("rgb", frames[t]["left"]))
-                            for t in timestamps[batch:batch + batch_size]])
-            replayed = tuple(self.replayer.replay(
-                tuple(batch_frames),
-                calib=calib,
-                stereo_config=StereoConfig(config)
-            ))
-
-            for i in range(1, len(batch_frames)): # dropping first frame as incorrectly processed
-                depth = replayed[i]['depth']
-                pcl = replayed[i]['pcl']
-                timestamp = timestamps[batch + i - 1] # i starts at one for batch frames to skip double but there is no double for frames
-                pcl = process_pointcloud(pcl, depth, frames[timestamp].get("rgb", None), aligned_to_rgb)
-
-                timestamp = timestamp.split(".npy")[0]
-                np.save(os.path.join(self.output_folder, f"depth_{timestamp}.npy"), depth)
-                colorized_depth, _, _ = colorize_depth(depth, "depth", label=False, min_val=0, max_val=7000)
-                cv2.imwrite(os.path.join(self.output_folder, f"depth_{timestamp}.png"), colorized_depth)
-                o3d.io.write_point_cloud(os.path.join(self.output_folder, f"pcl_{timestamp}.ply"), pcl)
-
-        with open(os.path.join(self.output_folder, f'config.json'), 'w') as f:
-            json.dump(config, f, indent=4)
-
-        print("GENERATED")
 
     def load_or_generate(self):
         self.output_folder = self.get_or_create_output_folder()
 
         if not self.depth_in_replay_outputs:
-            if self.batch_generation: self.generate_and_save_depth_replay_batch()
-            else: self.generate_save_depth_replay_one_frame()
+            self.generate_save_depth_replay_one_frame()
 
         current_timestamp = self.view_info['timestamps'][self.view_info['current_index']]
         print(f"LOADING TIMESTEP: {current_timestamp}")
