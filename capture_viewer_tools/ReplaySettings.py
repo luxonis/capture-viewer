@@ -214,6 +214,12 @@ def update_button_values(new_config, button_values):
     button_values['enableCompanding_val'].set(new_config.get('cfg.costMatching.enableCompanding', default_config['cfg.costMatching.enableCompanding']))
     button_values['leftRightCheckThreshold_val'].set(new_config.get('cfg.algorithmControl.leftRightCheckThreshold', default_config['cfg.algorithmControl.leftRightCheckThreshold']))
 
+def add_trace_to_button_values(button_values, fallback_function):
+    for button, value in button_values.items():
+        try:
+            button_values[button].trace_add("write", fallback_function)
+        except:
+            print("Failed to add trace to button {}".format(button))
 
 def create_settings_layout(frame, button_values):
     def update_label(var, label, form="int"):

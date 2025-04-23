@@ -201,7 +201,7 @@ class ReplayVisualizer:
 
         return config
 
-    def on_generate_button_keydown(self, button_values, frame=None):
+    def generate_replay_depth(self, button_values, frame=None):
         if self.depth_generate_thread1.is_alive() or self.depth_generate_thread2.is_alive():
             print("Depth Thread is already running")
             show_popup("Warning", "Depth processing thread is already running, please wait for replay on camera to finish.", frame)
@@ -374,6 +374,9 @@ class ReplayVisualizer:
         content_frame = tk.Frame(settings_canvas)
         initial_config = self.get_initial_config(original_config=None)
         inicialize_button_values(initial_config, button_values)
+        def fallback_generate_function(*args):
+            self.generate_replay_depth(button_values, frame=settings_frame_custom)
+        add_trace_to_button_values(button_values, fallback_generate_function)
         create_settings_layout(content_frame, button_values)
 
         settings_canvas.create_window((0, 0), window=content_frame, anchor="nw")
@@ -383,10 +386,6 @@ class ReplayVisualizer:
 
         content_frame2 = tk.Frame(settings_frame_custom)
         content_frame2.grid(row=2, column=0, sticky="n")
-
-        generate_button2 = tk.Button(content_frame2, text="GENERATE single", bg="SeaGreen1", activebackground="SeaGreen3", command=lambda: self.on_generate_button_keydown(button_values,
-                                                                                                                                                                    frame=settings_frame_custom))
-        generate_button2.grid(row=0, column=0, sticky="n")
 
 
         return settings_frame_custom, settings_canvas
@@ -625,6 +624,15 @@ class ReplayVisualizer:
             os.makedirs(output_folder, exist_ok=False)
         return output_folder
 
+    def save_depth_pcl(self, depth, pcl, config):
+        np.save(os.path.join(self.output_folder, f"depth_{timestamp}.npy"), depth)
+        colorized_depth, _, _ = colorize_depth(depth, "depth", label=False, color_noise_percent_removal=0)
+        cv2.imwrite(os.path.join(self.output_folder, f"depth_{timestamp}.png"), colorized_depth)
+        o3d.io.write_point_cloud(os.path.join(self.output_folder, f"pcl_{timestamp}.ply"), pcl)
+
+        with open(os.path.join(self.output_folder, f'config.json'), 'w') as f:
+            json.dump(config, f, indent=4)
+
     def generate_save_depth_replay_one_frame(self, output_folder=None):
         print("Generating depth for ONE timestamp")
         left = self.current_view["left"]
@@ -637,7 +645,6 @@ class ReplayVisualizer:
         color = self.current_view["rgb"]
         config = self.config_json
         calib = self.view_info["calib"]
-        timestamp = self.view_info['timestamps'][self.view_info['current_index']].split('.npy')[0]
 
         if left is None or right is None:
             print("No left or right frames provided, closing replay")
@@ -666,13 +673,7 @@ class ReplayVisualizer:
         pcl = process_pointcloud(pcl, depth, color, aligned_to_rgb)
 
         # Save depth data
-        np.save(os.path.join(self.output_folder, f"depth_{timestamp}.npy"), depth)
-        colorized_depth, _, _ = colorize_depth(depth, "depth", label=False, color_noise_percent_removal=0)
-        cv2.imwrite(os.path.join(self.output_folder, f"depth_{timestamp}.png"), colorized_depth)
-        o3d.io.write_point_cloud(os.path.join(self.output_folder, f"pcl_{timestamp}.ply"), pcl)
-
-        with open(os.path.join(self.output_folder, f'config.json'), 'w') as f:
-            json.dump(config, f, indent=4)
+        self.save_depth_pcl(depth, pcl, config)
 
         print("GENERATED")
         return output_folder
@@ -746,9 +747,9 @@ if __name__ == '__main__':
         "alignSocket": "COLOR"
     }
 
-    timestamp = '1441065.npy'
+    timestamp = '1441065'
     for key in selected_types:
-        image_path = os.path.join(capture_folder, f"{key}_{timestamp}")
+        image_path = os.path.join(capture_folder, f"{key}_{timestamp}.npy")
         image = np.load(image_path)
         current_view[key] = image.copy()
 
