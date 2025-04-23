@@ -201,13 +201,21 @@ class ReplayVisualizer:
 
         return config
 
+    def start_checker_thread(self):
+        def checker():
+            for i in range(5):
+                alive1 = self.depth_generate_thread1.is_alive()
+                alive2 = self.depth_generate_thread2.is_alive()
+                if not alive1 and not alive2:
+                    return
+                time.sleep(0.5)
+            print("Threads still running after 5 checks.")
+            show_popup("Warning", "Depth processing thread is already running, please wait for replay on camera to finish.", frame)
+
+        threading.Thread(target=checker, daemon=True).start()
+
     def generate_replay_depth_threads(self, button_values, frame=None):
-        if self.depth_generate_thread1.is_alive() or self.depth_generate_thread2.is_alive():
-            time.sleep(1)
-            if self.depth_generate_thread1.is_alive() or self.depth_generate_thread2.is_alive():
-                print("Depth Thread is already running")
-                show_popup("Warning", "Depth processing thread is already running, please wait for replay on camera to finish.", frame)
-                return
+        self.start_checker_thread()
 
         if button_values["settings_section_number"] == 1:
             self.depth_generate_thread1 = threading.Thread(target=self._on_generate, args=(button_values, frame,))
@@ -506,6 +514,10 @@ class ReplayVisualizer:
 
         self.bind_scrolling()
 
+    def initialize_depth(self):
+        self.toplLevel.after(100, lambda: self.generate_replay_depth_threads(self.button_values1))
+        self.toplLevel.after(200, lambda: self.generate_replay_depth_threads(self.button_values2))
+
     def get_colormap(self):
         if self.selected_colormap.get() == "GREYSCALE":
             return None
@@ -750,5 +762,6 @@ if __name__ == '__main__':
     repVis = ReplayVisualizer(root, view_info, current_view)
     repVis.create_layout()
     repVis.refresh_display(label="Generate Depth")
+    repVis.initialize_depth()
 
     root.mainloop()
