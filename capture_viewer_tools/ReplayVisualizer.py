@@ -5,7 +5,7 @@ import tkinter as tk
 from tkinter import ttk, Tk, filedialog
 import threading
 import os
-import json
+import tempfile
 import glob
 from datetime import datetime
 from PIL import Image, ImageTk
@@ -89,7 +89,7 @@ class ReplayVisualizer:
         self.depth_generate_thread1 = threading.Thread(target=lambda: None)
         self.depth_generate_thread2 = threading.Thread(target=lambda: None)
 
-        self.replayer = Replay(device_info=self.device_info, outputs={'depth', 'pcl'}, stereo_config=StereoConfig({}))
+        self.replayer = Replay(device_info=self.device_info, outputs={'depth', 'pcl'}, stereo_config=StereoConfig({'stereo.setDepthAlign': 'dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_RIGHT'}))
 
     def get_initial_config(self, original_config):
         if self.last_config is None and original_config is not None:
@@ -201,19 +201,21 @@ class ReplayVisualizer:
 
         return config
 
-    def generate_replay_depth(self, button_values, frame=None):
+    def generate_replay_depth_threads(self, button_values, frame=None):
         if self.depth_generate_thread1.is_alive() or self.depth_generate_thread2.is_alive():
-            print("Depth Thread is already running")
-            show_popup("Warning", "Depth processing thread is already running, please wait for replay on camera to finish.", frame)
-            return
+            time.sleep(1)
+            if self.depth_generate_thread1.is_alive() or self.depth_generate_thread2.is_alive():
+                print("Depth Thread is already running")
+                show_popup("Warning", "Depth processing thread is already running, please wait for replay on camera to finish.", frame)
+                return
 
         if button_values["settings_section_number"] == 1:
-            self.depth_generate_thread1 = threading.Thread(target=self.on_generate, args=(button_values, frame,))
+            self.depth_generate_thread1 = threading.Thread(target=self._on_generate, args=(button_values, frame,))
             self.depth_generate_thread1.start()
         elif button_values["settings_section_number"] == 2:
-            self.depth_generate_thread2 = threading.Thread(target=self.on_generate, args=(button_values, frame,))
+            self.depth_generate_thread2 = threading.Thread(target=self._on_generate, args=(button_values, frame,))
             self.depth_generate_thread2.start()
-    def on_generate(self, button_values, frame=None):
+    def _on_generate(self, button_values, frame=None):
         settings_section_number = button_values['settings_section_number']
         print(f"GENERATE THREAD: {settings_section_number}")
 
@@ -239,7 +241,7 @@ class ReplayVisualizer:
         self.refresh_display(label="Loading...")
         self.main_frame.update_idletasks()
 
-        self.load_or_generate()
+        self.replay_generate_one_frame()
 
         if settings_section_number == 1:
             self.generated_depth1 = self.last_generated_depth
@@ -375,7 +377,8 @@ class ReplayVisualizer:
         initial_config = self.get_initial_config(original_config=None)
         inicialize_button_values(initial_config, button_values)
         def fallback_generate_function(*args):
-            self.generate_replay_depth(button_values, frame=settings_frame_custom)
+            self.generate_replay_depth_threads(button_values, frame=settings_frame_custom)
+
         add_trace_to_button_values(button_values, fallback_generate_function)
         create_settings_layout(content_frame, button_values)
 
@@ -386,7 +389,6 @@ class ReplayVisualizer:
 
         content_frame2 = tk.Frame(settings_frame_custom)
         content_frame2.grid(row=2, column=0, sticky="n")
-
 
         return settings_frame_custom, settings_canvas
     def create_config_section(self, collumn_in_main_frame, config_frame_name):
@@ -505,7 +507,6 @@ class ReplayVisualizer:
         self.bind_scrolling()
 
     def get_colormap(self):
-        print(self.selected_colormap.get())
         if self.selected_colormap.get() == "GREYSCALE":
             return None
         colormap_name = f"COLORMAP_{self.selected_colormap.get()}"
@@ -633,7 +634,7 @@ class ReplayVisualizer:
         with open(os.path.join(self.output_folder, f'config.json'), 'w') as f:
             json.dump(config, f, indent=4)
 
-    def generate_save_depth_replay_one_frame(self, output_folder=None):
+    def replay_generate_one_frame(self, output_folder=None):
         print("Generating depth for ONE timestamp")
         left = self.current_view["left"]
         right = self.current_view["right"]
@@ -672,22 +673,14 @@ class ReplayVisualizer:
         aligned_to_rgb = self.config_json['stereo.setDepthAlign'] == "dai.CameraBoardSocket.CAM_A"
         pcl = process_pointcloud(pcl, depth, color, aligned_to_rgb)
 
-        # Save depth data
-        self.save_depth_pcl(depth, pcl, config)
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.ply') as tmp_file:
+            o3d.io.write_point_cloud(tmp_file.name, pcl)
+
+        self.last_generated_depth = depth
+        self.last_generated_pcl_path = tmp_file.name
 
         print("GENERATED")
         return output_folder
-
-    def load_or_generate(self):
-        self.output_folder = self.get_or_create_output_folder()
-
-        if not self.depth_in_replay_outputs:
-            self.generate_save_depth_replay_one_frame()
-
-        current_timestamp = self.view_info['timestamps'][self.view_info['current_index']]
-        print(f"LOADING TIMESTEP: {current_timestamp}")
-        self.last_generated_depth = np.load(os.path.join(self.output_folder, f"depth_{current_timestamp}"))
-        self.last_generated_pcl_path = os.path.join(self.output_folder, f"pcl_{current_timestamp.split('.npy')[0]}.ply")
 
 if __name__ == '__main__':
     import depthai as dai
