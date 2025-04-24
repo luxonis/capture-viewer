@@ -225,21 +225,25 @@ def format_json_for_replay(config_json):
     return config_json
 
 def create_placeholder_frame(size, text):
-    # Create a blank white image using OpenCV
-    placeholder_image = np.ones((size[1], size[0], 3),
-                                dtype=np.uint8) * 255  # size[1] is height, size[0] is width
-    # Set font, scale, and thickness for the text
+    placeholder_image = np.ones((size[1], size[0], 3), dtype=np.uint8) * 255
     font = cv2.FONT_HERSHEY_SIMPLEX
-    base_scale = size[1] / 300  # Adjust 300 as needed for your preferred sizing
-    font_scale = max(base_scale, 0.3)
-    thickness = max(int(size[1] / 150), 1)
-    # Calculate the text size and position
-    text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
-    text_x = (size[0] - text_size[0]) // 2  # Center the text horizontally
-    text_y = (size[1] + text_size[1]) // 2  # Center the text vertically
-    # Draw the text onto the image
-    cv2.putText(placeholder_image, text, (text_x, text_y), font, font_scale, (0, 0, 0), thickness,
-                lineType=cv2.LINE_AA)
+    max_width, max_height = size[0] * 0.9, size[1] * 0.9
+
+    font_scale = 1.0
+    thickness = 2
+    while True:
+        text_size, _ = cv2.getTextSize(text, font, font_scale, thickness)
+        if text_size[0] <= max_width and text_size[1] <= max_height:
+            font_scale += 0.1
+        else:
+            font_scale -= 0.1
+            break
+
+    text_size, _ = cv2.getTextSize(text, font, font_scale, thickness)
+    text_x = (size[0] - text_size[0]) // 2
+    text_y = (size[1] + text_size[1]) // 2
+
+    cv2.putText(placeholder_image, text, (text_x, text_y), font, font_scale, (0, 0, 0), thickness, cv2.LINE_AA)
     return placeholder_image
 
 def device_connected():
