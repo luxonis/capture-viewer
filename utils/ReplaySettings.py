@@ -550,7 +550,7 @@ def create_settings_layout(frame, button_values):
     # current_row += 1
 
     # Brightness Filter Enable
-    ttk.Label(custom_settings_frame, text="Brightness Filter Enable (NOT TESTED IN GUI)").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
+    ttk.Label(custom_settings_frame, text="Brightness Filter Enable").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
     brightness_filter_checkbox = ttk.Checkbutton(custom_settings_frame, variable=button_values['brightness_filter_enable'], command=lambda: toggle_frame_settings(button_values['brightness_filter_enable'], brightness_frame))
     brightness_filter_checkbox.grid(row=current_row, column=1, padx=10, pady=10, sticky="w")
     current_row += 1
@@ -574,7 +574,7 @@ def create_settings_layout(frame, button_values):
     current_row += 1
 
     # Filter Order Enable
-    ttk.Label(custom_settings_frame, text="Filter Order Selection Enable (NOT TESTED IN GUI)").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
+    ttk.Label(custom_settings_frame, text="Filter Order Selection Enable").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
     send_filter_order_checkbox = ttk.Checkbutton(custom_settings_frame, variable=button_values['filtering_order_enable'], command=lambda: toggle_frame_settings(button_values['filtering_order_enable'], order_frame))
     send_filter_order_checkbox.grid(row=current_row, column=1, padx=10, pady=10, sticky="w")
     current_row += 1
