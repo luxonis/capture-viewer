@@ -324,6 +324,8 @@ class ReplayVisualizer:
         button_frame.rowconfigure((0, 3), weight=1)
         button_frame.columnconfigure(2, weight=1)
 
+        save_button = tk.Button(generated_depth_frame, text="Save", command= lambda: self.save_depth_pcl(column_in_main_frame), bg="#007BFF", activebackground="#339CFF", fg="white")
+        save_button.grid(row=2, column=0, columnspan=2, pady=(5, 10), padx=10, sticky='ew')
 
         return generated_depth_frame, generated_depth_image
     def create_settings_section(self, collumn_in_main_frame, frame_name, button_values):
@@ -585,14 +587,40 @@ class ReplayVisualizer:
             os.makedirs(output_folder, exist_ok=False)
         return output_folder
 
-    def save_depth_pcl(self, depth, pcl, config):
-        np.save(os.path.join(self.output_folder, f"depth_{timestamp}.npy"), depth)
-        colorized_depth, _, _ = colorize_depth(depth, "depth", label=False, color_noise_percent_removal=0)
-        cv2.imwrite(os.path.join(self.output_folder, f"depth_{timestamp}.png"), colorized_depth)
-        o3d.io.write_point_cloud(os.path.join(self.output_folder, f"pcl_{timestamp}.ply"), pcl)
+    def save_depth_pcl(self, collumn_in_main):
+        self.output_folder = self.get_or_create_output_folder()
 
-        with open(os.path.join(self.output_folder, f'config.json'), 'w') as f:
-            json.dump(config, f, indent=4)
+        if self.depth_in_replay_outputs:
+            print("Previously generated, updating...")
+
+        if collumn_in_main == 0:
+            depth = self.generated_depth1
+            pcl_path = self.pcl_path1
+            config = self.config_json1
+        else:
+            depth = self.generated_depth2
+            pcl_path = self.pcl_path2
+            config = self.config_json2
+
+        pcl = o3d.io.read_point_cloud(pcl_path)
+
+        if self._save_depth_pcl(depth, pcl, config):
+            print(f"SAVED data successfully: {self.output_folder}")
+
+    def _save_depth_pcl(self, depth, pcl, config):
+        try:
+            np.save(os.path.join(self.output_folder, f"depth_{timestamp}.npy"), depth)
+            colorized_depth, _, _ = colorize_depth(depth, "depth", label=False, color_noise_percent_removal=0)
+            cv2.imwrite(os.path.join(self.output_folder, f"depth_{timestamp}.png"), colorized_depth)
+            o3d.io.write_point_cloud(os.path.join(self.output_folder, f"pcl_{timestamp}.ply"), pcl)
+
+            with open(os.path.join(self.output_folder, f'config.json'), 'w') as f:
+                json.dump(config, f, indent=4)
+            return True
+        except Exception as e:
+            print(e)
+            return False
+
 
 if __name__ == '__main__':
     import depthai as dai
