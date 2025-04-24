@@ -120,14 +120,13 @@ class ReplayVisualizer:
 
     def start_replay_checker_thread(self, frame):
         def checker():
-            for i in range(5):
+            for i in range(10):
                 alive1 = self.depth_generate_thread1.is_alive()
                 alive2 = self.depth_generate_thread2.is_alive()
                 if not alive1 and not alive2:
                     return
                 time.sleep(0.5)
             print("Threads still running after 5 checks.")
-            show_popup("Warning", "Depth processing thread is already running, please wait for replay on camera to finish.", frame)
 
         threading.Thread(target=checker, daemon=True).start()
 
