@@ -4,7 +4,7 @@ from tkinter import ttk, Tk, filedialog
 import json
 import os
 
-from capture_viewer_tools.convertor_capture2replay_json import handle_dict, decimation_set_dict, CT_kernel_dict
+from capture_viewer_tools.convert import *
 
 # Define a dictionary of default settings
 default_config = {
@@ -724,38 +724,6 @@ def create_settings_layout(frame, button_values):
     # popup_window.grab_set()  # Make the window modal (disable interaction with the main window)
     # popup_window.wait_window()  # Wait for the popup window to be destroyed
 
-
-def check_valid_filtering_order(order):
-    new_order = order.copy()
-    new_order.sort()
-    return new_order == [1, 2, 3, 4, 5]
-
-def get_filter_order(dec_ord, med_ord, speckle_ord, spatial_ord, temporal_ord):
-    order = [0, 0, 0, 0, 0]
-    print(dec_ord, med_ord, speckle_ord, spatial_ord, temporal_ord)
-    order[dec_ord - 1] = 'dai.StereoDepthConfig.PostProcessing.Filter.DECIMATION'
-    order[med_ord - 1] = 'dai.StereoDepthConfig.PostProcessing.Filter.MEDIAN'
-    order[speckle_ord - 1] = 'dai.StereoDepthConfig.PostProcessing.Filter.SPECKLE'
-    order[spatial_ord - 1] = 'dai.StereoDepthConfig.PostProcessing.Filter.SPATIAL'
-    order[temporal_ord - 1] = 'dai.StereoDepthConfig.PostProcessing.Filter.TEMPORAL'
-    final_str = '['
-    print(order)
-    for item in order:
-        assert type(item) == str
-        final_str += item
-        final_str += ','
-    final_str += ']'
-    print(final_str)
-    return final_str
-
-def get_filter_order_back(order_string):
-    result = [0, 0, 0, 0, 0]
-    names = ["DECIMATION", "MEDIAN", "SPECKLE", "TEMPORAL", "SPATIAL"]
-    for i, item in enumerate(order_string.split(',')):
-        for j in range(len(names)):
-            if names[j] in item:
-                result[j] = i+1
-    return result
 
 if __name__ == '__main__':
     # Example usage

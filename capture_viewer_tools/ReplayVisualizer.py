@@ -16,16 +16,16 @@ import platform
 from capture_viewer_tools.capture_tools import (colorize_depth, calculate_scaled_dimensions, get_min_max_depths,
                                                 format_json_for_replay, create_placeholder_frame, process_pointcloud)
 
-from capture_viewer_tools.convertor_capture2replay_json import config2settings
 from capture_viewer_tools.ReplaySettings import *
 
-from capture_viewer_tools.convertor_capture2replay_json import settings2config, handle_dict, decimation_set_dict, CT_kernel_dict
 from capture_viewer_tools.popup_info import show_popup
 
 from capture_viewer_tools.capture_tools import create_depth_range_frame, get_current_monitor_size
 
 from depth.replay_depth import Replay
 from depth.stereo_config import StereoConfig
+
+from capture_viewer_tools.convert import *
 
 class ReplayVisualizer:
     def __init__(self, root, view_info, current_view):
@@ -105,108 +105,7 @@ class ReplayVisualizer:
             current_config = default_config
         return current_config
 
-    def convert_current_button_values_to_config(self, button_values, frame):
-        config = {}
-        config['stereo.setDepthAlign'] = button_values['depth_align'].get()
-        if button_values['profile_preset'].get() != 'None':
-            config['stereo.setDefaultProfilePreset'] = button_values['profile_preset'].get()
-
-        if button_values['custom_settings_val'].get():
-            if button_values['filtering_order_enable'].get():  # needs to be the first item for the config to not be initialised in case of wrong filtering order
-                if not check_valid_filtering_order(
-                        [button_values['decimation_order'].get(), button_values['median_order'].get(), button_values['speckle_order'].get(), button_values['spatial_order'].get(),
-                         button_values['temporal_order'].get()]):
-                    show_popup("Warning", "FILTERING ORDER IS NOT VALID", frame)
-                    return config
-                else:
-                    config['cfg.postProcessing.filteringOrder'] = get_filter_order(button_values['decimation_order'].get(),
-                                                                                   button_values['median_order'].get(),
-                                                                                   button_values['speckle_order'].get(),
-                                                                                   button_values['spatial_order'].get(),
-                                                                                   button_values['temporal_order'].get())
-
-            config['stereo.setRectification'] = button_values['rectificationBox_val'].get()
-            config['stereo.setLeftRightCheck'] = button_values['LRBox_val'].get()
-
-            config['stereo.setExtendedDisparity'] = button_values['extendedBox_val'].get()
-            config['stereo.setSubpixel'] = button_values['subpixelBox_val'].get()
-
-            if button_values['subpixelBox_val'].get():
-                config['stereo.setSubpixelFractionalBits'] = button_values['fractional_bits_val'].get()
-
-            # FILTERS
-
-            if button_values['median_filter_enable'].get():
-                config['stereo.initialConfig.setMedianFilter'] = button_values['median_val'].get()
-            else:
-                config['stereo.initialConfig.setMedianFilter'] = "dai.MedianFilter.MEDIAN_OFF"
-
-            # Bilateral filter
-            # todo - [1944301021AA992E00] [1.2.2] [9.439] [StereoDepth(2)] [warning] Bilateral filter is deprecated!
-            # config['cfg.postProcessing.bilateralSigmaValue'] = bilateral_sigma_val.get()
-            # if bilateral_filter_enable.get():
-            #     # is this all settings?
-            #     pass
-
-            # Brightness filter
-            if button_values['brightness_filter_enable'].get():  # todo can we disable brightness filter?
-                config['cfg.postProcessing.brightnessFilter.maxBrightness'] = button_values['max_brightness_slider'].get()
-                config['cfg.postProcessing.brightnessFilter.minBrightness'] = button_values['min_brightness_slider'].get()
-
-            # Speckle filter
-            config['cfg.postProcessing.speckleFilter.enable'] = button_values['speckle_filter_enable'].get()
-            if button_values['speckle_filter_enable'].get():
-                config['cfg.postProcessing.speckleFilter.speckleRange'] = button_values['speckle_range_slider'].get()
-                config[
-                    'cfg.postProcessing.speckleFilter.differenceThreshold'] = button_values['speckle_difference_threshold'].get()
-
-            # Spacial filter
-            config['cfg.postProcessing.spatialFilter.enable'] = button_values['spatial_filter_enable'].get()
-            if button_values['spatial_filter_enable'].get():
-                config['cfg.postProcessing.spatialFilter.holeFillingRadius'] = button_values['hole_filling_radius_slider'].get()
-                config['cfg.postProcessing.spatialFilter.numIterations'] = button_values['num_iterations_slider'].get()
-                config['cfg.postProcessing.spatialFilter.alpha'] = button_values['alpha_slider'].get()
-                config['cfg.postProcessing.spatialFilter.delta'] = button_values['delta_slider'].get()
-
-            # Temporal filter
-            config['cfg.postProcessing.temporalFilter.enable'] = button_values['temporal_filter_enable'].get()
-            if button_values['temporal_filter_enable'].get():
-                config['cfg.postProcessing.temporalFilter.alpha'] = button_values['temporal_alpha_slider'].get()
-                config['cfg.postProcessing.temporalFilter.delta'] = button_values['temporal_delta_slider'].get()
-
-            # Threshold filter
-            if button_values['threshold_filter_enable'].get():  # todo same as brightness filter
-                config['cfg.postProcessing.thresholdFilter.minRange'] = button_values['min_range_val'].get()
-                config['cfg.postProcessing.thresholdFilter.maxRange'] = button_values['max_range_val'].get()
-
-            # Decimation filter
-            config['cfg.postProcessing.decimationFilter.decimationFactor'] = 1  # by default do not decimate
-            if button_values['decimation_filter_enable'].get():
-                config['cfg.postProcessing.decimationFilter.decimationFactor'] = button_values['decimation_factor_val'].get()
-                config['cfg.postProcessing.decimationFilter.decimationMode'] = handle_dict(
-                    button_values['decimation_mode_val'].get(), decimation_set_dict)  # leave this is correct
-
-        if button_values['advanced_settings_enable'].get():
-            config["cfg.censusTransform.kernelSize"] = handle_dict(button_values['CT_kernel_val'].get(), CT_kernel_dict)
-            config["cfg.censusTransform.enableMeanMode"] = button_values['mean_mode_enable'].get()
-            config["cfg.censusTransform.threshold"] = button_values['CT_threshold_val'].get()
-
-            config["cfg.costAggregation.divisionFactor"] = button_values['division_factor_val'].get()
-            config["cfg.costAggregation.horizontalPenaltyCostP1"] = button_values['horizontal_penalty_p1_val'].get()
-            config["cfg.costAggregation.horizontalPenaltyCostP2"] = button_values['horizontal_penalty_p2_val'].get()
-            config["cfg.costAggregation.verticalPenaltyCostP1"] = button_values['vertical_penalty_p1_val'].get()
-            config["cfg.costAggregation.verticalPenaltyCostP2"] = button_values['vertical_penalty_p2_val'].get()
-
-            config["cfg.costMatching.confidenceThreshold"] = button_values['confidence_threshold_val'].get()
-            config["cfg.costMatching.linearEquationParameters.alpha"] = button_values['CM_alpha_val'].get()
-            config["cfg.costMatching.linearEquationParameters.beta"] = button_values['CM_beta_val'].get()
-            config["cfg.costMatching.linearEquationParameters.threshold"] = button_values['matching_threshold_val'].get()
-            config["cfg.costMatching.enableCompanding"] = button_values['enableCompanding_val'].get()
-            config["cfg.algorithmControl.leftRightCheckThreshold"] = button_values['leftRightCheckThreshold_val'].get()
-
-        return config
-
-    def start_checker_thread(self, frame):
+    def start_replay_checker_thread(self, frame):
         def checker():
             for i in range(5):
                 alive1 = self.depth_generate_thread1.is_alive()
@@ -219,25 +118,21 @@ class ReplayVisualizer:
 
         threading.Thread(target=checker, daemon=True).start()
 
-    def generate_replay_depth_threads(self, button_values, frame=None):
-        self.start_checker_thread(frame)
+    def replay_start_thread(self, button_values, frame=None):
+        self.start_replay_checker_thread(frame)
 
         if button_values["settings_section_number"] == 1:
-            self.depth_generate_thread1 = threading.Thread(target=self._on_generate, args=(button_values, frame,))
+            self.depth_generate_thread1 = threading.Thread(target=self.replay_select_section, args=(button_values, frame,))
             self.depth_generate_thread1.start()
         elif button_values["settings_section_number"] == 2:
-            self.depth_generate_thread2 = threading.Thread(target=self._on_generate, args=(button_values, frame,))
+            self.depth_generate_thread2 = threading.Thread(target=self.replay_select_section, args=(button_values, frame,))
             self.depth_generate_thread2.start()
-    def _on_generate(self, button_values, frame=None):
+    def replay_select_section(self, button_values, frame=None):
         settings_section_number = button_values['settings_section_number']
         print(f"GENERATE THREAD: {settings_section_number}")
 
         self.last_config = self.config_json
-        self.config_json = self.convert_current_button_values_to_config(button_values, frame)
-
-        print(self.config_json)
-
-        # self.config_json = add_depthai_to_config(self.config_json)
+        self.config_json = convert_current_button_values_to_config(button_values, frame)
 
         self.last_generated_depth = None
 
@@ -249,7 +144,6 @@ class ReplayVisualizer:
             self.config_json2 = self.config_json
             self.generated_depth2 = None
             self.pcl_path2 = None
-
 
         self.refresh_display(label="Loading...")
         self.main_frame.update_idletasks()
@@ -268,6 +162,53 @@ class ReplayVisualizer:
         self.refresh_display(label="Updated")
         self.main_frame.update_idletasks()
         print(f"Thread {settings_section_number} finished")
+    def replay_generate_one_frame(self, output_folder=None):
+        print("Generating depth for ONE timestamp")
+        left = self.current_view["left"]
+        right = self.current_view["right"]
+
+        # if len(left.shape) == 3 and len(right.shape) == 3:
+        #     left = cv2.cvtColor(left, cv2.COLOR_BGR2GRAY)
+        #     right = cv2.cvtColor(right, cv2.COLOR_BGR2GRAY)
+
+        color = self.current_view["rgb"]
+        config = self.config_json
+        calib = self.view_info["calib"]
+
+        if left is None or right is None:
+            print("No left or right frames provided, closing replay")
+            return
+
+        if calib is None:
+            print("No calibration provided, closing replay")
+            return
+
+        if color is None:
+            print("No color specified")
+            color = left
+
+        # FIXED - sends two frames and takes the second, works with decimation filter
+        replayed = tuple(self.replayer.replay(
+            (
+                (left, right, color),
+                (left, right, color)),
+            calib=calib,
+            stereo_config=StereoConfig(config)
+        ))
+        depth = replayed[1]['depth']
+        pcl = replayed[1]['pcl']
+
+        aligned_to_rgb = self.config_json['stereo.setDepthAlign'] == "dai.CameraBoardSocket.CAM_A"
+        pcl = process_pointcloud(pcl, depth, color, aligned_to_rgb)
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.ply') as tmp_file:
+            o3d.io.write_point_cloud(tmp_file.name, pcl)
+
+        self.last_generated_depth = depth
+        self.last_generated_pcl_path = tmp_file.name
+
+        print("GENERATED")
+        return output_folder
 
     def on_mouse_wheel(self, event):
         # print(event.widget)
@@ -331,12 +272,28 @@ class ReplayVisualizer:
         self.settings_canvas1.focus_set()
         self.settings_canvas2.focus_set()
 
+
     def on_pointcloud_button(self, pcl_path, config_json):
         if pcl_path is None: return False
         script_directory = os.path.dirname(os.path.abspath(__file__))
         visualize_pointcloud_path = os.path.join(script_directory, 'visualize_pointcloud.py')
         subprocess.Popen(['python', visualize_pointcloud_path, pcl_path, str(config_json)])  # o3d.visualization.draw_geometries([pointcloud])
         time.sleep(1)
+
+    def update_depth_range(self, min, max):
+        self.fixed_depth_range_max = max
+        self.fixed_depth_range_min = min
+
+        self.fixed_depth_range = True
+
+        self.refresh_generated_depth_or_placeholder(self.generated_depth1, self.generated_depth_image1, "Recolor")
+        self.refresh_generated_depth_or_placeholder(self.generated_depth2, self.generated_depth_image2, "Recolor")
+    def update_resolution(self):
+        if self.generated_depth1 is not None:
+            self.depth_resolution1.set(f"{self.generated_depth1.shape}")
+        if self.generated_depth2 is not None:
+            self.depth_resolution2.set(f"{self.generated_depth2.shape}")
+
 
     def create_depth_section(self, column_in_main_frame):
         generated_depth_frame = tk.Frame(self.main_frame)
@@ -390,7 +347,7 @@ class ReplayVisualizer:
         initial_config = self.get_initial_config(original_config=None)
         inicialize_button_values(initial_config, button_values)
         def fallback_generate_function(*args):
-            self.generate_replay_depth_threads(button_values, frame=settings_frame_custom)
+            self.replay_start_thread(button_values, frame=settings_frame_custom)
 
         add_trace_to_button_values(button_values, fallback_generate_function)
         create_settings_layout(content_frame, button_values)
@@ -463,21 +420,6 @@ class ReplayVisualizer:
         difference_image.grid(row=1, column=0, padx=10, pady=10)
 
         return difference_frame, difference_image
-
-    def update_depth_range(self, min, max):
-        self.fixed_depth_range_max = max
-        self.fixed_depth_range_min = min
-
-        self.fixed_depth_range = True
-
-        self.refresh_generated_depth_or_placeholder(self.generated_depth1, self.generated_depth_image1, "Recolor")
-        self.refresh_generated_depth_or_placeholder(self.generated_depth2, self.generated_depth_image2, "Recolor")
-    def update_resolution(self):
-        if self.generated_depth1 is not None:
-            self.depth_resolution1.set(f"{self.generated_depth1.shape}")
-        if self.generated_depth2 is not None:
-            self.depth_resolution2.set(f"{self.generated_depth2.shape}")
-
     def create_edits_section(self, collumn_in_main_frame):
         edits_frame = tk.Frame(self.main_frame)
         edits_frame.grid(row=2, column=collumn_in_main_frame, padx=5, pady=5, sticky='nsew')
@@ -519,9 +461,10 @@ class ReplayVisualizer:
 
         self.bind_scrolling()
 
+
     def initialize_depth(self):
-        self.toplLevel.after(100, lambda: self.generate_replay_depth_threads(self.button_values1))
-        self.toplLevel.after(200, lambda: self.generate_replay_depth_threads(self.button_values2))
+        self.toplLevel.after(100, lambda: self.replay_start_thread(self.button_values1))
+        self.toplLevel.after(200, lambda: self.replay_start_thread(self.button_values2))
 
     def get_colormap(self):
         if self.selected_colormap.get() == "GREYSCALE":
@@ -650,54 +593,6 @@ class ReplayVisualizer:
 
         with open(os.path.join(self.output_folder, f'config.json'), 'w') as f:
             json.dump(config, f, indent=4)
-
-    def replay_generate_one_frame(self, output_folder=None):
-        print("Generating depth for ONE timestamp")
-        left = self.current_view["left"]
-        right = self.current_view["right"]
-
-        # if len(left.shape) == 3 and len(right.shape) == 3:
-        #     left = cv2.cvtColor(left, cv2.COLOR_BGR2GRAY)
-        #     right = cv2.cvtColor(right, cv2.COLOR_BGR2GRAY)
-
-        color = self.current_view["rgb"]
-        config = self.config_json
-        calib = self.view_info["calib"]
-
-        if left is None or right is None:
-            print("No left or right frames provided, closing replay")
-            return
-
-        if calib is None:
-            print("No calibration provided, closing replay")
-            return
-
-        if color is None:
-            print("No color specified")
-            color = left
-
-        # FIXED - sends two frames and takes the second, works with decimation filter
-        replayed = tuple(self.replayer.replay(
-            (
-                (left, right, color),
-                (left, right, color)),
-            calib=calib,
-            stereo_config=StereoConfig(config)
-        ))
-        depth = replayed[1]['depth']
-        pcl = replayed[1]['pcl']
-
-        aligned_to_rgb = self.config_json['stereo.setDepthAlign'] == "dai.CameraBoardSocket.CAM_A"
-        pcl = process_pointcloud(pcl, depth, color, aligned_to_rgb)
-
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.ply') as tmp_file:
-            o3d.io.write_point_cloud(tmp_file.name, pcl)
-
-        self.last_generated_depth = depth
-        self.last_generated_pcl_path = tmp_file.name
-
-        print("GENERATED")
-        return output_folder
 
 if __name__ == '__main__':
     import depthai as dai
