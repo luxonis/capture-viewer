@@ -13,19 +13,19 @@ import subprocess
 import time
 import platform
 
-from capture_viewer_tools.capture_tools import (colorize_depth, calculate_scaled_dimensions, get_min_max_depths,
-                                                format_json_for_replay, create_placeholder_frame, process_pointcloud)
+from utils.capture_tools import (colorize_depth, calculate_scaled_dimensions, get_min_max_depths,
+                                 format_json_for_replay, create_placeholder_frame, process_pointcloud)
 
-from capture_viewer_tools.ReplaySettings import *
+from utils.ReplaySettings import *
 
-from capture_viewer_tools.popup_info import show_popup
+from utils.popup_info import show_popup
 
-from capture_viewer_tools.capture_tools import create_depth_range_frame, get_current_monitor_size
+from utils.capture_tools import create_depth_range_frame, get_current_monitor_size
 
 from depth.replay_depth import Replay
 from depth.stereo_config import StereoConfig
 
-from capture_viewer_tools.convert import *
+from utils.convert import *
 
 class ReplayVisualizer:
     def __init__(self, root, view_info, current_view):

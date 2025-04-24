@@ -1,9 +1,9 @@
 import argparse
 import re
 
-from capture_viewer_tools.capture_tools import extract_calibration_values, create_depth_range_frame, get_current_monitor_size
-from capture_viewer_tools.button_functions import *
-from capture_viewer_tools.popup_info import show_popup
+from utils.capture_tools import extract_calibration_values, create_depth_range_frame, get_current_monitor_size
+from utils.button_functions import *
+from utils.popup_info import show_popup
 
 # change window size here
 canvas_width = 1920  # 1920

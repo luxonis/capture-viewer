@@ -1,5 +1,5 @@
 import cv2
-from capture_viewer_tools.capture_tools import get_calibration_between_sockets
+from utils.capture_tools import get_calibration_between_sockets
 
 def undistort_rgb(rgb, data, rgbSize):
     M1, D1, M2, D2, T, R, TARGET_MATRIX, _ = data

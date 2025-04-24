@@ -4,7 +4,7 @@ from tkinter import ttk, Tk, filedialog
 import json
 import os
 
-from capture_viewer_tools.convert import *
+from utils.convert import *
 
 # Define a dictionary of default settings
 default_config = {

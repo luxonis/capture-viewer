@@ -3,7 +3,7 @@ import depthai as dai
 import cv2
 import matplotlib.pyplot as plt
 import open3d as o3d
-from capture_viewer_tools.pointcloud import rotate_pointcloud
+from utils.pointcloud import rotate_pointcloud
 from tkinter import *
 import tkinter as tk
 
