@@ -384,6 +384,7 @@ def on_replay(root, view_info, current_view):
     repVis = ReplayVisualizer(root, view_info, current_view)
     repVis.create_layout()
     repVis.refresh_display(label="Generate Depth")
+    repVis.initialize_depth()
 
 
 class LoadingHandler:
