@@ -31,6 +31,7 @@ class ReplayVisualizer:
     def __init__(self, root, view_info, current_view):
         self.toplLevel = tk.Toplevel(root)
         self.toplLevel.title("REPLAY")
+        self.toplLevel.protocol("WM_DELETE_WINDOW", self.close)
 
         self.screen_width, self.screen_height = get_current_monitor_size(self.toplLevel)
         print(self.screen_width, self.screen_height)
@@ -90,6 +91,10 @@ class ReplayVisualizer:
         self.depth_generate_thread2 = threading.Thread(target=lambda: None)
 
         self.replayer = Replay(device_info=self.device_info, outputs={'depth', 'pcl'}, stereo_config=StereoConfig({'stereo.setDepthAlign': 'dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_RIGHT'}))
+
+    def close(self):
+        del self.replayer
+        self.toplLevel.destroy()
 
     def get_initial_config(self, original_config):
         if self.last_config is None and original_config is not None:
@@ -201,7 +206,7 @@ class ReplayVisualizer:
 
         return config
 
-    def start_checker_thread(self):
+    def start_checker_thread(self, frame):
         def checker():
             for i in range(5):
                 alive1 = self.depth_generate_thread1.is_alive()
@@ -215,7 +220,7 @@ class ReplayVisualizer:
         threading.Thread(target=checker, daemon=True).start()
 
     def generate_replay_depth_threads(self, button_values, frame=None):
-        self.start_checker_thread()
+        self.start_checker_thread(frame)
 
         if button_values["settings_section_number"] == 1:
             self.depth_generate_thread1 = threading.Thread(target=self._on_generate, args=(button_values, frame,))
