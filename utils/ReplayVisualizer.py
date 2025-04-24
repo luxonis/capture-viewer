@@ -90,7 +90,10 @@ class ReplayVisualizer:
         self.depth_generate_thread1 = threading.Thread(target=lambda: None)
         self.depth_generate_thread2 = threading.Thread(target=lambda: None)
 
-        self.replayer = Replay(device_info=self.device_info, outputs={'depth', 'pcl'}, stereo_config=StereoConfig({'stereo.setDepthAlign': 'dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_RIGHT'}))
+        self.replayer = None
+        self.replayer_ready = threading.Event()
+
+        threading.Thread(target=self.initialize_replayer, daemon=True).start()
 
     def close(self):
         del self.replayer
@@ -104,6 +107,16 @@ class ReplayVisualizer:
         else:
             current_config = default_config
         return current_config
+
+    def initialize_replayer(self):
+        self.replayer = Replay(
+            device_info=self.device_info,
+            outputs={'depth', 'pcl'},
+            stereo_config=StereoConfig({
+                'stereo.setDepthAlign': 'dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_RIGHT'
+            })
+        )
+        self.replayer_ready.set()
 
     def start_replay_checker_thread(self, frame):
         def checker():
@@ -324,7 +337,7 @@ class ReplayVisualizer:
         button_frame.rowconfigure((0, 3), weight=1)
         button_frame.columnconfigure(2, weight=1)
 
-        save_button = tk.Button(generated_depth_frame, text="Save", command= lambda: self.save_depth_pcl(column_in_main_frame), bg="#007BFF", activebackground="#339CFF", fg="white")
+        save_button = tk.Button(generated_depth_frame, text="Save", command= lambda: self.save_depth_pcl(column_in_main_frame), bg="#007BFF", activebackground="#339CFF")
         save_button.grid(row=2, column=0, columnspan=2, pady=(5, 10), padx=10, sticky='ew')
 
         return generated_depth_frame, generated_depth_image
@@ -465,6 +478,7 @@ class ReplayVisualizer:
 
 
     def initialize_depth(self):
+        self.replayer_ready.wait()
         self.toplLevel.after(100, lambda: self.replay_start_thread(self.button_values1))
         self.toplLevel.after(200, lambda: self.replay_start_thread(self.button_values2))
 
@@ -611,7 +625,11 @@ class ReplayVisualizer:
         try:
             np.save(os.path.join(self.output_folder, f"depth_{timestamp}.npy"), depth)
             colorized_depth, _, _ = colorize_depth(depth, "depth", label=False, color_noise_percent_removal=0)
+            colorized_depth = cv2.cvtColor(colorized_depth, cv2.COLOR_RGB2BGR)
             cv2.imwrite(os.path.join(self.output_folder, f"depth_{timestamp}.png"), colorized_depth)
+            colorized_depth, _, _ = colorize_depth(depth, "depth", label=False, color_noise_percent_removal=1)
+            colorized_depth = cv2.cvtColor(colorized_depth, cv2.COLOR_RGB2BGR)
+            cv2.imwrite(os.path.join(self.output_folder, f"depth_{timestamp}_.png"), colorized_depth)
             o3d.io.write_point_cloud(os.path.join(self.output_folder, f"pcl_{timestamp}.ply"), pcl)
 
             with open(os.path.join(self.output_folder, f'config.json'), 'w') as f:
