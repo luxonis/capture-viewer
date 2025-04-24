@@ -602,6 +602,7 @@ class ReplayVisualizer:
         return output_folder
 
     def save_depth_pcl(self, collumn_in_main):
+        timestamp = self.view_info['timestamps'][self.view_info['current_index']].split('.npy')[0]
         self.output_folder = self.get_or_create_output_folder()
 
         if self.depth_in_replay_outputs:
@@ -618,10 +619,10 @@ class ReplayVisualizer:
 
         pcl = o3d.io.read_point_cloud(pcl_path)
 
-        if self._save_depth_pcl(depth, pcl, config):
+        if self._save_depth_pcl(depth, pcl, config, timestamp):
             print(f"SAVED data successfully: {self.output_folder}")
 
-    def _save_depth_pcl(self, depth, pcl, config):
+    def _save_depth_pcl(self, depth, pcl, config, timestamp):
         try:
             np.save(os.path.join(self.output_folder, f"depth_{timestamp}.npy"), depth)
             colorized_depth, _, _ = colorize_depth(depth, "depth", label=False, color_noise_percent_removal=0)
