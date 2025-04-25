@@ -17,7 +17,7 @@ from .stereo_config import StereoConfig
 __is_dai3 = dai.__version__.startswith('3.')
 
 @tenacity.retry(
-        stop=tenacity.stop_after_attempt(7),
+        stop=tenacity.stop_after_attempt(5),
         wait=tenacity.wait_exponential(multiplier=2, min=4, max=20),
         retry=tenacity.retry_if_exception_type((
             RuntimeError,
@@ -124,11 +124,12 @@ def replay_depth(depth_on, *args, **kwargs):
 def replay(frames, *, calib=None, stereo_config=StereoConfig({}), outputs:Set[str]={'depth',}, device_info=None):
     """Wrapper around replay functionality on the device."""
     with Replay(device_info=device_info, outputs=outputs, stereo_config=stereo_config) as replayer:
-        yield from replayer.replay(frames, calib=calib, stereo_config=stereo_config)
+        yield from replayer.replay(frames, calib=calib)
 
 
 def _create_pipeline_v2(outputs, depth_align):
     """Create a pipeline to compute desired outputs."""
+    # print(f'DEBUG: _create_pipeline_v2({depth_align})')
     if not outputs:
         raise ValueError('No output specified')
 
@@ -179,8 +180,7 @@ def _create_pipeline_v2(outputs, depth_align):
     xlink_out['depth'].setStreamName("depth")
     stereo = pipeline.create(dai.node.StereoDepth)
     stereo.setRuntimeModeSwitch(True)  # allow runtime switch of stereo modes
-
-    # stereo_config.configure_stereo_node(stereo)
+    # stereo.setDepthAlign(eval(depth_align))
 
     xin_stereo_depth_config = pipeline.create(dai.node.XLinkIn)
     xin_stereo_depth_config.setStreamName('stereo_config')
@@ -238,9 +238,10 @@ class ReplayV2:
         return self
 
     def __exit__(self, type, value, traceback):
-        del self._device
+        if hasattr(self, '_device'):
+            del self._device
 
-    def __init__(self, stereo_config:StereoConfig=StereoConfig(), outputs:Set[str]={'depth',}, device_info=''):
+    def __init__(self, stereo_config:StereoConfig=StereoConfig(), outputs:Set[str]={'depth',}, device_info=None):
         """
         Args:
         - frames: iterable of tuples (left, right[, rgb]) of images as numpy arrays
@@ -249,17 +250,43 @@ class ReplayV2:
         - timeout_s: raise TimeoutError if getting a single queue item from pipeline takes longer than given time in seconds
         - device_info: optional depthai.DeviceInfo to use specified device
         """
-        self._current_depth_align = stereo_config.get('stereo.setDepthAlign', 'not_set')
-        self._pipeline, self._stereo, self._xOut = _create_pipeline_v2(outputs, self._current_depth_align)
-        stereo_config.configure_stereo_node(self._stereo)
+        # print(f'DEBUG: ReplayV2.__init__():\n  stereo_config: {stereo_config}')
+        self._current_set_rectification = stereo_config.get('stereo.setRectification', True)
+        self._current_depth_align = stereo_config.get('stereo.setDepthAlign', 'dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_LEFT')
+        self._current_stereo_preset = stereo_config.get('stereo.setDefaultProfilePreset', None)
+
+        self._pipeline = None
+        self._outputs = outputs
         self._runtime_statistics = {}
         self._device_info = device_info
-        self._setup()
+        self._setup(stereo_config=stereo_config)
 
-    def _setup(self):
+    @tenacity.retry(
+        stop=tenacity.stop_after_attempt(3),
+        wait=tenacity.wait_exponential(multiplier=2, min=1, max=10),
+        retry=tenacity.retry_if_exception_type((RuntimeError)),
+        reraise=True)
+    def _setup(self, stereo_config):
         """Connect to a device and start the pipeline."""
+        # print(f'DEBUG: ReplayV2._setup():\n  stereo_config: {stereo_config}')
+        if hasattr(self, '_device'):
+            del self._device
+        if self._pipeline is None or \
+                stereo_config.get('stereo.setDepthAlign', self._current_depth_align) != self._current_depth_align or \
+                stereo_config.get('stereo.setRectification', self._current_set_rectification) != self._current_set_rectification or \
+                stereo_config.get('stereo.setDefaultProfilePreset', self._current_stereo_preset) != self._current_stereo_preset:
+            if not self._pipeline is None:
+                del self._pipeline
+                del self._stereo
+            self._current_depth_align = stereo_config.get('stereo.setDepthAlign', self._current_depth_align)  # update setDepthAlign if present in the config
+            self._pipeline, self._stereo, self._xOut = _create_pipeline_v2(self._outputs, self._current_depth_align)
+            self._default_config = StereoConfig.from_stereo_node_cfg(self._stereo.initialConfig.get())
+
+        stereo_config.configure_stereo_node(self._stereo)
+
         self._device = get_device(device_info=self._device_info)
         self._device.startPipeline(self._pipeline)
+        self._send_configuration()
 
     def runtime_stats(self, key=None):
         """Return runtime statistics, if there are any."""
@@ -270,29 +297,90 @@ class ReplayV2:
         else:
             return self._runtime_statistics[key]
 
-    def replay(self, frames, *, calib=None, stereo_config=StereoConfig(), workaround_decimation_filter=True, timeout_retries=3):
+    def replay(self, frames, *, calib=None, stereo_config=None, workaround_decimation_filter=True, timeout_retries=3):
         """
         Given the frames, and optional parameters, send them to device and return the results.
 
         Handles a TimeoutError when sending/receiving data to/from the device.
         """
+        # print(f'DEBUG: ReplayV2.replay()\n  stereo_config: {stereo_config}')
+        if not stereo_config is None:
+            # need_restart = False
+            # for k in stereo_config.keys():
+            #     if k == 'stereo.setRectification' and stereo_config['stereo.setRectification'] == self._current_set_rectification:
+            #         continue
+            #     if k == 'stereo.setDepthAlign' and stereo_config['stereo.setDepthAlign'] == self._current_set_rectification:
+            #         continue
+            #     if k.startswith('stereo.'):
+            #         need_restart = True
+            #         break
+            # if need_restart:
+            #     self._setup(stereo_config)
+            if stereo_config.get('stereo.setDepthAlign', self._current_depth_align) != self._current_depth_align:
+                self._setup(stereo_config)
+                self._current_depth_align = stereo_config['stereo.setDepthAlign']
+
         for frames_subset in batched(frames, 10):
             for _ in range(timeout_retries):
                 try:
                     subset = tuple(self._replay(frames_subset, calib=calib, stereo_config=stereo_config, workaround_decimation_filter=workaround_decimation_filter))
                     yield from subset
                     break
-                except TimeoutError:
-                    del self._device
-                    self._setup()
+                except (TimeoutError, RuntimeError):
+                    # TimeoutError: timeout when sending/receiving frames
+                    # RuntimeError: e.g. communication exception, device temporarily disconnected, ...
+                    self._setup(stereo_config)
             else:
                 raise TimeoutError(f'Failed to send/receive data to the device after {timeout_retries} retries.')
 
-    def _replay(self, frames, *, calib=None, stereo_config=StereoConfig(), workaround_decimation_filter=True):
-        if self._current_depth_align != stereo_config.get('stereo.setDepthAlign', self._current_depth_align):
-            self._current_depth_align = stereo_config['stereo.setDepthAlign']
-            del self._device
-            self._setup()
+    def _send_configuration(self):
+        # TODO send only if it differs from previously sent
+        # workaround for changing stereo configuration actually happening only after the second call?
+        # https://luxonis.slack.com/archives/CG1PHMY6M/p1737631283645999?thread_ts=1737631256.938159&cid=CG1PHMY6M
+        # q_send = self._device.getInputQueue('stereo_config')
+        # for _ in range(1):
+        #     q_send.send(self._stereo.initialConfig.get())
+        # print(f'DEBUG: ReplayV2._send_configuration()')
+        q_send = self._device.getInputQueue('stereo_config')
+        input_queues = {
+            "left": self._device.getInputQueue("left"),
+            "right": self._device.getInputQueue("right"),
+            # 'rgb': self._device.getInputQueue('rgb'),
+        }
+        # print('Getting output queues')
+        output_queues = {name: self._device.getOutputQueue(name, maxSize=1, blocking=True) for name in self._xOut.keys()}
+
+        cfg = self._stereo.initialConfig.get()
+        for try_idx in range(3):
+            # print(f'Sending config (try {try_idx})')
+
+            q_send.send(cfg)
+            q_send.send(cfg)
+            # q_send.send(self._stereo.initialConfig.get())
+            # Send empty frame to flush the queue, maybe not needed?
+            empty_frame = np.zeros((800, 1280), dtype=np.uint8)
+            _send_images(input_queues, {
+                "left": empty_frame,
+                "right": empty_frame,
+            })
+            # Get empty frames and the config
+            result = {name: queue.get() for name, queue in output_queues.items()}
+
+            # print('Receiving config')
+            cfg_sent = StereoConfig.from_stereo_node_cfg(cfg)
+            cfg_rvcd = StereoConfig.from_stereo_node_cfg(result['stereo_config'].get())
+            if cfg_sent._cfg == cfg_rvcd._cfg:
+                # print(' - configs are equal')
+                break
+        if not cfg_sent._cfg == cfg_rvcd._cfg:
+            raise RuntimeError('Failed to apply StereoDepth configuration by sending the config message')
+
+
+    def _replay(self, frames, *, calib=None, stereo_config=None, workaround_decimation_filter=True):
+        if stereo_config is not None:
+            self._default_config.configure_stereo_node(self._stereo)
+            stereo_config.configure_stereo_node(self._stereo)
+            self._send_configuration()
 
         if calib is None:
             print('Warning: using device calibration!')
@@ -306,14 +394,7 @@ class ReplayV2:
             'stereo_config': self._device.getInputQueue('stereo_config'),
             # 'rgb': self._device.getInputQueue('rgb'),
         }
-
         output_queues = {name: self._device.getOutputQueue(name, maxSize=4, blocking=False) for name in self._xOut.keys()}
-
-        stereo_config.configure_stereo_node(self._stereo)
-        # workaround for changing stereo configuration actually happening only after the second call
-        # https://luxonis.slack.com/archives/CG1PHMY6M/p1737631283645999?thread_ts=1737631256.938159&cid=CG1PHMY6M
-        for _ in range(2):
-            input_queues['stereo_config'].send(self._stereo.initialConfig.get())
 
         # workaround for postProcessing.decimationFilter.factor > 1, where the first returned frame is garbage
         # TODO is this workaround still needed?
@@ -354,13 +435,91 @@ class ReplayV3:
         return self
 
     def __exit__(self, type, value, traceback):
-        pass
+        del self._pipeline
+        del self._device
 
-    def __init__(self, calib=None, stereo_config={}, outputs:Set[str]={'depth',}):
-        self._calib = calib
+    def __init__(self, stereo_config:StereoConfig=None, outputs:Set[str]={'depth',}, device_info=''):
+        if not outputs:
+            raise ValueError('No output specified')
         self._stereo_config = stereo_config
         self._outputs = outputs
         self._runtime_statistics = {}
+        self._device_info = device_info
+        self._setup()
+
+    def _setup(self):
+        self._device = get_device(self._device_info)
+        self._pipeline = dai.Pipeline(self._device)
+
+        stereo = self._pipeline.create(dai.node.StereoDepth)
+        mono_left = stereo.left.createInputQueue()
+        mono_right = stereo.right.createInputQueue()
+        out_depth = stereo.depth.createOutputQueue()
+        out_depth.setName('depth')
+        out_q = [out_depth, ]
+
+        # currentConfig = dai.StereoDepthConfig()
+
+        # currentConfig.algorithmControl = stereo.initialConfig.algorithmControl
+        # currentConfig.postProcessing = stereo.initialConfig.postProcessing
+        # currentConfig.costAggregation = stereo.initialConfig.costAggregation
+        # currentConfig.costMatching = stereo.initialConfig.costMatching
+        # currentConfig.censusTransform = stereo.initialConfig.censusTransform
+
+        platform = self._pipeline.getDefaultDevice().getPlatform()
+
+        # Workaround RGB camera to fix depth alignment
+        if self._stereo_config.get('stereo.setDepthAlign', '') == 'dai.CameraBoardSocket.CAM_A':
+            if platform == dai.Platform.RVC2:
+                cam_rgb = self._pipeline.create(dai.node.ColorCamera)
+                cam_rgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_800_P)
+                cam_rgb.setBoardSocket(dai.CameraBoardSocket.CAM_A)
+                # cam_rgb.setIspScale(1, 3)
+
+        # if platform == dai.Platform.RVC4:
+        #     # cam_rgb = self._pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_A)
+        #     # rgb_out = cam_rgb.requestOutput(size = (1280, 800), fps = 30)
+        #     align = self._pipeline.create(dai.node.ImageAlign)
+
+        #     stereo.depth.link(align.input)
+        #     # rgb_out.link(align.inputAlignTo)
+        #     stereo.right.link(align.inputAlignTo)
+        #     out_aligned = align.outputAligned.createOutputQueue()
+        #     out_aligned.setName('depth_aligned')
+        #     out_q.append(out_aligned)
+
+        if 'disparity' in self._outputs:
+            out_disparity = stereo.disparity.createOutputQueue()
+            out_disparity.setName('disparity')
+            out_q.append(out_disparity)
+
+        if 'rectified_left' in self._outputs:
+            out_rectified_left = stereo.rectifiedLeft.createOutputQueue()
+            out_rectified_left.setName('rectified_left')
+            out_q.append(out_rectified_left)
+
+        if 'rectified_right' in self._outputs:
+            out_rectified_right = stereo.rectifiedRight.createOutputQueue()
+            out_rectified_right.setName('rectified_right')
+            out_q.append(out_rectified_right)
+
+        if 'pcl' in self._outputs:
+            raise NotImplementedError('Generating a pointcloud on the device is not implemented')
+
+        self._xin_stereo_depth_config = stereo.inputConfig.createInputQueue()
+        self._xout_stereo_depth_config = stereo.outConfig.createOutputQueue()
+        self._xout_stereo_depth_config.setName("stereo_config")
+
+        if not self._stereo_config is None:
+            self._stereo_config.configure_stereo_node(stereo)
+
+        self._pipeline.start()
+        self._in_q = {
+            'left': mono_left,
+            'right': mono_right
+        }
+        self._output_queues = {q.getName(): q for q in out_q}
+        self._stereo = stereo
 
     def runtime_stats(self, key=None):
         if not self._runtime_statistics:
@@ -370,7 +529,26 @@ class ReplayV3:
         else:
             return self._runtime_statistics[key]
 
-    def replay(self, frames, device_info=None):
+    def replay(self, frames, *, calib=None, stereo_config=StereoConfig(),timeout_retries=3):
+        """
+        Given the frames, and optional parameters, send them to device and return the results.
+
+        Handles a TimeoutError when sending/receiving data to/from the device.
+        """
+        for frames_subset in batched(frames, 10):
+            for _ in range(timeout_retries):
+                try:
+                    subset = tuple(self._replay(frames_subset, calib=calib, stereo_config=stereo_config))
+                    yield from subset
+                    break
+                except TimeoutError:
+                    del self._device
+                    del self._pipeline
+                    self._setup()
+            else:
+                raise TimeoutError(f'Failed to send/receive data to the device after {timeout_retries} retries.')
+
+    def _replay(self, frames, *, calib=None, stereo_config=StereoConfig({})):
         """
         Args:
         - frames: iterable of (left, right[, rgb]) images as numpy arrays
@@ -380,103 +558,53 @@ class ReplayV3:
         - timeout_s: raise TimeoutError if getting a single queue item from pipeline takes longer than given time in seconds
         - outputs: choose which outputs you want: 'depth', 'disparity', 'rectified_left', 'rectified_right'
         """
-        if not self._outputs:
-            raise ValueError('No output specified')
+        self._current_depth_align = self._stereo_config.get('stereo.setDepthAlign', 'not_set')
+        if self._current_depth_align != stereo_config.get('stereo.setDepthAlign', self._current_depth_align):
+            # TODO if setDepthAlign has changed, reset pipeline etc.
+            raise NotImplementedError('Chaning `setDepthAlign` is not supported. Create a new Replay object with the new depth alignment.')
+        if calib is None:
+            print('Warning: using device calibration!')
+        else:
+            # self._device.setCalibration(calib)
+            self._pipeline.setCalibrationData(calib)
 
-        with dai.Pipeline(get_device(device_info)) as pipeline:
-            stereo = pipeline.create(dai.node.StereoDepth)
-            mono_left = stereo.left.createInputQueue()
-            mono_right = stereo.right.createInputQueue()
-            out_depth = stereo.depth.createOutputQueue()
-            out_depth.setName('depth')
-            out_q = [out_depth, ]
+        if not stereo_config is None:
+            self._stereo_config = stereo_config
+            stereo_config.configure_stereo_node(self._stereo)
+            # workaround for changing stereo configuration actually happening only after the second call
+            # https://luxonis.slack.com/archives/CG1PHMY6M/p1737631283645999?thread_ts=1737631256.938159&cid=CG1PHMY6M
+            cfg = dai.StereoDepthConfig()
+            cfg.algorithmControl = self._stereo.initialConfig.algorithmControl
+            cfg.postProcessing = self._stereo.initialConfig.postProcessing
+            cfg.costAggregation = self._stereo.initialConfig.costAggregation
+            cfg.costMatching = self._stereo.initialConfig.costMatching
+            cfg.censusTransform = self._stereo.initialConfig.censusTransform
+            for _ in range(2):
+                self._xin_stereo_depth_config.send(cfg)
 
-            platform = pipeline.getDefaultDevice().getPlatform()
-
-            # Workaround RGB camera to fix depth alignment
-            if self._stereo_config.get('stereo.setDepthAlign', '') == 'dai.CameraBoardSocket.CAM_A':
-                if platform == dai.Platform.RVC2:
-                    cam_rgb = pipeline.create(dai.node.ColorCamera)
-                    cam_rgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_800_P)
-                    cam_rgb.setBoardSocket(dai.CameraBoardSocket.CAM_A)
-                    # cam_rgb.setIspScale(1, 3)
-
-            # if platform == dai.Platform.RVC4:
-            #     # cam_rgb = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_A)
-            #     # rgb_out = cam_rgb.requestOutput(size = (1280, 800), fps = 30)
-            #     align = pipeline.create(dai.node.ImageAlign)
-
-            #     stereo.depth.link(align.input)
-            #     # rgb_out.link(align.inputAlignTo)
-            #     stereo.right.link(align.inputAlignTo)
-            #     out_aligned = align.outputAligned.createOutputQueue()
-            #     out_aligned.setName('depth_aligned')
-            #     out_q.append(out_aligned)
-
-            if 'disparity' in self._outputs:
-                out_disparity = stereo.disparity.createOutputQueue()
-                out_disparity.setName('disparity')
-                out_q.append(out_disparity)
-
-            if 'rectified_left' in self._outputs:
-                out_rectified_left = stereo.rectifiedLeft.createOutputQueue()
-                out_rectified_left.setName('rectified_left')
-                out_q.append(out_rectified_left)
-
-            if 'rectified_right' in self._outputs:
-                out_rectified_right = stereo.rectifiedRight.createOutputQueue()
-                out_rectified_right.setName('rectified_right')
-                out_q.append(out_rectified_right)
-
-            if 'pcl' in self._outputs:
-                raise NotImplementedError('Generating a pointcloud on the device is not implemented')
-
-            if not self._stereo_config is None:
-                self._stereo_config.configure_stereo_node(stereo)
-
-            if self._calib is None:
-                print('Warning: using device calibration!')
+        timestamp_ms = 0  # needed for sync stage in Stereo node
+        frame_interval_ms = 50
+        start = time.perf_counter()
+        frames_count = 0
+        for idx, frame in enumerate(frames):
+            frames_count += 1
+            if len(frame) == 2:
+                left_frame, right_frame = frame
+                rgb_frame = np.stack((left_frame, left_frame, np.zeros_like(left_frame)), axis=-1).astype(np.uint8)
+            elif len(frame) == 3:
+                left_frame, right_frame, rgb_frame = frame
             else:
-                pipeline.setCalibrationData(self._calib)
+                raise ValueError(f'Unexpected length of frame {len(frame)}. Expected 2 or 3.')
+            tstamp = datetime.timedelta(seconds = timestamp_ms // 1000,
+                        milliseconds = timestamp_ms % 1000)
+            # TODO send RGB as well (, 'rgb': rgb_frame)
+            _send_images(self._in_q, {'left': left_frame.astype(np.uint8), 'right': right_frame.astype(np.uint8)}, ts=tstamp)
+            timestamp_ms += frame_interval_ms
 
-            pipeline.start()
-            in_q = {
-                'left': mono_left,
-                'right': mono_right
-            }
-
-            output_queues = {q.getName(): q for q in out_q}
-
-            timestamp_ms = 0  # needed for sync stage in Stereo node
-            frame_interval_ms = 50
-            start = time.perf_counter()
-            frames_count = 0
-            sent_frames = 0
-            wait_offset = 3  # send N frames before expecting results from the first
-            for idx, frame in enumerate(frames):
-                frames_count += 1
-                if len(frame) == 2:
-                    left_frame, right_frame = frame
-                    rgb_frame = np.stack((left_frame, left_frame, np.zeros_like(left_frame)), axis=-1).astype(np.uint8)
-                elif len(frame) == 3:
-                    left_frame, right_frame, rgb_frame = frame
-                else:
-                    raise ValueError(f'Unexpected length of frame {len(frame)}. Expected 2 or 3.')
-                tstamp = datetime.timedelta(seconds = timestamp_ms // 1000,
-                            milliseconds = timestamp_ms % 1000)
-                # TODO send RGB as well (, 'rgb': rgb_frame)
-                _send_images(in_q, {'left': left_frame.astype(np.uint8), 'right': right_frame.astype(np.uint8)}, ts=tstamp)
-                sent_frames += 1
-                timestamp_ms += frame_interval_ms
-
-                if not pipeline.isRunning():
-                    raise RuntimeError('Pipeline stopped before all frames were processed')
-                if idx >= wait_offset:
-                    yield _get_data(output_queues)
-                    sent_frames -= 1
-            for _ in range(sent_frames):
-                yield _get_data(output_queues)
-            end = time.perf_counter()
+            if not self._pipeline.isRunning():
+                raise RuntimeError('Pipeline stopped before all frames were processed')
+            yield _get_data(self._output_queues)
+        end = time.perf_counter()
 
         self._runtime_statistics = {
             'spf': (end - start) / frames_count,  # seconds per frame

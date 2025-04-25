@@ -54,7 +54,7 @@ default_config = {
     'cfg.costMatching.linearEquationParameters.beta': 2,
     'cfg.costMatching.linearEquationParameters.threshold': 127,
     'cfg.costMatching.enableCompanding': False,
-    'cfg.algorithmControl.leftRightCheckThreshold': 5
+    'cfg.algorithmControl.leftRightCheckThreshold': 10  # 5 for high accuracy, 10 for high density
 }
 
 
