@@ -34,7 +34,7 @@ class ReplayVisualizer:
         self.toplLevel.protocol("WM_DELETE_WINDOW", self.close)
 
         self.screen_width, self.screen_height = get_current_monitor_size(self.toplLevel)
-        print(self.screen_width, self.screen_height)
+        print(f"[Replay]: screen w x h = {self.screen_width} x {self.screen_height}")
         self.toplLevel.geometry(f"{self.screen_width}x{self.screen_height}")
         self.toplLevel.resizable(True, True)
 
@@ -47,7 +47,7 @@ class ReplayVisualizer:
 
         self.device_info = view_info['device_info']
 
-        print(self.device_info)
+        print(f"[Replay]: device info: {self.device_info}")
 
         self.last_generated_depth = None
         self.generated_depth1 = None
@@ -90,8 +90,12 @@ class ReplayVisualizer:
         self.depth_generate_thread1 = threading.Thread(target=lambda: None)
         self.depth_generate_thread2 = threading.Thread(target=lambda: None)
 
+        # self.replay_outputs = {'depth','pcl'}
+        self.replay_outputs = {'depth',}
+
         self.replayer = None
         self.replayer_ready = threading.Event()
+        self.replayer_lock = threading.Lock()
 
         threading.Thread(target=self.initialize_replayer, daemon=True).start()
 
@@ -109,30 +113,17 @@ class ReplayVisualizer:
         return current_config
 
     def initialize_replayer(self):
-        self.replayer = Replay(
-            device_info=self.device_info,
-            outputs={'depth', 'pcl'},
-            stereo_config=StereoConfig({
-                'stereo.setDepthAlign': 'dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_RIGHT'
-            })
-        )
-        self.replayer_ready.set()
-
-    def start_replay_checker_thread(self, frame):
-        def checker():
-            for i in range(10):
-                alive1 = self.depth_generate_thread1.is_alive()
-                alive2 = self.depth_generate_thread2.is_alive()
-                if not alive1 and not alive2:
-                    return
-                time.sleep(0.5)
-            print("Threads still running after 5 checks.")
-
-        threading.Thread(target=checker, daemon=True).start()
+        with self.replayer_lock:
+            self.replayer = Replay(
+                device_info=self.device_info,
+                outputs=self.replay_outputs,
+                stereo_config=StereoConfig({
+                    'stereo.setDepthAlign': 'dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_RIGHT'
+                })
+            )
+            self.replayer_ready.set()
 
     def replay_start_thread(self, button_values, frame=None):
-        self.start_replay_checker_thread(frame)
-
         if button_values["settings_section_number"] == 1:
             self.depth_generate_thread1 = threading.Thread(target=self.replay_select_section, args=(button_values, frame,))
             self.depth_generate_thread1.start()
@@ -141,7 +132,7 @@ class ReplayVisualizer:
             self.depth_generate_thread2.start()
     def replay_select_section(self, button_values, frame=None):
         settings_section_number = button_values['settings_section_number']
-        print(f"GENERATE THREAD: {settings_section_number}")
+        print(f"[Thread {settings_section_number}][{threading.current_thread().ident}]: Started")
 
         self.last_config = self.config_json
         self.config_json = convert_current_button_values_to_config(button_values, frame)
@@ -173,9 +164,9 @@ class ReplayVisualizer:
 
         self.refresh_display(label="Updated")
         self.main_frame.update_idletasks()
-        print(f"Thread {settings_section_number} finished")
+        print(f"[Thread {settings_section_number}][{threading.current_thread().ident}]: Finished")
     def replay_generate_one_frame(self, output_folder=None):
-        print("Generating depth for ONE timestamp")
+        print("[Replay Depth]: generating...")
         left = self.current_view["left"]
         right = self.current_view["right"]
 
@@ -188,42 +179,44 @@ class ReplayVisualizer:
         calib = self.view_info["calib"]
 
         if left is None or right is None:
-            print("No left or right frames provided, closing replay")
+            print("[WARNING][Replay Depth]: No left or right frames provided, closing replay")
             return
 
         if calib is None:
-            print("No calibration provided, closing replay")
+            print("[WARNING][Replay Depth]: No calibration provided, closing replay")
             return
 
         if color is None:
-            print("No color specified")
             color = left
 
         # FIXED - sends two frames and takes the second, works with decimation filter
-        replayed = tuple(self.replayer.replay(
-            (
-                (left, right, color),
-                (left, right, color)),
-            calib=calib,
-            stereo_config=StereoConfig(config)
-        ))
-        depth = replayed[1]['depth']
-        pcl = replayed[1]['pcl']
+        with self.replayer_lock:
+            replayed = tuple(self.replayer.replay(
+                (
+                    (left, right, color),
+                    (left, right, color)),
+                calib=calib,
+                stereo_config=StereoConfig(config)
+            ))
+            depth = replayed[1]['depth']
 
-        aligned_to_rgb = self.config_json['stereo.setDepthAlign'] == "dai.CameraBoardSocket.CAM_A"
-        pcl = process_pointcloud(pcl, depth, color, aligned_to_rgb)
+            if 'pcl' in self.replay_outputs:
+                pcl = replayed[1]['pcl']
 
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.ply') as tmp_file:
-            o3d.io.write_point_cloud(tmp_file.name, pcl)
+                aligned_to_rgb = self.config_json['stereo.setDepthAlign'] == "dai.CameraBoardSocket.CAM_A"
+                pcl = process_pointcloud(pcl, depth, color, aligned_to_rgb)
 
-        self.last_generated_depth = depth
-        self.last_generated_pcl_path = tmp_file.name
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.ply') as tmp_file:
+                    o3d.io.write_point_cloud(tmp_file.name, pcl)
 
-        print("GENERATED")
+                self.last_generated_pcl_path = tmp_file.name
+
+            self.last_generated_depth = depth
+
+            print("[Replay Depth]: GENERATED")
         return output_folder
 
     def on_mouse_wheel(self, event):
-        # print(event.widget)
         if event.delta > 0:
             self.on_mouse_wheel_up(event)
         elif event.delta < 0:
@@ -529,7 +522,7 @@ class ReplayVisualizer:
         generated_json_text.config(state=tk.DISABLED)  # Disable editing again
 
     def refresh_display(self, label=None):
-        print("Refresh display:", label)
+        print("[Display Refresh]:", label)
 
         self.refresh_generated_depth_or_placeholder(self.generated_depth1, self.generated_depth_image1, label)
         self.refresh_generated_depth_or_placeholder(self.generated_depth2, self.generated_depth_image2, label)
@@ -605,7 +598,7 @@ class ReplayVisualizer:
         self.output_folder = self.get_or_create_output_folder()
 
         if self.depth_in_replay_outputs:
-            print("Previously generated, updating...")
+            print("[SAVING]: Previously generated, updating...")
 
         if collumn_in_main == 0:
             depth = self.generated_depth1
@@ -619,8 +612,7 @@ class ReplayVisualizer:
         pcl = o3d.io.read_point_cloud(pcl_path)
 
         if self._save_depth_pcl(depth, pcl, config, timestamp):
-            print(f"SAVED data successfully: {self.output_folder}")
-
+            print(f"[SAVING]: data saved to: {self.output_folder}")
     def _save_depth_pcl(self, depth, pcl, config, timestamp):
         try:
             np.save(os.path.join(self.output_folder, f"depth_{timestamp}.npy"), depth)
@@ -636,7 +628,7 @@ class ReplayVisualizer:
                 json.dump(config, f, indent=4)
             return True
         except Exception as e:
-            print(e)
+            print("[Save Exception]:", e)
             return False
 
 
@@ -704,7 +696,6 @@ if __name__ == '__main__':
         image = np.load(image_path)
         current_view[key] = image.copy()
 
-    print("initialization...")
     repVis = ReplayVisualizer(root, view_info, current_view)
     repVis.create_layout()
     repVis.refresh_display(label="Generate Depth")
