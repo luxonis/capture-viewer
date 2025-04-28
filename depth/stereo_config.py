@@ -72,10 +72,10 @@ class StereoConfig:
     def from_stereo_node_cfg(cls, _cfg):
         """Get configuration from a dai.node.StereoDepth node config."""
         return StereoConfig({
-            # 'stereo.setRectification': True,  # TODO use enableRectification
+            'stereo.setRectification': True,  # TODO use enableRectification
             'cfg.costMatching.confidenceThreshold': _cfg.costMatching.confidenceThreshold,
             # algorithmControl
-            'cfg.algorithmControl.depthAlign': 'dai.StereoDepthConfig.AlgorithmControl.DepthAlign.' + _cfg.algorithmControl.depthAlign.name,
+            'stereo.setDepthAlign': 'dai.StereoDepthConfig.AlgorithmControl.DepthAlign.' + _cfg.algorithmControl.depthAlign.name,
             'cfg.algorithmControl.depthUnit': 'dai.StereoDepthConfig.AlgorithmControl.DepthUnit.' + _cfg.algorithmControl.depthUnit.name,
             'cfg.algorithmControl.customDepthUnitMultiplier': _cfg.algorithmControl.customDepthUnitMultiplier,
             'cfg.algorithmControl.enableLeftRightCheck': _cfg.algorithmControl.enableLeftRightCheck,
@@ -224,11 +224,60 @@ class StereoConfig:
                     exec(f'{k}={v}')
                     unused_keys.remove(k)
                     # print('  => ', rgetattr(locals()[k0], kN))
-        if not cfg is None and dai.__version__.startswith('2.'):
-            stereo.initialConfig.set(cfg)
+        # if not cfg is None and dai.__version__.startswith('2.'):
+        #     stereo.initialConfig.set(cfg)
 
         if len(unused_keys):
             raise ValueError('Unused configuration keys:', unused_keys)
+
+    def configure_stereo_depth_config(self, cfg):
+        '''Apply configuration to a dai.StereoDepthConfig.'''
+        # print(f'DEBUG: StereoConfig.configure_stereo_depth_config():\n  stereo_config: {self}')
+        config = copy.deepcopy(self._cfg)
+        import depthai as dai
+        __is_dai3 = dai.__version__.startswith('3.')
+        assert not __is_dai3
+
+        # try:
+        #     # Split filtering cfg.postProcessing.filteringOrder if composed of a single string
+        #     config['cfg.postProcessing.filteringOrder'] = config['cfg.postProcessing.filteringOrder'].split(',')
+        # except (KeyError, AttributeError):
+        #     pass
+
+        unused_keys = list(config.keys())
+        # We need to set the stereo params first, then initial config (cfg)
+        for key_prefix in ('cfg.',):
+            for k, v in config.items():
+                if not k.startswith(key_prefix):
+                    continue
+                # print(f'{k} -> {v}')
+                k0, _, kN = k.partition('.')
+                # if k0 == 'cfg' and cfg is None:
+                # workaround for versions 2.28.0.0 and lower
+                # if not hasattr(cfg.postProcessing, 'filteringOrder') and 'cfg.postProcessing.filteringOrder' in config:
+                #     # TODO This might cause a KeyError, but only on 2.28.0.0..
+                #     print('WARNING: Ignoring cfg.postProcessing.filteringOrder settings, since it is not implemented in this version of depthai')
+                #     unused_keys.remove('cfg.postProcessing.filteringOrder')
+                #     del config['cfg.postProcessing.filteringOrder']
+
+                # print(' - stereo.initialConfig.get()')
+                if isinstance(v, (list, tuple)):
+                    v = ','.join(v)
+                try:
+                    # print(f' - trying calling {k} as a function')
+                    eval(f'{k}({v})')
+                    unused_keys.remove(k)
+                    # fn(v)
+                except (TypeError, SyntaxError):  # not callable, try setting it directly
+                    # print(f' - trying setting {k} as a variable')
+                    # rsetattr(locals()[k0], kN, v)
+                    # print(f' - {k}={v}')
+                    exec(f'{k}={v}')
+                    unused_keys.remove(k)
+                    # print('  => ', rgetattr(locals()[k0], kN))
+
+        # if len(unused_keys):
+        #     raise ValueError('Unused configuration keys:', unused_keys)
 
     def __setitem__(self, key, value):
         _equivalent = (
@@ -237,14 +286,14 @@ class StereoConfig:
             ('stereo.setExtendedDisparity', 'cfg.algorithmControl.enableExtended'),
             ('stereo.setLeftRightCheck', 'cfg.algorithmControl.enableLeftRightCheck'),
             ('stereo.setConfidenceThreshold', 'cfg.costMatching.confidenceThreshold'),
-            ('stereo.setDepthAlign', 'cfg.algorithmControl.depthAlign'),
             ('stereo.setMedianFilter', 'cfg.postProcessing.median'),
             ('stereo.initialConfig.setMedianFilter', 'cfg.postProcessing.median'),
+            ('stereo.setDepthAlign', 'cfg.algorithmControl.depthAlign'),
         )
 
         for a, b in _equivalent:
             if key == a:
-                print(f'INFO: Using "{a}" is not recommended, use "{b}" instead, which should be quivalent')
+                # print(f'INFO: Using "{a}" is not recommended, use "{b}" instead, which should be quivalent')
                 # raise NotImplementedError(f'Using {a} is not recommended, use {b} instead')
                 if b in self._cfg:
                     raise ValueError(f'Config contains both {a} and {b}')
@@ -262,4 +311,7 @@ class StereoConfig:
         return key in self._cfg
 
     def keys(self):
-        return self._cfg.keys()
+        yield from self._cfg.keys()
+
+    def items(self):
+        yield from self._cfg.items()

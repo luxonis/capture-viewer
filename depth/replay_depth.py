@@ -11,7 +11,7 @@ import depthai as dai
 import numpy as np
 import tenacity
 from .timeout import timeout
-from depth.utils import batched
+from .utils import batched
 from .stereo_config import StereoConfig
 
 __is_dai3 = dai.__version__.startswith('3.')
@@ -127,9 +127,9 @@ def replay(frames, *, calib=None, stereo_config=StereoConfig({}), outputs:Set[st
         yield from replayer.replay(frames, calib=calib)
 
 
-def _create_pipeline_v2(outputs, depth_align):
+def _create_pipeline_v2(outputs, depth_align, set_rectification):
     """Create a pipeline to compute desired outputs."""
-    # print(f'DEBUG: _create_pipeline_v2({depth_align})')
+    # print(f'DEBUG: _create_pipeline_v2({depth_align}, set_rectification={set_rectification})')
     if not outputs:
         raise ValueError('No output specified')
 
@@ -181,6 +181,7 @@ def _create_pipeline_v2(outputs, depth_align):
     stereo = pipeline.create(dai.node.StereoDepth)
     stereo.setRuntimeModeSwitch(True)  # allow runtime switch of stereo modes
     # stereo.setDepthAlign(eval(depth_align))
+    stereo.setRectification(set_rectification)
 
     xin_stereo_depth_config = pipeline.create(dai.node.XLinkIn)
     xin_stereo_depth_config.setStreamName('stereo_config')
@@ -251,15 +252,18 @@ class ReplayV2:
         - device_info: optional depthai.DeviceInfo to use specified device
         """
         # print(f'DEBUG: ReplayV2.__init__():\n  stereo_config: {stereo_config}')
+        # Set rectification cannot be obtained from StereoDepth node config
         self._current_set_rectification = stereo_config.get('stereo.setRectification', True)
+        # When depth alignment changes, we need to reset the pipeline
         self._current_depth_align = stereo_config.get('stereo.setDepthAlign', 'dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_LEFT')
-        self._current_stereo_preset = stereo_config.get('stereo.setDefaultProfilePreset', None)
+        # self._current_stereo_preset = stereo_config.get('stereo.setDefaultProfilePreset', None)
 
         self._pipeline = None
         self._outputs = outputs
         self._runtime_statistics = {}
         self._device_info = device_info
         self._setup(stereo_config=stereo_config)
+        self._stereo_depth_cfg = dai.StereoDepthConfig()
 
     @tenacity.retry(
         stop=tenacity.stop_after_attempt(3),
@@ -273,16 +277,24 @@ class ReplayV2:
             del self._device
         if self._pipeline is None or \
                 stereo_config.get('stereo.setDepthAlign', self._current_depth_align) != self._current_depth_align or \
-                stereo_config.get('stereo.setRectification', self._current_set_rectification) != self._current_set_rectification or \
-                stereo_config.get('stereo.setDefaultProfilePreset', self._current_stereo_preset) != self._current_stereo_preset:
+                stereo_config.get('stereo.setRectification', self._current_set_rectification) != self._current_set_rectification:
+            #     stereo_config.get('stereo.setDefaultProfilePreset', self._current_stereo_preset) != self._current_stereo_preset:
             if not self._pipeline is None:
                 del self._pipeline
                 del self._stereo
-            self._current_depth_align = stereo_config.get('stereo.setDepthAlign', self._current_depth_align)  # update setDepthAlign if present in the config
-            self._pipeline, self._stereo, self._xOut = _create_pipeline_v2(self._outputs, self._current_depth_align)
-            self._default_config = StereoConfig.from_stereo_node_cfg(self._stereo.initialConfig.get())
 
-        stereo_config.configure_stereo_node(self._stereo)
+            self._pipeline, self._stereo, self._xOut = _create_pipeline_v2(
+                self._outputs,
+                stereo_config.get('stereo.setDepthAlign', self._current_depth_align),
+                stereo_config.get('stereo.setRectification', self._current_set_rectification)
+            )
+            self._stereo_depth_config = self._stereo.initialConfig.get()  # this is the magic bit that I was missing
+            self._default_config = StereoConfig.from_stereo_node_cfg(dai.StereoDepthConfig().get())
+        self._current_depth_align = stereo_config.get('stereo.setDepthAlign', self._current_depth_align)  # update setDepthAlign if present in the config
+        self._current_set_rectification = stereo_config.get('stereo.setRectification', self._current_set_rectification)
+        # stereo_config.configure_stereo_node(self._stereo)  # some settings can only be done throught the stereo node? = setDefaultPreset
+        stereo_config.configure_stereo_depth_config(self._stereo_depth_config)
+
 
         self._device = get_device(device_info=self._device_info)
         self._device.startPipeline(self._pipeline)
@@ -316,17 +328,19 @@ class ReplayV2:
             #         break
             # if need_restart:
             #     self._setup(stereo_config)
-            if stereo_config.get('stereo.setDepthAlign', self._current_depth_align) != self._current_depth_align:
+            if stereo_config.get('stereo.setDepthAlign', self._current_depth_align) != self._current_depth_align or \
+                    stereo_config.get('stereo.setRectification', self._current_set_rectification) != self._current_set_rectification:
+                # print(f'DEBUG: ReplayV2.replay() needs to reset pipeline and device')
                 self._setup(stereo_config)
-                self._current_depth_align = stereo_config['stereo.setDepthAlign']
 
-        for frames_subset in batched(frames, 10):
+        for frames_subset in batched(frames, 20):
             for _ in range(timeout_retries):
                 try:
                     subset = tuple(self._replay(frames_subset, calib=calib, stereo_config=stereo_config, workaround_decimation_filter=workaround_decimation_filter))
                     yield from subset
                     break
-                except (TimeoutError, RuntimeError):
+                except (TimeoutError, RuntimeError) as e:
+                    print(f'INFO: ReplayV2.replay(): error while replaying frames ({e}), retrying')
                     # TimeoutError: timeout when sending/receiving frames
                     # RuntimeError: e.g. communication exception, device temporarily disconnected, ...
                     self._setup(stereo_config)
@@ -342,44 +356,51 @@ class ReplayV2:
         #     q_send.send(self._stereo.initialConfig.get())
         # print(f'DEBUG: ReplayV2._send_configuration()')
         q_send = self._device.getInputQueue('stereo_config')
-        input_queues = {
-            "left": self._device.getInputQueue("left"),
-            "right": self._device.getInputQueue("right"),
-            # 'rgb': self._device.getInputQueue('rgb'),
-        }
+        # input_queues = {
+        #     "left": self._device.getInputQueue("left"),
+        #     "right": self._device.getInputQueue("right"),
+        # }
         # print('Getting output queues')
-        output_queues = {name: self._device.getOutputQueue(name, maxSize=1, blocking=True) for name in self._xOut.keys()}
+        # output_queues = {name: self._device.getOutputQueue(name, maxSize=1, blocking=True) for name in self._xOut.keys()}
 
-        cfg = self._stereo.initialConfig.get()
+
+        configMessage = dai.StereoDepthConfig()
+        configMessage.set(self._stereo_depth_config)
+
+        # config_msg = self._stereo.initialConfig.get()
         for try_idx in range(3):
+            # TODO assert that the sent config is used immediately!
             # print(f'Sending config (try {try_idx})')
 
-            q_send.send(cfg)
-            q_send.send(cfg)
-            # q_send.send(self._stereo.initialConfig.get())
-            # Send empty frame to flush the queue, maybe not needed?
-            empty_frame = np.zeros((800, 1280), dtype=np.uint8)
-            _send_images(input_queues, {
-                "left": empty_frame,
-                "right": empty_frame,
-            })
-            # Get empty frames and the config
-            result = {name: queue.get() for name, queue in output_queues.items()}
+            q_send.send(configMessage)
+            q_send.send(configMessage)
+        #     # q_send.send(self._stereo.initialConfig.get())
+        #     # Send empty frame to flush the queue, maybe not needed?
+        #     empty_frame = np.zeros((800, 1280), dtype=np.uint8)
+        #     _send_images(input_queues, {
+        #         "left": empty_frame,
+        #         "right": empty_frame,
+        #     })
+        #     # Get empty frames and the config
+        #     result = {name: queue.get() for name, queue in output_queues.items()}
 
-            # print('Receiving config')
-            cfg_sent = StereoConfig.from_stereo_node_cfg(cfg)
-            cfg_rvcd = StereoConfig.from_stereo_node_cfg(result['stereo_config'].get())
-            if cfg_sent._cfg == cfg_rvcd._cfg:
-                # print(' - configs are equal')
-                break
-        if not cfg_sent._cfg == cfg_rvcd._cfg:
-            raise RuntimeError('Failed to apply StereoDepth configuration by sending the config message')
+        #     # print('Receiving config')
+        #     cfg_sent = StereoConfig.from_stereo_node_cfg(configMessage.get())
+        #     cfg_rvcd = StereoConfig.from_stereo_node_cfg(result['stereo_config'].get())
+        #     if cfg_sent._cfg == cfg_rvcd._cfg:
+        #         # print(' - configs are equal')
+        #         break
+        #     print('INFO: ReplayV2._send_configuration(): retry sending')
+        # if not cfg_sent._cfg == cfg_rvcd._cfg:
+        #     raise RuntimeError('Failed to apply StereoDepth configuration by sending the config message')
 
 
     def _replay(self, frames, *, calib=None, stereo_config=None, workaround_decimation_filter=True):
         if stereo_config is not None:
-            self._default_config.configure_stereo_node(self._stereo)
+            # print(f'DEBUG: ReplayV2._replay() configuring stereo and sending config')
+            # self._default_config.configure_stereo_node(self._stereo)
             stereo_config.configure_stereo_node(self._stereo)
+            stereo_config.configure_stereo_depth_config(self._stereo_depth_config)
             self._send_configuration()
 
         if calib is None:
