@@ -90,8 +90,7 @@ class ReplayVisualizer:
         self.depth_generate_thread1 = threading.Thread(target=lambda: None)
         self.depth_generate_thread2 = threading.Thread(target=lambda: None)
 
-        # self.replay_outputs = {'depth','pcl'}
-        self.replay_outputs = {'depth',}
+        self.replay_outputs = {'depth','pcl'}
 
         self.replayer = None
         self.replayer_ready = threading.Event()
