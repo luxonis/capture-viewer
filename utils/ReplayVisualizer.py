@@ -147,7 +147,7 @@ class ReplayVisualizer:
             self.generated_depth2 = None
             self.pcl_path2 = None
 
-        self.refresh_display(label="Loading...")
+        # self.refresh_display(label="Loading...")
         self.main_frame.update_idletasks()
 
         self.replay_generate_one_frame()
