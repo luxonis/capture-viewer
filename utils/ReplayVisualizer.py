@@ -615,10 +615,10 @@ class ReplayVisualizer:
     def _save_depth_pcl(self, depth, pcl, config, timestamp):
         try:
             np.save(os.path.join(self.output_folder, f"depth_{timestamp}.npy"), depth)
-            colorized_depth, _, _ = colorize_depth(depth, "depth", label=False, color_noise_percent_removal=0)
+            colorized_depth, _, _ = colorize_depth(depth, "depth", label=False, color_noise_percent_removal=0, colormap=self.get_colormap())
             colorized_depth = cv2.cvtColor(colorized_depth, cv2.COLOR_RGB2BGR)
             cv2.imwrite(os.path.join(self.output_folder, f"depth_{timestamp}.png"), colorized_depth)
-            colorized_depth, _, _ = colorize_depth(depth, "depth", label=False, color_noise_percent_removal=1)
+            colorized_depth, _, _ = colorize_depth(depth, "depth", label=False, color_noise_percent_removal=1, colormap=self.get_colormap())
             colorized_depth = cv2.cvtColor(colorized_depth, cv2.COLOR_RGB2BGR)
             cv2.imwrite(os.path.join(self.output_folder, f"depth_{timestamp}_.png"), colorized_depth)
             o3d.io.write_point_cloud(os.path.join(self.output_folder, f"pcl_{timestamp}.ply"), pcl)
