@@ -317,19 +317,12 @@ class ReplayV2:
         """
         # print(f'DEBUG: ReplayV2.replay()\n  stereo_config: {stereo_config}')
         if not stereo_config is None:
-            # need_restart = False
-            # for k in stereo_config.keys():
-            #     if k == 'stereo.setRectification' and stereo_config['stereo.setRectification'] == self._current_set_rectification:
-            #         continue
-            #     if k == 'stereo.setDepthAlign' and stereo_config['stereo.setDepthAlign'] == self._current_set_rectification:
-            #         continue
-            #     if k.startswith('stereo.'):
-            #         need_restart = True
-            #         break
-            # if need_restart:
-            #     self._setup(stereo_config)
-            if stereo_config.get('stereo.setDepthAlign', self._current_depth_align) != self._current_depth_align or \
-                    stereo_config.get('stereo.setRectification', self._current_set_rectification) != self._current_set_rectification:
+            need_restart = False
+            if stereo_config.get('stereo.setDepthAlign', self._current_depth_align) != self._current_depth_align:
+                need_restart = True
+            if stereo_config.get('stereo.setRectification', self._current_set_rectification) != self._current_set_rectification:
+                need_restart = True
+            if need_restart:
                 # print(f'DEBUG: ReplayV2.replay() needs to reset pipeline and device')
                 self._setup(stereo_config)
 
@@ -397,8 +390,10 @@ class ReplayV2:
 
     def _replay(self, frames, *, calib=None, stereo_config=None, workaround_decimation_filter=True):
         if stereo_config is not None:
-            # print(f'DEBUG: ReplayV2._replay() configuring stereo and sending config')
-            # self._default_config.configure_stereo_node(self._stereo)
+            print(f'DEBUG: ReplayV2._replay() configuring stereo and sending config')
+            print(stereo_config)
+            self._default_config.configure_stereo_node(self._stereo)
+            self._default_config.configure_stereo_depth_config(self._stereo_depth_config)
             stereo_config.configure_stereo_node(self._stereo)
             stereo_config.configure_stereo_depth_config(self._stereo_depth_config)
             self._send_configuration()
@@ -620,11 +615,13 @@ class ReplayV3:
                         milliseconds = timestamp_ms % 1000)
             # TODO send RGB as well (, 'rgb': rgb_frame)
             _send_images(self._in_q, {'left': left_frame.astype(np.uint8), 'right': right_frame.astype(np.uint8)}, ts=tstamp)
+            sent_frames += 1
             timestamp_ms += frame_interval_ms
 
             if not self._pipeline.isRunning():
                 raise RuntimeError('Pipeline stopped before all frames were processed')
             yield _get_data(self._output_queues)
+            sent_frames -= 1
         end = time.perf_counter()
 
         self._runtime_statistics = {

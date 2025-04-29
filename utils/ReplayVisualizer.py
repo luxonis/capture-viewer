@@ -27,6 +27,13 @@ from depth.stereo_config import StereoConfig
 
 from utils.convert import *
 
+from tkinter import Frame
+
+from queue import Queue
+
+from ReplayThread import ReplayThread, ReplayRequest
+
+
 class ReplayVisualizer:
     def __init__(self, root, view_info, current_view):
         self.toplLevel = tk.Toplevel(root)
@@ -87,16 +94,21 @@ class ReplayVisualizer:
         self.button_values1 = {"settings_section_number" : 1}  # button_key: value
         self.button_values2 = {"settings_section_number" : 2}  # button_key: value
 
-        self.depth_generate_thread1 = threading.Thread(target=lambda: None)
-        self.depth_generate_thread2 = threading.Thread(target=lambda: None)
+        # self.depth_generate_thread1 = threading.Thread(target=lambda: None)
+        # self.depth_generate_thread2 = threading.Thread(target=lambda: None)
 
-        self.replay_outputs = {'depth','pcl'}
+        self.replay_outputs = {'depth', 'pcl'}
 
-        self.replayer = None
-        self.replayer_ready = threading.Event()
-        self.replayer_lock = threading.Lock()
+        self.replay_input_q = Queue()
+        self.replay_output_q = Queue()
 
-        threading.Thread(target=self.initialize_replayer, daemon=True).start()
+        self.replay_thread = ReplayThread(self.replay_input_q, self.replay_output_q)
+        self.replay_thread.start()
+        self.replay_thread.initialize_replayer(self.device_info, self.replay_outputs)
+        self.replay_thread.process_requests()
+
+
+
 
     def close(self):
         del self.replayer
@@ -111,109 +123,139 @@ class ReplayVisualizer:
             current_config = default_config
         return current_config
 
-    def initialize_replayer(self):
-        with self.replayer_lock:
-            self.replayer = Replay(
-                device_info=self.device_info,
-                outputs=self.replay_outputs,
-                stereo_config=StereoConfig({
-                    'stereo.setDepthAlign': 'dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_RIGHT'
-                })
-            )
-            self.replayer_ready.set()
+    def replay_send_request(self, button_values, frame=None):
+        if not self.replay_thread.is_alive():
+            raise ValueError("Replay thread is not running")
 
-    def replay_start_thread(self, button_values, frame=None):
-        if button_values["settings_section_number"] == 1:
-            self.depth_generate_thread1 = threading.Thread(target=self.replay_select_section, args=(button_values, frame,))
-            self.depth_generate_thread1.start()
-        elif button_values["settings_section_number"] == 2:
-            self.depth_generate_thread2 = threading.Thread(target=self.replay_select_section, args=(button_values, frame,))
-            self.depth_generate_thread2.start()
-    def replay_select_section(self, button_values, frame=None):
-        settings_section_number = button_values['settings_section_number']
-        print(f"[Thread {settings_section_number}][{threading.current_thread().ident}]: Started")
-
+        self.last_generated_depth = None
         self.last_config = self.config_json
         self.config_json = convert_current_button_values_to_config(button_values, frame)
 
-        self.last_generated_depth = None
+        settings_section_number = button_values['settings_section_number']
 
-        if settings_section_number == 1:
-            self.config_json1 = self.config_json
-            self.generated_depth1 = None
-            self.pcl_path1 = None
-        elif settings_section_number == 2:
-            self.config_json2 = self.config_json
-            self.generated_depth2 = None
-            self.pcl_path2 = None
+        request = ReplayRequest(
+            left=self.current_view["left"],
+            right=self.current_view["right"],
+            color=self.current_view["rgb"],
+            calibration=self.view_info["calib"],
+            config=self.config_json,
+            section=settings_section_number,
+            parent_frame=frame
+        )
 
+        self.replay_input_q.put(request)
+
+    def replay_main(self, settings_section_number):
+        # refresh display
         self.refresh_display(label="Loading...")
         self.main_frame.update_idletasks()
 
-        self.replay_generate_one_frame()
-
         if settings_section_number == 1:
-            self.generated_depth1 = self.last_generated_depth
-            self.pcl_path1 = self.last_generated_pcl_path
+            self.replay_send_request(self.button_values1, frame=None)
         elif settings_section_number == 2:
-            self.generated_depth2 = self.last_generated_depth
-            self.pcl_path2 = self.last_generated_pcl_path
-        
+            self.replay_send_request(self.button_values2, frame=None)
+
+        # wait for output queue - todo in thread
+        last_generated_depth, last_generated_pcl_path = self.replay_output_q.get()
+        self.replay_output_q.task_done()
+        if settings_section_number == 1:
+            self.generated_depth1 = last_generated_depth
+            self.pcl_path1 = last_generated_pcl_path
+        elif settings_section_number == 2:
+            self.generated_depth2 = last_generated_depth
+            self.pcl_path2 = last_generated_pcl_path
+
         self.depth_range_min, self.depth_range_max = get_min_max_depths(self.generated_depth1, self.generated_depth2)
 
+        # refresh display
         self.refresh_display(label="Updated")
         self.main_frame.update_idletasks()
-        print(f"[Thread {settings_section_number}][{threading.current_thread().ident}]: Finished")
-    def replay_generate_one_frame(self, output_folder=None):
-        print("[Replay Depth]: generating...")
-        left = self.current_view["left"]
-        right = self.current_view["right"]
 
-        # if len(left.shape) == 3 and len(right.shape) == 3:
-        #     left = cv2.cvtColor(left, cv2.COLOR_BGR2GRAY)
-        #     right = cv2.cvtColor(right, cv2.COLOR_BGR2GRAY)
-
-        color = self.current_view["rgb"]
-        config = self.config_json
-        calib = self.view_info["calib"]
-
-        if left is None or right is None:
-            print("[WARNING][Replay Depth]: No left or right frames provided, closing replay")
-            return
-
-        if calib is None:
-            print("[WARNING][Replay Depth]: No calibration provided, closing replay")
-            return
-
-        if color is None:
-            color = left
-
-        # FIXED - sends two frames and takes the second, works with decimation filter
-        with self.replayer_lock:
-            replayed = tuple(self.replayer.replay(
-                (
-                    (left, right, color),
-                    (left, right, color)),
-                calib=calib,
-                stereo_config=StereoConfig(config)
-            ))
-            depth = replayed[1]['depth']
-
-            if 'pcl' in self.replay_outputs:
-                pcl = replayed[1]['pcl']
-
-                aligned_to_rgb = self.config_json['stereo.setDepthAlign'] == "dai.CameraBoardSocket.CAM_A"
-                pcl = process_pointcloud(pcl, depth, color, aligned_to_rgb)
-
-                with tempfile.NamedTemporaryFile(delete=False, suffix='.ply') as tmp_file:
-                    o3d.io.write_point_cloud(tmp_file.name, pcl)
-
-                self.last_generated_pcl_path = tmp_file.name
-
-            self.last_generated_depth = depth
-
-            print("[Replay Depth]: GENERATED")
-        return output_folder
+    # def replay_select_section(self, button_values, frame=None):
+    #     settings_section_number = button_values['settings_section_number']
+    #     print(f"[Thread {settings_section_number}][{threading.current_thread().ident}]: Started")
+    #
+    #     self.last_config = self.config_json
+    #     self.config_json = convert_current_button_values_to_config(button_values, frame)
+    #
+    #     self.last_generated_depth = None
+    #
+    #     if settings_section_number == 1:
+    #         self.config_json1 = self.config_json
+    #         self.generated_depth1 = None
+    #         self.pcl_path1 = None
+    #     elif settings_section_number == 2:
+    #         self.config_json2 = self.config_json
+    #         self.generated_depth2 = None
+    #         self.pcl_path2 = None
+    #
+    #     self.refresh_display(label="Loading...")
+    #     self.main_frame.update_idletasks()
+    #
+    #     self.replay_generate_one_frame()
+    #
+    #     if settings_section_number == 1:
+    #         self.generated_depth1 = self.last_generated_depth
+    #         self.pcl_path1 = self.last_generated_pcl_path
+    #     elif settings_section_number == 2:
+    #         self.generated_depth2 = self.last_generated_depth
+    #         self.pcl_path2 = self.last_generated_pcl_path
+    #
+    #     self.depth_range_min, self.depth_range_max = get_min_max_depths(self.generated_depth1, self.generated_depth2)
+    #
+    #     self.refresh_display(label="Updated")
+    #     self.main_frame.update_idletasks()
+    #     print(f"[Thread {settings_section_number}][{threading.current_thread().ident}]: Finished")
+    # def replay_generate_one_frame(self, output_folder=None):
+    #     print("[Replay Depth]: generating...")
+    #     left = self.current_view["left"]
+    #     right = self.current_view["right"]
+    #
+    #     # if len(left.shape) == 3 and len(right.shape) == 3:
+    #     #     left = cv2.cvtColor(left, cv2.COLOR_BGR2GRAY)
+    #     #     right = cv2.cvtColor(right, cv2.COLOR_BGR2GRAY)
+    #
+    #     color = self.current_view["rgb"]
+    #     config = self.config_json
+    #     calib = self.view_info["calib"]
+    #
+    #     if left is None or right is None:
+    #         print("[WARNING][Replay Depth]: No left or right frames provided, closing replay")
+    #         return
+    #
+    #     if calib is None:
+    #         print("[WARNING][Replay Depth]: No calibration provided, closing replay")
+    #         return
+    #
+    #     if color is None:
+    #         color = left
+    #
+    #     # FIXED - sends two frames and takes the second, works with decimation filter
+    #     with self.replayer_lock:
+    #         replayed = tuple(self.replayer.replay(
+    #             (
+    #                 (left, right, color),
+    #                 (left, right, color)),
+    #             calib=calib,
+    #             stereo_config=StereoConfig(config)
+    #         ))
+    #         depth = replayed[1]['depth']
+    #
+    #         if 'pcl' in self.replay_outputs:
+    #             pcl = replayed[1]['pcl']
+    #
+    #             aligned_to_rgb = self.config_json['stereo.setDepthAlign'] == "dai.CameraBoardSocket.CAM_A"
+    #             pcl = process_pointcloud(pcl, depth, color, aligned_to_rgb)
+    #
+    #             with tempfile.NamedTemporaryFile(delete=False, suffix='.ply') as tmp_file:
+    #                 o3d.io.write_point_cloud(tmp_file.name, pcl)
+    #
+    #             self.last_generated_pcl_path = tmp_file.name
+    #
+    #         self.last_generated_depth = depth
+    #
+    #         print("[Replay Depth]: GENERATED")
+    #     return output_folder
 
     def on_mouse_wheel(self, event):
         if event.delta > 0:
@@ -353,7 +395,7 @@ class ReplayVisualizer:
         initial_config = self.get_initial_config(original_config=None)
         inicialize_button_values(initial_config, button_values)
         def fallback_generate_function(*args):
-            self.replay_start_thread(button_values, frame=settings_frame_custom)
+            self.replay_send_request(button_values, frame=settings_frame_custom)
 
         add_trace_to_button_values(button_values, fallback_generate_function)
         create_settings_layout(content_frame, button_values)
@@ -469,9 +511,8 @@ class ReplayVisualizer:
 
 
     def initialize_depth(self):
-        self.replayer_ready.wait()
-        self.toplLevel.after(100, lambda: self.replay_start_thread(self.button_values1))
-        self.toplLevel.after(200, lambda: self.replay_start_thread(self.button_values2))
+        self.replay_send_request(self.button_values1)
+        self.replay_send_request(self.button_values2)
 
     def get_colormap(self):
         if self.selected_colormap.get() == "GREYSCALE":
