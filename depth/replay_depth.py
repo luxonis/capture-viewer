@@ -179,8 +179,13 @@ def _create_pipeline_v2(outputs, depth_align, set_rectification):
     xlink_out['depth'] = pipeline.create(dai.node.XLinkOut)
     xlink_out['depth'].setStreamName("depth")
     stereo = pipeline.create(dai.node.StereoDepth)
-    stereo.setRuntimeModeSwitch(True)  # allow runtime switch of stereo modes
-    # stereo.setDepthAlign(eval(depth_align))
+    if depth_align in ('dai.CameraBoardSocket.CAM_A',
+                    'dai.CameraBoardSocket.CAM_B',
+                    'dai.CameraBoardSocket.CAM_C'):
+        stereo.setRuntimeModeSwitch(False)
+    else:
+        stereo.setRuntimeModeSwitch(True)  # allow runtime switch of stereo modes
+    stereo.setDepthAlign(eval(depth_align))
     stereo.setRectification(set_rectification)
 
     xin_stereo_depth_config = pipeline.create(dai.node.XLinkIn)
@@ -239,8 +244,7 @@ class ReplayV2:
         return self
 
     def __exit__(self, type, value, traceback):
-        if hasattr(self, '_device'):
-            del self._device
+        self._cleanup()
 
     def __init__(self, stereo_config:StereoConfig=StereoConfig(), outputs:Set[str]={'depth',}, device_info=None):
         """
@@ -265,6 +269,16 @@ class ReplayV2:
         self._setup(stereo_config=stereo_config)
         self._stereo_depth_cfg = dai.StereoDepthConfig()
 
+    def _cleanup(self):
+        """Delete device, pipeline and stereo if they exist."""
+        if hasattr(self, '_device'):
+            del self._device
+        if hasattr(self, '_pipeline'):
+            del self._pipeline
+        if hasattr(self, '_stereo'):
+            del self._stereo
+
+
     @tenacity.retry(
         stop=tenacity.stop_after_attempt(3),
         wait=tenacity.wait_exponential(multiplier=2, min=1, max=10),
@@ -273,32 +287,19 @@ class ReplayV2:
     def _setup(self, stereo_config):
         """Connect to a device and start the pipeline."""
         # print(f'DEBUG: ReplayV2._setup():\n  stereo_config: {stereo_config}')
-        if hasattr(self, '_device'):
-            del self._device
-        # if self._pipeline is None or \
-        #         stereo_config.get('stereo.setDepthAlign', self._current_depth_align) != self._current_depth_align or \
-        #         stereo_config.get('stereo.setRectification', self._current_set_rectification) != self._current_set_rectification:
-        #         # stereo_config.get('stereo.setDefaultProfilePreset', 'None') != self._current_stereo_preset:
-        if not self._pipeline is None:
-            del self._pipeline
-            del self._stereo
+        self._cleanup()
 
-        self._pipeline, self._stereo, self._xOut = _create_pipeline_v2(
-            self._outputs,
-            stereo_config.get('stereo.setDepthAlign', self._current_depth_align),
-            stereo_config.get('stereo.setRectification', self._current_set_rectification)
-        )
-        self._stereo_depth_config = self._stereo.initialConfig.get()  # this is the magic bit that I was missing
-        self._default_config = dai.StereoDepthConfig().get()  # StereoConfig.from_stereo_node_cfg()
-        self._current_depth_align = stereo_config.get('stereo.setDepthAlign', self._current_depth_align)  # update setDepthAlign if present in the config
+        self._current_depth_align = stereo_config.get('stereo.setDepthAlign', self._current_depth_align)
         self._current_set_rectification = stereo_config.get('stereo.setRectification', self._current_set_rectification)
         self._current_stereo_preset = stereo_config.get('stereo.setDefaultProfilePreset', 'None')
+        self._pipeline, self._stereo, self._xOut = _create_pipeline_v2(
+            self._outputs,
+            self._current_depth_align,
+            self._current_set_rectification
+        )
+        self._default_config = dai.StereoDepthConfig().get()  # StereoConfig.from_stereo_node_cfg()
         # print(f'DEBUG: ReplayV2._setup():\n  _current_depth_align: {self._current_depth_align}\n  _current_set_rectification: {self._current_set_rectification}\n  _current_stereo_preset: {self._current_stereo_preset}')
-        stereo_config.configure_stereo_node(self._stereo)  # some settings can only be done throught the stereo node? = setDefaultPreset
-        self._stereo_depth_config = self._stereo.initialConfig.get()
-        stereo_config.configure_stereo_depth_config(self._stereo_depth_config)
-        self._stereo.initialConfig.set(self._stereo_depth_config)
-
+        stereo_config.configure_stereo_node(self._stereo)
 
         self._device = get_device(device_info=self._device_info)
         self._device.startPipeline(self._pipeline)
@@ -322,7 +323,10 @@ class ReplayV2:
         # print(f'DEBUG: ReplayV2.replay()\n  stereo_config: {stereo_config}')
         if not stereo_config is None:
             need_restart = False
-            if stereo_config.get('stereo.setDepthAlign', self._current_depth_align) != self._current_depth_align:
+            if stereo_config.get('stereo.setDepthAlign', self._current_depth_align) != self._current_depth_align or \
+                stereo_config.get('stereo.setDepthAlign', self._current_depth_align) in ('dai.CameraBoardSocket.CAM_A',
+                    'dai.CameraBoardSocket.CAM_B',
+                    'dai.CameraBoardSocket.CAM_C'):
                 need_restart = True
             if stereo_config.get('stereo.setRectification', self._current_set_rectification) != self._current_set_rectification:
                 need_restart = True
@@ -362,17 +366,16 @@ class ReplayV2:
         # print('Getting output queues')
         # output_queues = {name: self._device.getOutputQueue(name, maxSize=1, blocking=True) for name in self._xOut.keys()}
 
-
-        configMessage = dai.StereoDepthConfig()
-        configMessage.set(self._stereo_depth_config)
+        config_msg = dai.StereoDepthConfig()
+        config_msg.set(self._stereo.initialConfig.get())
 
         # config_msg = self._stereo.initialConfig.get()
         for try_idx in range(3):
             # TODO assert that the sent config is used immediately!
             # print(f'Sending config (try {try_idx})')
 
-            q_send.send(configMessage)
-            q_send.send(configMessage)
+            q_send.send(config_msg)
+            q_send.send(config_msg)
         #     # q_send.send(self._stereo.initialConfig.get())
         #     # Send empty frame to flush the queue, maybe not needed?
         #     empty_frame = np.zeros((800, 1280), dtype=np.uint8)
@@ -384,7 +387,7 @@ class ReplayV2:
         #     result = {name: queue.get() for name, queue in output_queues.items()}
 
         #     # print('Receiving config')
-        #     cfg_sent = StereoConfig.from_stereo_node_cfg(configMessage.get())
+        #     cfg_sent = StereoConfig.from_stereo_node_cfg(config_msg.get())
         #     cfg_rvcd = StereoConfig.from_stereo_node_cfg(result['stereo_config'].get())
         #     if cfg_sent._cfg == cfg_rvcd._cfg:
         #         # print(' - configs are equal')
@@ -398,15 +401,9 @@ class ReplayV2:
         if stereo_config is not None:
             # print(f'DEBUG: ReplayV2._replay() configuring stereo and sending config')
             # set default to possibly override previous preset
-            # self._default_config.configure_stereo_node(self._stereo)
-            # self._stereo_depth_config = self._stereo.initialConfig.get()
-            # self._default_config.configure_stereo_depth_config(self._stereo_depth_config)
             self._stereo.initialConfig.set(self._default_config)
             # apply current config over the default
             stereo_config.configure_stereo_node(self._stereo)
-            self._stereo_depth_config = self._stereo.initialConfig.get()
-            stereo_config.configure_stereo_depth_config(self._stereo_depth_config)
-            self._stereo.initialConfig.set(self._stereo_depth_config)
             # send to device
             self._send_configuration()
 
