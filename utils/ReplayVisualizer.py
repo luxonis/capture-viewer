@@ -17,7 +17,10 @@ from utils.ReplaySettings import *
 from utils.capture_tools import create_depth_range_frame, get_current_monitor_size
 from utils.convert import *
 
-from ReplayThread import ReplayThread, ReplayRequest
+if __name__ == '__main__':
+    from ReplayThread import ReplayThread, ReplayRequest
+else:
+    from .ReplayThread import ReplayThread, ReplayRequest
 
 
 class ReplayVisualizer:
