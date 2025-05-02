@@ -310,8 +310,8 @@ def create_settings_layout(frame, button_values):
     #
     ttk.Label(popup_window, text="setDepthAlign").grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
     align_options = {
-        "Left": "dai.CameraBoardSocket.LEFT",
-        "Right": "dai.CameraBoardSocket.RIGHT",
+        "Left": "dai.CameraBoardSocket.CAM_B",
+        "Right": "dai.CameraBoardSocket.CAM_C",
         "Rec Left": "dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_LEFT",
         "Rec Right": "dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_RIGHT",
         "RGB": "dai.CameraBoardSocket.CAM_A"

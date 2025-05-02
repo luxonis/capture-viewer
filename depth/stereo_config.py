@@ -87,7 +87,7 @@ class StereoConfig:
             # 'cfg.algorithmControl.centerAlignmentShiftFactor': _cfg.algorithmControl.centerAlignmentShiftFactor,
             'cfg.algorithmControl.numInvalidateEdgePixels': _cfg.algorithmControl.numInvalidateEdgePixels,
             # postProcessing
-            # TODO 'cfg.postProcessing.filteringOrder': _cfg.postProcessing.filteringOrder,
+            'cfg.postProcessing.filteringOrder': tuple('dai.StereoDepthConfig.PostProcessing.' + str(f) for f in _cfg.postProcessing.filteringOrder),
             'cfg.postProcessing.median': 'dai.StereoDepthConfig.MedianFilter.' + _cfg.postProcessing.median.name,
             'cfg.postProcessing.bilateralSigmaValue': _cfg.postProcessing.bilateralSigmaValue,
             'cfg.postProcessing.spatialFilter.enable': _cfg.postProcessing.spatialFilter.enable,
@@ -224,8 +224,8 @@ class StereoConfig:
                     exec(f'{k}={v}')
                     unused_keys.remove(k)
                     # print('  => ', rgetattr(locals()[k0], kN))
-        # if not cfg is None and dai.__version__.startswith('2.'):
-        #     stereo.initialConfig.set(cfg)
+        if not cfg is None and dai.__version__.startswith('2.'):
+            stereo.initialConfig.set(cfg)
 
         if len(unused_keys):
             raise ValueError('Unused configuration keys:', unused_keys)
@@ -238,11 +238,11 @@ class StereoConfig:
         __is_dai3 = dai.__version__.startswith('3.')
         assert not __is_dai3
 
-        # try:
-        #     # Split filtering cfg.postProcessing.filteringOrder if composed of a single string
-        #     config['cfg.postProcessing.filteringOrder'] = config['cfg.postProcessing.filteringOrder'].split(',')
-        # except (KeyError, AttributeError):
-        #     pass
+        try:
+            # Split filtering cfg.postProcessing.filteringOrder if composed of a single string
+            config['cfg.postProcessing.filteringOrder'] = config['cfg.postProcessing.filteringOrder'].split(',')
+        except (KeyError, AttributeError):
+            pass
 
         unused_keys = list(config.keys())
         # We need to set the stereo params first, then initial config (cfg)
@@ -288,7 +288,6 @@ class StereoConfig:
             ('stereo.setConfidenceThreshold', 'cfg.costMatching.confidenceThreshold'),
             ('stereo.setMedianFilter', 'cfg.postProcessing.median'),
             ('stereo.initialConfig.setMedianFilter', 'cfg.postProcessing.median'),
-            ('stereo.setDepthAlign', 'cfg.algorithmControl.depthAlign'),
         )
 
         for a, b in _equivalent:
