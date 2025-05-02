@@ -23,16 +23,18 @@ class ReplayRequest:
         self.replay_outputs = None
 
 class ReplayThread(threading.Thread):
-    def __init__(self, input_queue: queue.Queue, output_queue: queue.Queue):
+    def __init__(self, input_queue: queue.Queue, output_queue: queue.Queue, replay_outputs, device_info):
         super().__init__(daemon=True)
         self.input_queue = input_queue
         self.output_queue = output_queue
         self.running = True
+        self.replay_outputs = replay_outputs
 
-    def process_requests(self):
+        self.initialize_replayer(device_info)
+
+    def run(self):
         if not self.replayer:
             raise ValueError("Replayer not initialized")
-
         while self.running:
             try:
                 frame_data = self.input_queue.get(timeout=1)
@@ -41,8 +43,7 @@ class ReplayThread(threading.Thread):
             except queue.Empty:
                 continue
 
-    def initialize_replayer(self, device_info, replay_outputs):
-        self.replay_outputs = replay_outputs
+    def initialize_replayer(self, device_info):
         self.replayer = Replay(
             device_info=device_info,
             outputs=self.replay_outputs,
@@ -52,16 +53,15 @@ class ReplayThread(threading.Thread):
         )
 
     def process_frame(self, frame_data):
-        left = frame_data['left']
-        right = frame_data['right']
-        color = frame_data['color']
-        calib = frame_data['calib']
-        config = frame_data['config']
+        left = frame_data.left
+        right = frame_data.right
+        color = frame_data.color
+        calib = frame_data.calib
+        config = frame_data.config
+        section = frame_data.section
 
         replayed = tuple(self.replayer.replay(
-            (
-                (left, right, color),
-                (left, right, color)),
+            ((left, right, color), (left, right, color)),
             calib=calib,
             stereo_config=StereoConfig(config)
         ))
@@ -70,18 +70,13 @@ class ReplayThread(threading.Thread):
         last_generated_pcl_path = None
         if 'pcl' in self.replay_outputs:
             pcl = replayed[1]['pcl']
-
             aligned_to_rgb = config['stereo.setDepthAlign'] == "dai.CameraBoardSocket.CAM_A"
             pcl = process_pointcloud(pcl, depth, color, aligned_to_rgb)
-
             with tempfile.NamedTemporaryFile(delete=False, suffix='.ply') as tmp_file:
                 o3d.io.write_point_cloud(tmp_file.name, pcl)
+            last_generated_pcl_path = tmp_file.name
 
-            last_generated_pcl_path = tmp_file.name  # this
-
-        last_generated_depth = depth  # this
-
-        self.output_queue.put((last_generated_depth, last_generated_pcl_path))
+        self.output_queue.put((section, depth, last_generated_pcl_path))
 
     def stop(self):
         self.running = False

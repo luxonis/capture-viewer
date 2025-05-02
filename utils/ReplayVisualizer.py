@@ -33,6 +33,7 @@ from queue import Queue
 
 from ReplayThread import ReplayThread, ReplayRequest
 
+import threading
 
 class ReplayVisualizer:
     def __init__(self, root, view_info, current_view):
@@ -102,16 +103,20 @@ class ReplayVisualizer:
         self.replay_input_q = Queue()
         self.replay_output_q = Queue()
 
-        self.replay_thread = ReplayThread(self.replay_input_q, self.replay_output_q)
+        print("Starting replay thread")
+        self.replay_thread = ReplayThread(self.replay_input_q, self.replay_output_q, self.replay_outputs, self.device_info)
         self.replay_thread.start()
-        self.replay_thread.initialize_replayer(self.device_info, self.replay_outputs)
-        self.replay_thread.process_requests()
+        print("Started replay thread")
+
+        print("Starting replay update thread")
+        self.replay_update_thread = threading.Thread(target=self.replay_process_output_queue, daemon=True)
+        self.replay_update_thread.start()
 
 
 
 
     def close(self):
-        del self.replayer
+        del self.replay_thread.replayer
         self.toplLevel.destroy()
 
     def get_initial_config(self, original_config):
@@ -146,31 +151,37 @@ class ReplayVisualizer:
         self.replay_input_q.put(request)
 
     def replay_main(self, settings_section_number):
-        # refresh display
-        self.refresh_display(label="Loading...")
-        self.main_frame.update_idletasks()
+        # # refresh display
+        # self.refresh_display(label="Loading...")
+        # self.main_frame.update_idletasks()
+
+        print("Replay main")
 
         if settings_section_number == 1:
             self.replay_send_request(self.button_values1, frame=None)
         elif settings_section_number == 2:
             self.replay_send_request(self.button_values2, frame=None)
 
-        # wait for output queue - todo in thread
-        last_generated_depth, last_generated_pcl_path = self.replay_output_q.get()
-        self.replay_output_q.task_done()
-        if settings_section_number == 1:
-            self.generated_depth1 = last_generated_depth
-            self.pcl_path1 = last_generated_pcl_path
-        elif settings_section_number == 2:
-            self.generated_depth2 = last_generated_depth
-            self.pcl_path2 = last_generated_pcl_path
+        print("Replay main send request")
 
-        self.depth_range_min, self.depth_range_max = get_min_max_depths(self.generated_depth1, self.generated_depth2)
 
-        # refresh display
-        self.refresh_display(label="Updated")
-        self.main_frame.update_idletasks()
+    def replay_process_output_queue(self):
+        while True:
+            settings_section_number, last_generated_depth, last_generated_pcl_path = self.replay_output_q.get()
+            print("Got from output queue, section:", settings_section_number)
+            self.replay_output_q.task_done()
+            if settings_section_number == 1:
+                self.generated_depth1 = last_generated_depth
+                self.pcl_path1 = last_generated_pcl_path
+            elif settings_section_number == 2:
+                self.generated_depth2 = last_generated_depth
+                self.pcl_path2 = last_generated_pcl_path
 
+            self.depth_range_min, self.depth_range_max = get_min_max_depths(self.generated_depth1, self.generated_depth2)
+
+            # refresh display
+            self.refresh_display(label="Updated")
+            self.main_frame.update_idletasks()
     # def replay_select_section(self, button_values, frame=None):
     #     settings_section_number = button_values['settings_section_number']
     #     print(f"[Thread {settings_section_number}][{threading.current_thread().ident}]: Started")
