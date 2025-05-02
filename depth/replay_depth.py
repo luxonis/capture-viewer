@@ -399,6 +399,7 @@ class ReplayV2:
 
     def _replay(self, frames, *, calib=None, stereo_config=None, workaround_decimation_filter=True):
         if stereo_config is not None:
+
             # print(f'DEBUG: ReplayV2._replay() configuring stereo and sending config')
             # set default to possibly override previous preset
             self._stereo.initialConfig.set(self._default_config)
