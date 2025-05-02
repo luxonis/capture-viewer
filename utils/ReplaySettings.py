@@ -1,7 +1,5 @@
 import tkinter as tk
 from tkinter import ttk, Tk, filedialog
-
-import json
 import os
 
 from utils.convert import *
@@ -9,7 +7,7 @@ from utils.convert import *
 # Define a dictionary of default settings
 default_config = {
     'stereo.setDepthAlign': 'dai.StereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_RIGHT',
-    'stereo.setDefaultProfilePreset': "dai.node.StereoDepth.PresetMode.HIGH_DENSITY",
+    'stereo.setDefaultProfilePreset': "dai.node.StereoDepth.PresetMode.DEFAULT",
     'stereo.setRectification': True,
     'stereo.setLeftRightCheck': True,
     'stereo.setExtendedDisparity': False,
@@ -216,10 +214,11 @@ def update_button_values(new_config, button_values):
 
 def add_trace_to_button_values(button_values, fallback_function):
     for button, value in button_values.items():
+        if button in ['settings_section_number', 'initial_filter_order']: continue
         try:
             button_values[button].trace_add("write", fallback_function)
         except:
-            print("Failed to add trace to button {}".format(button))
+            print("[REPLAY SETTINGS]: Failed to add trace to button {}".format(button))
 
 def create_settings_layout(frame, button_values):
     def update_label(var, label, form="int"):

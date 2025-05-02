@@ -2,38 +2,23 @@ import numpy as np
 import cv2
 import open3d as o3d
 import tkinter as tk
-from tkinter import ttk, Tk, filedialog
-import threading
-import os
-import tempfile
 import glob
 from datetime import datetime
 from PIL import Image, ImageTk
 import subprocess
 import time
 import platform
+import threading
+from queue import Queue
 
 from utils.capture_tools import (colorize_depth, calculate_scaled_dimensions, get_min_max_depths,
                                  format_json_for_replay, create_placeholder_frame, process_pointcloud)
-
 from utils.ReplaySettings import *
-
-from utils.popup_info import show_popup
-
 from utils.capture_tools import create_depth_range_frame, get_current_monitor_size
-
-from depth.replay_depth import Replay
-from depth.stereo_config import StereoConfig
-
 from utils.convert import *
-
-from tkinter import Frame
-
-from queue import Queue
 
 from ReplayThread import ReplayThread, ReplayRequest
 
-import threading
 
 class ReplayVisualizer:
     def __init__(self, root, view_info, current_view):
@@ -42,7 +27,7 @@ class ReplayVisualizer:
         self.toplLevel.protocol("WM_DELETE_WINDOW", self.close)
 
         self.screen_width, self.screen_height = get_current_monitor_size(self.toplLevel)
-        print(f"[Replay]: screen w x h = {self.screen_width} x {self.screen_height}")
+        print(f"[Replay]: Screen w x h = {self.screen_width} x {self.screen_height}")
         self.toplLevel.geometry(f"{self.screen_width}x{self.screen_height}")
         self.toplLevel.resizable(True, True)
 
@@ -52,16 +37,12 @@ class ReplayVisualizer:
 
         self.view_info = view_info
         self.current_view = current_view
-
         self.device_info = view_info['device_info']
+        print(f"[Replay]: Device info: {self.device_info}")
 
-        print(f"[Replay]: device info: {self.device_info}")
-
-        self.last_generated_depth = None
         self.generated_depth1 = None
         self.generated_depth2 = None
 
-        self.last_generated_pcl_path = None
         self.pcl_path1 = None
         self.pcl_path2 = None
 
@@ -84,8 +65,6 @@ class ReplayVisualizer:
         self.depth_resolution1 = tk.StringVar(value="")
         self.depth_resolution2 = tk.StringVar(value="")
 
-        self.last_config = None
-
         self.output_dir = os.path.join(view_info["capture_folder"], "replay_outputs")
         if not os.path.exists(self.output_dir): os.makedirs(self.output_dir)
 
@@ -95,48 +74,39 @@ class ReplayVisualizer:
         self.button_values1 = {"settings_section_number" : 1}  # button_key: value
         self.button_values2 = {"settings_section_number" : 2}  # button_key: value
 
-        # self.depth_generate_thread1 = threading.Thread(target=lambda: None)
-        # self.depth_generate_thread2 = threading.Thread(target=lambda: None)
-
         self.replay_outputs = {'depth', 'pcl'}
 
         self.replay_input_q = Queue()
         self.replay_output_q = Queue()
 
-        print("Starting replay thread")
+        print("[REPLAY]: Starting replay threads...")
         self.replay_thread = ReplayThread(self.replay_input_q, self.replay_output_q, self.replay_outputs, self.device_info)
         self.replay_thread.start()
-        print("Started replay thread")
 
-        print("Starting replay update thread")
         self.replay_update_thread = threading.Thread(target=self.replay_process_output_queue, daemon=True)
         self.replay_update_thread.start()
-
-
-
+        print("[REPLAY]: Replay threads started.")
 
     def close(self):
         del self.replay_thread.replayer
+        print("[REPLAY]: Replayer closed")
         self.toplLevel.destroy()
 
     def get_initial_config(self, original_config):
-        if self.last_config is None and original_config is not None:
-            current_config = settings2config(original_config)
-        elif self.last_config is not None:
-            current_config = self.last_config
-        else:
-            current_config = default_config
-        return current_config
+        if original_config is not None: return settings2config(original_config)
+        else: return default_config
 
     def replay_send_request(self, button_values, frame=None):
         if not self.replay_thread.is_alive():
-            raise ValueError("Replay thread is not running")
+            raise ValueError("[REPLAY]: Replay thread is not running")
 
-        self.last_generated_depth = None
-        self.last_config = self.config_json
         self.config_json = convert_current_button_values_to_config(button_values, frame)
 
         settings_section_number = button_values['settings_section_number']
+
+        # So the same configs aren't send multiple times to the device
+        if settings_section_number == 1 and self.config_json == self.config_json1: return
+        if settings_section_number == 2 and self.config_json == self.config_json2: return
 
         request = ReplayRequest(
             left=self.current_view["left"],
@@ -148,29 +118,20 @@ class ReplayVisualizer:
             parent_frame=frame
         )
 
+        print(f"[REPLAY][{settings_section_number}]: Sending request")
+        print(f"[REPLAY][{settings_section_number}]: {self.config_json}")
         self.replay_input_q.put(request)
 
+        if settings_section_number == 1: self.config_json1 = self.config_json
+        elif settings_section_number == 2: self.config_json2 = self.config_json
 
-    def replay_main(self, settings_section_number):
-        # # refresh display
-        # self.refresh_display(label="Loading...")
-        # self.main_frame.update_idletasks()
-
-        print("Replay main")
-
-        if settings_section_number == 1:
-            self.replay_send_request(self.button_values1, frame=None)
-        elif settings_section_number == 2:
-            self.replay_send_request(self.button_values2, frame=None)
-
-        print("Replay main send request")
-
+        self.main_frame.update_idletasks()
 
     def replay_process_output_queue(self):
         while True:
             settings_section_number, last_generated_depth, last_generated_pcl_path = self.replay_output_q.get()
-            print("Got from output queue, section:", settings_section_number)
             self.replay_output_q.task_done()
+            print(f"[REPLAY][{settings_section_number}]: Processing output")
             if settings_section_number == 1:
                 self.generated_depth1 = last_generated_depth
                 self.pcl_path1 = last_generated_pcl_path
@@ -183,91 +144,6 @@ class ReplayVisualizer:
             # refresh display
             self.refresh_display(label="Updated")
             self.main_frame.update_idletasks()
-    # def replay_select_section(self, button_values, frame=None):
-    #     settings_section_number = button_values['settings_section_number']
-    #     print(f"[Thread {settings_section_number}][{threading.current_thread().ident}]: Started")
-    #
-    #     self.last_config = self.config_json
-    #     self.config_json = convert_current_button_values_to_config(button_values, frame)
-    #
-    #     self.last_generated_depth = None
-    #
-    #     if settings_section_number == 1:
-    #         self.config_json1 = self.config_json
-    #         self.generated_depth1 = None
-    #         self.pcl_path1 = None
-    #     elif settings_section_number == 2:
-    #         self.config_json2 = self.config_json
-    #         self.generated_depth2 = None
-    #         self.pcl_path2 = None
-    #
-    #     self.refresh_display(label="Loading...")
-    #     self.main_frame.update_idletasks()
-    #
-    #     self.replay_generate_one_frame()
-    #
-    #     if settings_section_number == 1:
-    #         self.generated_depth1 = self.last_generated_depth
-    #         self.pcl_path1 = self.last_generated_pcl_path
-    #     elif settings_section_number == 2:
-    #         self.generated_depth2 = self.last_generated_depth
-    #         self.pcl_path2 = self.last_generated_pcl_path
-    #
-    #     self.depth_range_min, self.depth_range_max = get_min_max_depths(self.generated_depth1, self.generated_depth2)
-    #
-    #     self.refresh_display(label="Updated")
-    #     self.main_frame.update_idletasks()
-    #     print(f"[Thread {settings_section_number}][{threading.current_thread().ident}]: Finished")
-    # def replay_generate_one_frame(self, output_folder=None):
-    #     print("[Replay Depth]: generating...")
-    #     left = self.current_view["left"]
-    #     right = self.current_view["right"]
-    #
-    #     # if len(left.shape) == 3 and len(right.shape) == 3:
-    #     #     left = cv2.cvtColor(left, cv2.COLOR_BGR2GRAY)
-    #     #     right = cv2.cvtColor(right, cv2.COLOR_BGR2GRAY)
-    #
-    #     color = self.current_view["rgb"]
-    #     config = self.config_json
-    #     calib = self.view_info["calib"]
-    #
-    #     if left is None or right is None:
-    #         print("[WARNING][Replay Depth]: No left or right frames provided, closing replay")
-    #         return
-    #
-    #     if calib is None:
-    #         print("[WARNING][Replay Depth]: No calibration provided, closing replay")
-    #         return
-    #
-    #     if color is None:
-    #         color = left
-    #
-    #     # FIXED - sends two frames and takes the second, works with decimation filter
-    #     with self.replayer_lock:
-    #         replayed = tuple(self.replayer.replay(
-    #             (
-    #                 (left, right, color),
-    #                 (left, right, color)),
-    #             calib=calib,
-    #             stereo_config=StereoConfig(config)
-    #         ))
-    #         depth = replayed[1]['depth']
-    #
-    #         if 'pcl' in self.replay_outputs:
-    #             pcl = replayed[1]['pcl']
-    #
-    #             aligned_to_rgb = self.config_json['stereo.setDepthAlign'] == "dai.CameraBoardSocket.CAM_A"
-    #             pcl = process_pointcloud(pcl, depth, color, aligned_to_rgb)
-    #
-    #             with tempfile.NamedTemporaryFile(delete=False, suffix='.ply') as tmp_file:
-    #                 o3d.io.write_point_cloud(tmp_file.name, pcl)
-    #
-    #             self.last_generated_pcl_path = tmp_file.name
-    #
-    #         self.last_generated_depth = depth
-    #
-    #         print("[Replay Depth]: GENERATED")
-    #     return output_folder
 
     def on_mouse_wheel(self, event):
         if event.delta > 0:
