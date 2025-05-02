@@ -276,7 +276,7 @@ class ReplayVisualizer:
         save_button.grid(row=2, column=0, columnspan=2, pady=(5, 10), padx=10, sticky='ew')
 
         return generated_depth_frame, generated_depth_image
-    def create_settings_section(self, collumn_in_main_frame, frame_name, button_values):
+    def create_settings_section(self, collumn_in_main_frame, frame_name, button_values, other_button_values):
         settings_frame_custom = tk.Frame(self.main_frame, name=frame_name)
         settings_frame_custom.grid(row=2, column=collumn_in_main_frame, sticky="nsew")
 
@@ -300,7 +300,7 @@ class ReplayVisualizer:
             self.replay_send_request(button_values, frame=settings_frame_custom)
 
         add_trace_to_button_values(button_values, fallback_generate_function)
-        create_settings_layout(content_frame, button_values)
+        create_settings_layout(content_frame, button_values, other_button_values)
 
         settings_canvas.create_window((0, 0), window=content_frame, anchor="nw")
         content_frame.update_idletasks()
@@ -397,8 +397,8 @@ class ReplayVisualizer:
         self.difference_frame, self.difference_image = self.create_difference_section(2)
 
         # SETTINGS
-        self.settings_frame_custom1, self.settings_canvas1 = self.create_settings_section(0, "settings_canvas1", self.button_values1)
-        self.settings_frame_custom2, self.settings_canvas2 = self.create_settings_section(1, "settings_canvas2", self.button_values2)
+        self.settings_frame_custom1, self.settings_canvas1 = self.create_settings_section(0, "settings_canvas1", self.button_values1, self.button_values2)
+        self.settings_frame_custom2, self.settings_canvas2 = self.create_settings_section(1, "settings_canvas2", self.button_values2,  self.button_values1)
 
         # CONFIG
         self.generated_json_text1, self.config_frame1, self.config_canvas1 = self.create_config_section(0, "config_frame1")

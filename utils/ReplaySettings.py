@@ -1,3 +1,4 @@
+import time
 import tkinter as tk
 from tkinter import ttk, Tk, filedialog
 import os
@@ -220,7 +221,7 @@ def add_trace_to_button_values(button_values, fallback_function):
         except:
             print("[REPLAY SETTINGS]: Failed to add trace to button {}".format(button))
 
-def create_settings_layout(frame, button_values):
+def create_settings_layout(frame, button_values, other_button_values):
     def update_label(var, label, form="int"):
         if label is None: return
         if form == "int":
@@ -300,6 +301,15 @@ def create_settings_layout(frame, button_values):
             if not button_values['advanced_settings_enable'].get():
                 advanced_settings_checkbox.invoke()
 
+    def on_copy_config(button_values_to_update, other_button_values):
+        source_config = convert_current_button_values_to_config(other_button_values, None)
+        update_button_values(source_config, button_values_to_update)
+
+        if other_button_values['custom_settings_val'].get() != button_values_to_update['custom_settings_val'].get():
+            cust_box.invoke()
+        if other_button_values['advanced_settings_enable'].get() != button_values_to_update['advanced_settings_enable'].get():
+            advanced_settings_checkbox.invoke()
+
     popup_window = frame
 
     # ----------------------------------------------------------------- BUTTONS -------------------------------------------------------------
@@ -346,6 +356,11 @@ def create_settings_layout(frame, button_values):
     load_config_button.grid(row=current_row, column=1, sticky='ew', padx=10)
     config_label = tk.Label(popup_window, textvariable=button_values['loaded_config'])
     config_label.grid(row=current_row, column=2, sticky='ew', padx=10)
+
+    current_row += 1
+
+    copy_config_button = tk.Button(popup_window, text="Copy Config", command=lambda: on_copy_config(button_values, other_button_values))
+    copy_config_button.grid(row=current_row, column=1, sticky='ew', padx=10)
 
     current_row += 1
 
