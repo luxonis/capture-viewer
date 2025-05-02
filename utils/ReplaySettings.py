@@ -659,8 +659,8 @@ def create_settings_layout(frame, button_values, other_button_values):
     inner_row += 1
 
     ttk.Label(advanced_stereo_setting_frame, text="costAggregation.divisionFactor").grid(row=inner_row, column=0, padx=10, pady=10, sticky="w")
-    spinbox(advanced_stereo_setting_frame, inner_row, 1, button_values['division_factor_val'], None, [0, 100])
-    ttk.Label(advanced_stereo_setting_frame, text="(1, 100)").grid(row=inner_row, column=2, padx=10, pady=10, sticky="w")
+    spinbox(advanced_stereo_setting_frame, inner_row, 1, button_values['division_factor_val'], None, [0, 3])
+    ttk.Label(advanced_stereo_setting_frame, text="(0, 3)").grid(row=inner_row, column=2, padx=10, pady=10, sticky="w")
 
     inner_row += 1
 
