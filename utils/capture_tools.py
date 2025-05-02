@@ -261,7 +261,17 @@ def device_connected():
 def get_min_max_depths(depth1, depth2, color_noise_percent_removal=1):
     if depth1 is None and depth2 is None:
         return None, None
-    elif depth1 is not None and depth2 is not None:
+
+    if depth1 is not None and depth2 is not None:
+        if depth1[depth1 > 0].size == 0 and depth2[depth2 > 0].size == 0:
+            return 0, 0
+        if depth1[depth1 > 0].size == 0 and depth2[depth2 > 0].size != 0:
+            range_min2, range_max2 = np.percentile(depth2[depth2 > 0], [0, 100 - color_noise_percent_removal])
+            return range_min2, range_max2
+        if depth1[depth1 > 0].size != 0 and depth2[depth2 > 0].size == 0:
+            range_min1, range_max1 = np.percentile(depth1[depth1 > 0], [0, 100 - color_noise_percent_removal])
+            return range_min1, range_max1
+
         range_min1, range_max1 = np.percentile(depth1[depth1 > 0], [0, 100 - color_noise_percent_removal])
         range_min2, range_max2 = np.percentile(depth2[depth2 > 0], [0, 100 - color_noise_percent_removal])
         depth_range_max = max(range_max1, range_max2)
