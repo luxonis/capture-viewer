@@ -36,7 +36,7 @@ class ReplayVisualizer:
 
         self.toplLevel.grid_rowconfigure(0, weight=1)
         self.toplLevel.grid_columnconfigure(0, weight=1)
-        self.loading_label = tk.Label(self.toplLevel, text="Loading...", font=("Arial", 20))
+        self.loading_label = tk.Label(self.toplLevel, text="Connecting to the device...", font=("Arial", 20))
         self.loading_label.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
 
         self.toplLevel.update_idletasks()
