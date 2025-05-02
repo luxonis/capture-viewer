@@ -34,6 +34,16 @@ class ReplayVisualizer:
         self.toplLevel.geometry(f"{self.screen_width}x{self.screen_height}")
         self.toplLevel.resizable(True, True)
 
+        self.toplLevel.grid_rowconfigure(0, weight=1)
+        self.toplLevel.grid_columnconfigure(0, weight=1)
+        self.loading_label = tk.Label(self.toplLevel, text="Loading...", font=("Arial", 20))
+        self.loading_label.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+
+        self.toplLevel.update_idletasks()
+
+        self.main_frame = tk.Frame(self.toplLevel)
+        self.main_frame.grid(row=0, column=0, sticky="nsew")
+
         max_image_width = int(self.screen_width / 3) - 100
         max_image_height = int(self.screen_height / 3) - 100
         self.scaled_original_size = calculate_scaled_dimensions(view_info['depth_size'], max_image_width, max_image_height)
@@ -51,6 +61,7 @@ class ReplayVisualizer:
 
         self.generated_depth_image1 = None
         self.generated_depth_image2 = None
+        self.difference_image = None
 
         self.fixed_depth_range = False
         self.fixed_depth_range_min = 0
@@ -379,9 +390,6 @@ class ReplayVisualizer:
         return edits_frame
 
     def create_layout(self):
-        self.main_frame = tk.Frame(self.toplLevel)
-        self.main_frame.grid(row=0, column=0, sticky="nsew")
-
         # depth 1 and depth 2
         self.generated_depth_frame1, self.generated_depth_image1 = self.create_depth_section(0)
         self.generated_depth_frame2, self.generated_depth_image2 = self.create_depth_section(1)
@@ -465,7 +473,7 @@ class ReplayVisualizer:
 
         self.update_resolution()
 
-
+    # todo edit
     def get_or_create_output_folder(self):
         def compare_json(file_path, json_data):
             """
