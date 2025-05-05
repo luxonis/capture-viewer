@@ -21,6 +21,7 @@ def create_and_save_metadata(device, settings_path, output_dir,
         "author": author,
         'settings_name': settings_path,
         "settings": json.load(open(settings_path)),
+        "dai_version": dai.__version__,
     }
 
     # Ensure the output directory exists
