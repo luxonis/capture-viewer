@@ -8,6 +8,7 @@
     "sync_on_host": true,
     "monoSettings": {
         "luma_denoise": 1,
+        "chroma_denoise": 0,
         "sharpness": 2,
         "contrast": 0
     },

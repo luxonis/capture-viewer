@@ -161,6 +161,7 @@ def initialize_mono_control(settings):
 
     mono_settings = settings["monoSettings"]
     ctrl.setLumaDenoise(mono_settings["luma_denoise"])
+    ctrl.setChromaDenoise(mono_settings["chroma_denoise"])
     ctrl.setSharpness(mono_settings["sharpness"])
     ctrl.setContrast(mono_settings["contrast"])
 
