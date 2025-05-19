@@ -94,7 +94,10 @@ def initialize_pipeline(pipeline, settings):
 
         if output_settings["left_raw"]: monoLeft.raw.link(sync.inputs["left_raw"])
         if output_settings["right_raw"]: monoRight.raw.link(sync.inputs["right_raw"])
-        if output_settings["rgb_raw"]: color.raw.link(sync.inputs["rgb_raw"])
+
+        if output_settings.get("rgb_raw", False):
+            raise NotImplementedError("RGB raw frames not implemented")
+            # if output_settings["rgb_raw"]: color.raw.link(sync.inputs["rgb_raw"])
 
         queues["sync"] = sync.out.createOutputQueue()
 
@@ -119,7 +122,9 @@ def initialize_pipeline(pipeline, settings):
 
         if output_settings["left_raw"]: queues['left_raw'] = monoLeft.raw.createOutputQueue()
         if output_settings["right_raw"]: queues['right_raw'] = monoRight.raw.createOutputQueue()
-        if output_settings["rgb_raw"]: queues['rgb_raw'] = color.raw.createOutputQueue()
+        if output_settings.get("rgb_raw", False):
+            # queues['rgb_raw'] = color.raw.createOutputQueue()
+            raise NotImplementedError("RGB raw frames not implemented")
 
 
     return pipeline, queues, input_queues
