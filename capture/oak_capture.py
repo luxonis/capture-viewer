@@ -135,7 +135,7 @@ def visualize_frame(name, frame, timestamp, mxid):
         depth_colorized = cv2.putText(depth_colorized, f"{timestamp} ms", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1,
                                       (255, 255, 255), 2)
         cv2.imshow(f"{mxid} {name}", depth_colorized)
-    elif name in ["left", "right", "rgb"]:
+    elif name in ["left", "right", "rgb", "left_raw", "right_raw", "rgb_raw"]:
         frame_timestamp = frame.copy()
         frame_timestamp = cv2.putText(frame_timestamp, f"{timestamp} ms", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
 
