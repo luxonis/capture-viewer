@@ -5,6 +5,7 @@
     "flood_light_intensity": 1,
     "stereoResolution": {"x": 1280, "y": 800},
     "rgbResolution": {"x": 640, "y": 480},
+    "sync_on_host": true,
     "monoSettings": {
         "luma_denoise": 1,
         "sharpness": 2,
@@ -18,8 +19,11 @@
 
     "output_settings": {
         "left": true,
+        "left_raw": false,
         "right": true,
+        "right_raw": false,
         "rgb": true,
+        "rgb_raw": false,
         "depth": true,
         "disparity": true,
         "sync": true

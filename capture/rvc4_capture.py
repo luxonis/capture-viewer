@@ -20,6 +20,7 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 root_path = os.path.join(os.path.dirname(script_dir), 'DATA')
 
 from utils.capture_universal import initialize_capture, finalise_capture
+from utils.raw_data_utils import unpackRaw10
 from oak_capture import visualize_frame, count_output_streams
 
 def set_stereo_node(pipeline, settings):
@@ -49,28 +50,35 @@ def initialize_pipeline(pipeline, settings):
     input_queues = {}
     output_settings = settings["output_settings"]
 
-    if output_settings["left"] or output_settings["left_raw"]:
+    if output_settings["left"]:
         monoLeft = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_B)
-        input_queues["left_input_control"] = monoLeft.inputControl.createInputQueue()
         monoLeftOut = configure_cam(monoLeft, settings["stereoResolution"]["x"], settings["stereoResolution"]["y"], settings["FPS"])
 
-    if output_settings["right"] or output_settings["right_raw"]:
+    if output_settings["right"]:
         monoRight = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_C)
-        input_queues["right_input_control"] = monoRight.inputControl.createInputQueue()
         monoRightOut = configure_cam(monoRight, settings["stereoResolution"]["x"], settings["stereoResolution"]["y"], settings["FPS"])
 
     if output_settings["rgb"] or output_settings["rgb_png"]:
         color = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_A)
         colorOut = configure_cam(color, settings["rgbResolution"]["x"], settings["rgbResolution"]["y"], settings["FPS"])
 
+
+
+    if output_settings["left"] or output_settings["left_raw"]: input_queues["left_input_control"] = monoLeft.inputControl.createInputQueue()
+    if output_settings["right"] or output_settings["right_raw"]: input_queues["right_input_control"] = monoRight.inputControl.createInputQueue()
+
+
+
     if output_settings["depth"] or output_settings["disparity"]:
         stereo = set_stereo_node(pipeline, settings)
         monoLeftOut.link(stereo.left)
         monoRightOut.link(stereo.right)
 
+
+
     if output_settings["sync"]:
         sync = pipeline.create(dai.node.Sync)
-        sync.setRunOnHost(True)  # Can also run on device
+        sync.setRunOnHost(settings['sync_on_host'])  # Can also run on device
 
         if output_settings["depth"]:
             stereo.syncedLeft.link(sync.inputs["left"])
@@ -83,6 +91,10 @@ def initialize_pipeline(pipeline, settings):
 
         if output_settings["rgb"]:
             colorOut.link(sync.inputs["rgb"])
+
+        if output_settings["left_raw"]: monoLeft.raw.link(sync.inputs["left_raw"])
+        if output_settings["right_raw"]: monoRight.raw.link(sync.inputs["right_raw"])
+        if output_settings["rgb_raw"]: color.raw.link(sync.inputs["rgb_raw"])
 
         queues["sync"] = sync.out.createOutputQueue()
 
@@ -104,6 +116,10 @@ def initialize_pipeline(pipeline, settings):
 
         if output_settings["rgb"]:
             queues["rgb"] = colorOut.createOutputQueue()
+
+        if output_settings["left_raw"]: queues['left_raw'] = monoLeft.raw.createOutputQueue()
+        if output_settings["right_raw"]: queues['right_raw'] = monoRight.raw.createOutputQueue()
+        if output_settings["rgb_raw"]: queues['rgb_raw'] = color.raw.createOutputQueue()
 
 
     return pipeline, queues, input_queues
@@ -216,7 +232,12 @@ if __name__ == "__main__":
                 msgGrp = q['sync'].get()
                 for name, msg in msgGrp:
                     timestamp = int(msg.getTimestamp().total_seconds() * 1000)
-                    cvFrame = msg.getCvFrame()
+
+                    if 'raw' in name:
+                        dataRaw = msg.getData()
+                        cvFrame = unpackRaw10(dataRaw, msg.getWidth(), msg.getHeight(), msg.getStride())
+                    else: cvFrame = msg.getCvFrame()
+
                     if save:
                         if name in ['left', 'right']:
                             if len(cvFrame.shape) == 3:
@@ -227,7 +248,10 @@ if __name__ == "__main__":
             else:
                 for name in q.keys():
                     frame = q[name].get()
-                    cvFrame = frame.getCvFrame()
+                    if 'raw' in name:
+                        dataRaw = frame.getData()
+                        cvFrame = unpackRaw10(dataRaw, frame.getWidth(), frame.getHeight(), frame.getStride())
+                    else: cvFrame = frame.getCvFrame()
                     timestamp = int(frame.getTimestamp().total_seconds() * 1000)
                     if save:
                         if name in ['left', 'right']:
