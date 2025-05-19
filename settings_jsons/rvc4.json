@@ -10,6 +10,11 @@
         "sharpness": 2,
         "contrast": 0
     },
+    "exposureSettings": {
+        "autoexposure": true,
+        "expTime": 3000,
+        "sensIso": 150
+    },
 
     "output_settings": {
         "left": true,
