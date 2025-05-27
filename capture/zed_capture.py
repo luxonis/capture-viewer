@@ -25,10 +25,10 @@ def initialize_capture(camera, root_dir, view_name, settings):
     calib_params = camera_info.camera_configuration.calibration_parameters
     width = camera_info.camera_configuration.resolution.width
     height = camera_info.camera_configuration.resolution.height
-    generate_depthai_calib_from_zed(calib_params, width, height)
+    calib = generate_depthai_calib_from_zed(calib_params, width, height)
 
-    with open(os.path.join(out_dir, "zed_settings.json"), 'w') as f:
-        json.dump(settings, f, indent=4)
+    with open(os.path.join(out_dir, "calib.json"), 'w') as f:
+        json.dump(calib, f, indent=4)
 
     metadata = {
         "model_name": str(camera_info.camera_model),
