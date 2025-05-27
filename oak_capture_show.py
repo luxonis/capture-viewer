@@ -95,10 +95,6 @@ class MainApp():
         calib = ''
         if os.path.exists(f'{capture_folder}/calib.json'):
             calib = dai.CalibrationHandler(f'{capture_folder}/calib.json')
-            M1, D1, M2, D2, T, R, TARGET_MATRIX, lensPosition = extract_calibration_values(calib, width, height, rgb_width, rgb_height)
-            datas = M1, D1, M2, D2, T, R, TARGET_MATRIX, lensPosition
-        else:
-            datas = None, None, None, None, None, None, None, None
 
         metadata_file = os.path.join(capture_folder, 'metadata.json')
         if os.path.exists(metadata_file):
@@ -119,7 +115,6 @@ class MainApp():
             "rgb_size": (rgb_width, rgb_height),
             "mono_size": (width, height),
             "stereoAlign_used_in_capture": check_settings(capture_folder),
-            "calibration_parameters": datas,
             "RGB_SOCKET": dai.CameraBoardSocket.CAM_A,
             "LEFT_SOCKET": dai.CameraBoardSocket.CAM_B,
             "RIGHT_SOCKET": dai.CameraBoardSocket.CAM_C,
