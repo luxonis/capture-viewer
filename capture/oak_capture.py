@@ -17,7 +17,7 @@ print(dai.__version__)
 
 # This can be customized to pass multiple parameters
 from utils.capture_universal import colorize_depth, initialize_capture, finalise_capture
-
+from utils.raw_data_utils import unpackRaw10
 script_dir = os.path.dirname(os.path.abspath(__file__))
 root_path_default = os.path.join(os.path.dirname(script_dir), 'DATA')
 
@@ -264,22 +264,30 @@ if __name__ == "__main__":
                     msgGrp = q['sync'].get()
                     for name, msg in msgGrp:
                         timestamp = int(msg.getTimestamp().total_seconds() * 1000)
-                        frame = msg.getCvFrame()
+                        if 'raw' in name:
+                            dataRaw = msg.getData()
+                            cvFrame = unpackRaw10(dataRaw, msg.getWidth(), msg.getHeight())
+                        else:
+                            cvFrame = msg.getCvFrame()
 
-                        frame_size = frame.nbytes
+                        frame_size = cvFrame.nbytes
                         while current_ram_usage + frame_size > MAX_RAM_USAGE:
                             time.sleep(0.01)  # Small wait to let saving thread catch up
 
                         if save:
                             with lock: current_ram_usage += frame_size
-                            save_queue.put((mxid, name, timestamp, frame, output_folders, settings, frame_size))
+                            save_queue.put((mxid, name, timestamp, cvFrame, output_folders, settings, frame_size))
                             num_captures[mxid] += 1
-                        visualize_frame(name, frame, timestamp, mxid)
+                        visualize_frame(name, cvFrame, timestamp, mxid)
             else:
                 for mxid, q in devices.items():
                     for name in q.keys():
                         frame = q[name].get()
-                        cvFrame = frame.getCvFrame()
+
+                        if 'raw' in name:
+                            dataRaw = frame.getData()
+                            cvFrame = unpackRaw10(dataRaw, msg.getWidth(), msg.getHeight(), msg.getStride())
+                        else: cvFrame = frame.getCvFrame()
 
                         frame_size = cvFrame.nbytes
                         while current_ram_usage + frame_size > MAX_RAM_USAGE:
