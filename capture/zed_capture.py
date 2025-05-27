@@ -31,16 +31,17 @@ def initialize_capture(camera, root_dir, view_name, settings):
         json.dump(settings, f, indent=4)
 
     metadata = {
-        "camera_model": str(camera_info.camera_model),
-        "serial_number": serial,
+        "model_name": str(camera_info.camera_model),
+        "mxId": str(serial),
+        "scene": str(view_name),
+        "date": timestamp,
         "firmware_version": str(camera_info.camera_configuration.firmware_version),
         "resolution": {"width": width, "height": height},
         "fps": camera_info.camera_configuration.fps,
         "depth_mode": settings.get("depth_mode", "NEURAL"),
         "coordinate_units": settings.get("coordinate_units", "MILLIMETER"),
         "color_space": settings.get("color_space", "RGB"),
-        "view_name": view_name,
-        "timestamp": timestamp
+        "settings": {}
     }
 
     with open(os.path.join(out_dir, "metadata.json"), 'w') as f:
@@ -70,7 +71,7 @@ def get_frames(camera, output_settings):
 
     timestamp = str(camera.get_timestamp(sl.TIME_REFERENCE.IMAGE).get_milliseconds())
 
-    return depth.get_data().copy(), left_image.get_data(), right_image.get_data(), timestamp
+    return depth.get_data().copy(), left_image.get_data().copy(), right_image.get_data().copy(), timestamp
 
 def count_output_streams(output_streams):
     stream_names = []
@@ -130,19 +131,18 @@ def main():
             continue
 
         depth_np, left_np_raw, right_np_raw, timestamp = result
-        left_np = cv2.cvtColor(left_np_raw, cv2.COLOR_RGBA2RGB) if output_settings.get("left", False) else None
-        right_np = cv2.cvtColor(right_np_raw, cv2.COLOR_RGBA2RGB) if output_settings.get("right", False) else None
+        left_np = cv2.cvtColor(left_np_raw, cv2.COLOR_RGBA2BGR) if output_settings.get("left", False) else None
+        right_np = cv2.cvtColor(right_np_raw, cv2.COLOR_RGBA2BGR) if output_settings.get("right", False) else None
         color_depth = colorize_depth(depth_np) if output_settings.get("depth", False) else None
 
         if output_settings.get("depth", False):
             cv2.imshow("Depth", color_depth)
         if output_settings.get("left", False):
-            cv2.imshow("Left", left_np)
+            cv2.imshow("Left", cv2.cvtColor(left_np, cv2.COLOR_BGR2RGB))
         if output_settings.get("right", False):
-            cv2.imshow("Right", right_np)
+            cv2.imshow("Right", cv2.cvtColor(right_np, cv2.COLOR_BGR2RGB))
 
         if save:
-            print(timestamp)
             if output_settings.get("depth", False):
                 np.save(os.path.join(out_dir, f"depth_{timestamp}.npy"), depth_np)
             if output_settings.get("depth_png", False):
