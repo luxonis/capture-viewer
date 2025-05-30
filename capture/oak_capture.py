@@ -37,6 +37,7 @@ def parseArguments():
     parser.add_argument("--autostart", default=-1, type=int, help="Automatically start capturing after given number of seconds (-1 to disable)")
     parser.add_argument("--devices", default=[], dest="devices", nargs="+", help="MXIDS or IPs of devices to connect to")
     parser.add_argument("--ram", default=2, type=float, help="Maximum RAM to be used while saving, in GB")
+    parser.add_argument("--att_connection", default=False, help="try to find the devices on the network before connecting immediately")
 
     args = parser.parse_args()
     settings_path = args.settings_file_path
@@ -55,7 +56,7 @@ def parseArguments():
 
     devices = [d.upper() for d in args.devices]
 
-    return settings_path, view_name, devices, args.autostart, args.ram, root_path
+    return settings_path, view_name, devices, args.autostart, args.ram, root_path, args.att_connection
 
 def worker(mxid, stack, devices, settings, num, shared_devices, exception_queue):
     try:
@@ -190,10 +191,11 @@ def attempt_connection(devices, attempts=10):
             return mxids
 
 if __name__ == "__main__":
-    settings_path, view_name, devices, autostart, ram, root_path = parseArguments()
+    settings_path, view_name, devices, autostart, ram, root_path, att_connect = parseArguments()
 
     with contextlib.ExitStack() as stack:
-        mxids = attempt_connection(devices)
+        if att_connect: mxids = attempt_connection(devices)
+        else: mxids = devices
 
         devices, shared_devices, output_folders = {}, {}, {}
         num_captures = {mxid: 0 for mxid in mxids}
