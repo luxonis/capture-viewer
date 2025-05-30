@@ -9,5 +9,6 @@
     "right": true,
     "depth": true,
     "depth_png": true
-  }
+  },
+  "fps": 10
 }

@@ -10,5 +10,6 @@
     "depth": true,
     "depth_png": true,
     "rgb": true
-  }
+  },
+  "fps": 5
 }

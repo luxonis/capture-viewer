@@ -102,6 +102,7 @@ def main():
     init_params.depth_mode = getattr(sl.DEPTH_MODE, settings.get("depth_mode", "NEURAL"))
     init_params.coordinate_units = getattr(sl.UNIT, settings.get("coordinate_units", "MILLIMETER"))
     init_params.camera_resolution = getattr(sl.RESOLUTION, settings.get("resolution", "HD2K"))
+    init_params.camera_fps = settings.get("fps", 30)
 
     if zed.open(init_params) != sl.ERROR_CODE.SUCCESS:
         exit("Failed to open ZED camera")
