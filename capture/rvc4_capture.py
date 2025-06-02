@@ -8,6 +8,7 @@ import numpy as np
 import argparse
 import time
 import json
+import datetime
 
 print(dai.__version__)
 
@@ -139,6 +140,7 @@ def parseArguments():
     parser.add_argument("--autostart", default=-1, type=int, help='Automatically start capturing after given number of seconds (-1 to disable)')
     # parser.add_argument("--devices", default=[], dest="mxids", nargs="+", help="MXIDS of devices to connect to")
     parser.add_argument("--ip", default=None, dest="ip", help="IP to connect to")
+    parser.add_argument("--autostart_time", default=0, help="Select a fixed time when the script is supposed to start")
 
     args = parser.parse_args()
     settings_path = args.settings_file_path
@@ -155,7 +157,16 @@ def parseArguments():
             settings_path = settings_path_2
         else: raise FileNotFoundError(f"Settings file '{settings_path}' does not exist.")
 
-    return settings_path, view_name, ip, args.autostart
+    if args.autostart_time:
+        today = datetime.date.today()
+        time_part = datetime.time.fromisoformat(args.autostart_time)
+        wait = datetime.datetime.combine(today, time_part)
+    else:
+        wait = 0
+
+    if args.autostart_time: args.autostart = 0
+
+    return settings_path, view_name, ip, args.autostart, wait
 
 def controlQueueSend(input_queues, ctrl):
     for queue in input_queues.values():
@@ -177,7 +188,7 @@ def initialize_mono_control(settings):
     return ctrl
 
 if __name__ == "__main__":
-    settings_path, view_name, ip, autostart = parseArguments()
+    settings_path, view_name, ip, autostart, autostart_time = parseArguments()
 
     print(f"connecting to device... IP: {ip}")
 
@@ -207,7 +218,11 @@ if __name__ == "__main__":
     print(f"Will capture max frames ({settings['num_captures']}) * number of streams ({len(streams)}) = {final_num_captures}")
 
     initial_time = time.time()
-    initialize_capture_time = initial_time + autostart
+    if autostart_time:
+        print("waiting till:", autostart_time)
+        initialize_capture_time = autostart_time.timestamp()
+    else:
+        initialize_capture_time = initial_time + autostart
 
     with dai.Pipeline(device) as pipeline:
         pipeline, q, input_queues = initialize_pipeline(pipeline, settings)
@@ -220,9 +235,6 @@ if __name__ == "__main__":
         if settings['flood_light']: pipeline.getDefaultDevice().setIrFloodLightIntensity(settings['flood_light_intensity'])
 
         print("Starting loop...")
-        initial_time = time.time()
-        initialize_capture_time = initial_time + autostart
-
         while pipeline.isRunning():
             if not save and autostart > -1 and time.time() > initialize_capture_time:
                 out_dir = initialize_capture(root_path, device, settings_path, view_name)

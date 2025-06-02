@@ -12,6 +12,7 @@ import argparse
 import numpy as np
 import time
 import screeninfo
+import datetime
 
 print(dai.__version__)
 
@@ -38,6 +39,7 @@ def parseArguments():
     parser.add_argument("--devices", default=[], dest="devices", nargs="+", help="MXIDS or IPs of devices to connect to")
     parser.add_argument("--ram", default=2, type=float, help="Maximum RAM to be used while saving, in GB")
     parser.add_argument("--att_connection", default=False, help="try to find the devices on the network before connecting immediately")
+    parser.add_argument("--autostart_time", default=0, help="Select a fixed time when the script is supposed to start")
 
     args = parser.parse_args()
     settings_path = args.settings_file_path
@@ -56,7 +58,17 @@ def parseArguments():
 
     devices = [d.upper() for d in args.devices]
 
-    return settings_path, view_name, devices, args.autostart, args.ram, root_path, args.att_connection
+    if args.autostart_time:
+        today = datetime.date.today()
+        time_part = datetime.time.fromisoformat(args.autostart_time)
+        wait = datetime.datetime.combine(today, time_part)
+    else:
+        wait = 0
+
+    if devices == []: args.att_connection = True
+    if args.autostart_time: args.autostart = 0
+
+    return settings_path, view_name, devices, args.autostart, args.ram, root_path, args.att_connection, wait
 
 def worker(mxid, stack, devices, settings, num, shared_devices, exception_queue):
     try:
@@ -191,7 +203,7 @@ def attempt_connection(devices, attempts=10):
             return mxids
 
 if __name__ == "__main__":
-    settings_path, view_name, devices, autostart, ram, root_path, att_connect = parseArguments()
+    settings_path, view_name, devices, autostart, ram, root_path, att_connect, autostart_time = parseArguments()
 
     with contextlib.ExitStack() as stack:
         if att_connect: mxids = attempt_connection(devices)
@@ -247,9 +259,15 @@ if __name__ == "__main__":
         save_thread.start()
 
         print("Starting loop...")
+
         initial_time = time.time()
-        initialize_capture_time = initial_time + autostart
+        if autostart_time:
+            print("waiting till:", autostart_time)
+            initialize_capture_time = autostart_time.timestamp()
+        else:
+            initialize_capture_time = initial_time + autostart
         while True:
+            # print(time.time(), initialize_capture_time)
             if not save and autostart > -1 and time.time() > initialize_capture_time:
                 for mxid in shared_devices.keys():
                     device = shared_devices[mxid]
