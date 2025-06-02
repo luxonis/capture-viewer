@@ -40,6 +40,7 @@ def parseArguments():
     parser.add_argument("--ram", default=2, type=float, help="Maximum RAM to be used while saving, in GB")
     parser.add_argument("--att_connection", default=False, help="try to find the devices on the network before connecting immediately")
     parser.add_argument("--autostart_time", default=0, help="Select a fixed time when the script is supposed to start")
+    parser.add_argument("--show_streams", default=False, help="Show all the running streams. If false, only shows the left frame")
 
     args = parser.parse_args()
     settings_path = args.settings_file_path
@@ -68,7 +69,7 @@ def parseArguments():
     if devices == []: args.att_connection = True
     if args.autostart_time: args.autostart = 0
 
-    return settings_path, view_name, devices, args.autostart, args.ram, root_path, args.att_connection, wait
+    return settings_path, view_name, devices, args.autostart, args.ram, root_path, args.att_connection, wait, args.show_streams
 
 def worker(mxid, stack, devices, settings, num, shared_devices, exception_queue):
     try:
@@ -176,6 +177,41 @@ def visualize_frame(name, frame, timestamp, mxid):
         depth_vis = cv2.putText(depth_vis, f"{timestamp} ms", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
         cv2.imshow(f"{mxid} {name}", depth_vis)
 
+def visualize_frame_info(name, frame, timestamp, mxid, streams):
+    frame_timestamp = frame.copy()
+    frame_timestamp = cv2.putText(frame_timestamp, f"{timestamp} ms", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+
+    h, _ = frame_timestamp.shape[:2]
+    y_start = h - 10 - len(streams) * 30
+    frame_timestamp = cv2.putText(
+        frame_timestamp,
+        "Active streams:",
+        (10, y_start - 30),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        1,
+        (0, 255, 255),
+        2
+    )
+
+    for i, stream in enumerate(reversed(streams)):
+        y = h - 10 - i * 30
+        frame_timestamp = cv2.putText(
+            frame_timestamp,
+            stream,
+            (10, y),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1,
+            (0, 255, 0),
+            2
+        )
+
+    screen = screeninfo.get_monitors()[0]
+    screen_width, screen_height = screen.width, screen.height
+    h, w = frame_timestamp.shape[:2]
+    if h > screen_height or w > screen_width:
+        frame_timestamp = downscale_to_fit(frame_timestamp, screen_width, screen_height)
+    cv2.imshow(f"{mxid} {name}", frame_timestamp)
+
 def attempt_connection(devices, attempts=10):
     mxids = []
     if len(devices) == 0:
@@ -203,7 +239,7 @@ def attempt_connection(devices, attempts=10):
             return mxids
 
 if __name__ == "__main__":
-    settings_path, view_name, devices, autostart, ram, root_path, att_connect, autostart_time = parseArguments()
+    settings_path, view_name, devices, autostart, ram, root_path, att_connect, autostart_time, show_streams = parseArguments()
 
     with contextlib.ExitStack() as stack:
         if att_connect: mxids = attempt_connection(devices)
@@ -250,7 +286,7 @@ if __name__ == "__main__":
         print(f"Number of streams: {len(streams)}")
         print(f"Will capture max frames ({settings['num_captures']}) * number of streams ({len(streams)}) = {final_num_captures}")
 
-        MAX_RAM_USAGE = 1 * 1024 * 1024 * 1024  # 1GB
+        MAX_RAM_USAGE = 2 * 1024 * 1024 * 1024  # 1GB
         current_ram_usage = 0
         lock = threading.Lock()  # Ensure thread-safe RAM tracking
         save_queue = queue.Queue()
@@ -298,7 +334,11 @@ if __name__ == "__main__":
                             with lock: current_ram_usage += frame_size
                             save_queue.put((mxid, name, timestamp, cvFrame, output_folders, settings, frame_size))
                             num_captures[mxid] += 1
-                        visualize_frame(name, cvFrame, timestamp, mxid)
+
+                        if show_streams:
+                            visualize_frame(name, cvFrame, timestamp, mxid)
+                        elif not show_streams and name == 'left':
+                            visualize_frame_info(name, cvFrame, timestamp, mxid, streams)
             else:
                 for mxid, q in devices.items():
                     for name in q.keys():
@@ -318,7 +358,11 @@ if __name__ == "__main__":
                             with lock: current_ram_usage += frame_size
                             save_queue.put((mxid, name, timestamp, cvFrame, output_folders, settings, frame_size))
                             num_captures[mxid] += 1
-                        visualize_frame(name, cvFrame, timestamp, mxid)
+
+                        if show_streams:
+                            visualize_frame(name, cvFrame, timestamp, mxid)
+                        elif not show_streams and name == 'left':
+                            visualize_frame_info(name, cvFrame, timestamp, mxid, streams)
 
             key = cv2.waitKey(1) & 0xFF
             if key == ord('q'): break

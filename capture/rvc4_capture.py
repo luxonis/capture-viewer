@@ -22,7 +22,7 @@ root_path = os.path.join(os.path.dirname(script_dir), 'DATA')
 
 from utils.capture_universal import initialize_capture, finalise_capture
 from utils.raw_data_utils import unpackRaw10
-from oak_capture import visualize_frame, count_output_streams
+from oak_capture import visualize_frame, visualize_frame_info, count_output_streams
 
 def set_stereo_node(pipeline, settings):
     stereo = pipeline.create(dai.node.StereoDepth)
@@ -141,6 +141,7 @@ def parseArguments():
     # parser.add_argument("--devices", default=[], dest="mxids", nargs="+", help="MXIDS of devices to connect to")
     parser.add_argument("--ip", default=None, dest="ip", help="IP to connect to")
     parser.add_argument("--autostart_time", default=0, help="Select a fixed time when the script is supposed to start")
+    parser.add_argument("--show_streams", default=False, help="Show all the running streams. If false, only shows the left frame")
 
     args = parser.parse_args()
     settings_path = args.settings_file_path
@@ -166,7 +167,7 @@ def parseArguments():
 
     if args.autostart_time: args.autostart = 0
 
-    return settings_path, view_name, ip, args.autostart, wait
+    return settings_path, view_name, ip, args.autostart, wait, args.show_streams
 
 def controlQueueSend(input_queues, ctrl):
     for queue in input_queues.values():
@@ -188,7 +189,7 @@ def initialize_mono_control(settings):
     return ctrl
 
 if __name__ == "__main__":
-    settings_path, view_name, ip, autostart, autostart_time = parseArguments()
+    settings_path, view_name, ip, autostart, autostart_time, show_streams = parseArguments()
 
     print(f"connecting to device... IP: {ip}")
 
@@ -262,7 +263,10 @@ if __name__ == "__main__":
                                 cvFrame = cv2.cvtColor(cvFrame, cv2.COLOR_BGR2GRAY)
                         np.save(f'{output_folders[mxid]}/{name}_{timestamp}.npy', cvFrame)
                         num_captures[mxid] += 1
-                    visualize_frame(name, cvFrame, timestamp, mxid)
+                    if show_streams:
+                        visualize_frame(name, cvFrame, timestamp, mxid)
+                    elif not show_streams and name == 'left':
+                        visualize_frame_info(name, cvFrame, timestamp, mxid, streams)
             else:
                 for name in q.keys():
                     frame = q[name].get()
@@ -277,7 +281,10 @@ if __name__ == "__main__":
                                 cvFrame = cv2.cvtColor(cvFrame, cv2.COLOR_BGR2GRAY)
                         np.save(f'{output_folders[mxid]}/{name}_{timestamp}.npy', cvFrame)
                         num_captures[mxid] += 1
-                    visualize_frame(name, cvFrame, timestamp, mxid)
+                    if show_streams:
+                        visualize_frame(name, cvFrame, timestamp, mxid)
+                    elif not show_streams and name == 'left':
+                        visualize_frame_info(name, cvFrame, timestamp, mxid, streams)
 
             key = cv2.waitKey(1)
             if key == ord('q'):

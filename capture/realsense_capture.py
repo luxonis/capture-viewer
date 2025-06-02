@@ -8,6 +8,7 @@ import time
 import datetime
 
 from utils.generate_calib import generate_depthai_calib_from_realsense
+from oak_capture import visualize_frame_info, visualize_frame
 
 def create_output_dir(base_path, serial, view_name, device_info, profile, settings):
     timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
@@ -79,6 +80,7 @@ def main():
     parser.add_argument("--autostart", default=-1, type=int)
     parser.add_argument("--settings", default="settings_jsons/rs_settings.json")
     parser.add_argument("--autostart_time", default=0, help="Select a fixed time for capture to start")
+    parser.add_argument("--show_streams", default=False, help="Show all the running streams. If false, only shows the left frame")
     args = parser.parse_args()
 
     if args.autostart_time:
@@ -89,6 +91,8 @@ def main():
         wait = 0
 
     if args.autostart_time: args.autostart = 0
+
+    show_streams = args.show_streams
 
     with open(args.settings) as f:
         settings = json.load(f)
@@ -158,14 +162,18 @@ def main():
 
             count += 1
 
-        if streams.get("left", False):
-            cv2.imshow("Left", left_np)
-        if streams.get("right", False):
-            cv2.imshow("Right", right_np)
-        if streams.get("depth", False):
-            cv2.imshow("Depth", color_depth)
-        if streams.get("rgb", False):
-            cv2.imshow("RGB", color_np)
+        if show_streams:
+            if streams.get("left", False):
+                visualize_frame("left", left_np, timestamp, serial)
+            if streams.get("right", False):
+                visualize_frame("right", right_np, timestamp, serial)
+            if streams.get("depth", False):
+                visualize_frame("depth", color_depth, timestamp, serial)
+            if streams.get("rgb", False):
+                visualize_frame("rgb", color_np, timestamp, serial)
+        elif not show_streams:
+            if streams.get("left", False):
+                visualize_frame_info("left", left_np, timestamp, serial, ['left', 'right', 'depth', 'rgb'])
 
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):

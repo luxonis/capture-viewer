@@ -8,6 +8,7 @@ import time
 import datetime
 from utils.capture_universal import colorize_depth
 from utils.generate_calib import generate_depthai_calib_from_zed
+from oak_capture import visualize_frame_info, visualize_frame
 
 
 def load_zed_settings(settings_path):
@@ -88,6 +89,7 @@ def main():
     parser.add_argument("--autostart", default=-1, type=int)
     parser.add_argument("--settings", default="settings_jsons/zed_settings.json")
     parser.add_argument("--autostart_time", default=0, help="Select a fixed time for capture to start")
+    parser.add_argument("--show_streams", default=False, help="Show all the running streams. If false, only shows the left frame")
     args = parser.parse_args()
 
     if args.autostart_time:
@@ -98,6 +100,8 @@ def main():
         wait = 0
 
     if args.autostart_time: args.autostart = 0
+
+    show_streams = args.show_streams
 
 
     settings = load_zed_settings(args.settings)
@@ -114,6 +118,8 @@ def main():
     init_params.coordinate_units = getattr(sl.UNIT, settings.get("coordinate_units", "MILLIMETER"))
     init_params.camera_resolution = getattr(sl.RESOLUTION, settings.get("resolution", "HD2K"))
     init_params.camera_fps = settings.get("fps", 30)
+
+    # todo fps not set correctly
 
     if zed.open(init_params) != sl.ERROR_CODE.SUCCESS:
         exit("Failed to open ZED camera")
@@ -152,12 +158,16 @@ def main():
         right_np = cv2.cvtColor(right_np_raw, cv2.COLOR_RGBA2BGR) if output_settings.get("right", False) else None
         color_depth = colorize_depth(depth_np) if output_settings.get("depth", False) else None
 
-        if output_settings.get("depth", False):
-            cv2.imshow("Depth", color_depth)
-        if output_settings.get("left", False):
-            cv2.imshow("Left", cv2.cvtColor(left_np, cv2.COLOR_BGR2RGB))
-        if output_settings.get("right", False):
-            cv2.imshow("Right", cv2.cvtColor(right_np, cv2.COLOR_BGR2RGB))
+        if show_streams:
+            if output_settings.get("left", False):
+                visualize_frame("left", cv2.cvtColor(left_np, cv2.COLOR_BGR2RGB), timestamp, "ZED")
+            if output_settings.get("right", False):
+                visualize_frame("right", cv2.cvtColor(right_np, cv2.COLOR_BGR2RGB), timestamp, "ZED")
+            if output_settings.get("depth", False):
+                visualize_frame("depth", color_depth, timestamp, "ZED")
+        elif not show_streams:
+            if output_settings.get("left", False):
+                visualize_frame_info("left", cv2.cvtColor(left_np, cv2.COLOR_BGR2RGB), timestamp, "ZED", ['left', 'right', 'depth'])
 
         if save:
             if output_settings.get("depth", False):
