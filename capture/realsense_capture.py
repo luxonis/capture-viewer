@@ -5,12 +5,12 @@ import cv2
 import os
 import json
 import time
-from datetime import datetime
+import datetime
 
 from utils.generate_calib import generate_depthai_calib_from_realsense
 
 def create_output_dir(base_path, serial, view_name, device_info, profile, settings):
-    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
     out_dir = os.path.join(base_path, f"RS_{serial}_{timestamp}")
     os.makedirs(out_dir, exist_ok=True)
 
@@ -78,7 +78,17 @@ def main():
     parser.add_argument("--output", default="DATA")
     parser.add_argument("--autostart", default=-1, type=int)
     parser.add_argument("--settings", default="settings_jsons/rs_settings.json")
+    parser.add_argument("--autostart_time", default=0, help="Select a fixed time for capture to start")
     args = parser.parse_args()
+
+    if args.autostart_time:
+        today = datetime.date.today()
+        time_part = datetime.time.fromisoformat(args.autostart_time)
+        wait = datetime.datetime.combine(today, time_part)
+    else:
+        wait = 0
+
+    if args.autostart_time: args.autostart = 0
 
     with open(args.settings) as f:
         settings = json.load(f)
@@ -99,8 +109,14 @@ def main():
 
     profile = pipeline.get_active_profile()
     serial = profile.get_device().get_info(rs.camera_info.serial_number)
-    start_time = time.time()
-    auto_start_time = start_time + args.autostart
+
+    initial_time = time.time()
+    if wait:
+        print("waiting till:", wait)
+        initialize_capture_time = wait.timestamp()
+    else:
+        initialize_capture_time = initial_time + args.autostart
+
     out_dir = None
     save = False
     count = 0
@@ -123,7 +139,7 @@ def main():
         color_depth = cv2.applyColorMap(cv2.convertScaleAbs(depth_np, alpha=0.03), cv2.COLORMAP_JET)
         timestamp = str(int(time.time() * 1000))
 
-        if args.autostart > -1 and not save and now >= auto_start_time:
+        if args.autostart > -1 and not save and now >= initialize_capture_time:
             save = True
             out_dir = create_output_dir(args.output, serial, args.view_name, profile.get_device(), profile, settings)
             print(f"Capture started: {all_frames} frames")

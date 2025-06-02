@@ -5,7 +5,7 @@ import cv2
 import os
 import json
 import time
-from datetime import datetime
+import datetime
 from utils.capture_universal import colorize_depth
 from utils.generate_calib import generate_depthai_calib_from_zed
 
@@ -18,7 +18,7 @@ def load_zed_settings(settings_path):
 def initialize_capture(camera, root_dir, view_name, settings):
     camera_info = camera.get_camera_information()
     serial = camera_info.serial_number
-    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
     out_dir = os.path.join(root_dir, f"ZED_{serial}_{timestamp}")
     os.makedirs(out_dir, exist_ok=True)
 
@@ -87,7 +87,18 @@ def main():
     parser.add_argument("--output", default="DATA")
     parser.add_argument("--autostart", default=-1, type=int)
     parser.add_argument("--settings", default="settings_jsons/zed_settings.json")
+    parser.add_argument("--autostart_time", default=0, help="Select a fixed time for capture to start")
     args = parser.parse_args()
+
+    if args.autostart_time:
+        today = datetime.date.today()
+        time_part = datetime.time.fromisoformat(args.autostart_time)
+        wait = datetime.datetime.combine(today, time_part)
+    else:
+        wait = 0
+
+    if args.autostart_time: args.autostart = 0
+
 
     settings = load_zed_settings(args.settings)
     num_frames = settings.get("num_captures", 20)
@@ -110,8 +121,13 @@ def main():
     print("Press 's' to start capture or 'q' to quit")
     save = False
     count = 0
-    start_time = time.time()
-    initialize_capture_time = start_time + args.autostart
+
+    initial_time = time.time()
+    if wait:
+        print("waiting till:", wait)
+        initialize_capture_time = wait.timestamp()
+    else:
+        initialize_capture_time = initial_time + args.autostart
 
     while count < num_frames:
         now = time.time()
