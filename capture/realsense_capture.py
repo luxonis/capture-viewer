@@ -1,4 +1,6 @@
 # RealSense capture script for saving RGB, IR, depth, and calibration data in RVC-compatible format
+import argparse
+
 import pyrealsense2 as rs
 import numpy as np
 import cv2
@@ -42,7 +44,7 @@ def create_output_dir(base_path, serial, view_name, device_info, profile, settin
         "date": timestamp,
         "firmware_version": str(firmware),
         "resolution": resolution,
-        "fps": 30,
+        "fps": settings.get("fps", 15),
         "depth_mode": settings.get("depth_mode", "HIGH_ACCURACY"),
         "coordinate_units": settings.get("coordinate_units", "MILLIMETER"),
         "color_space": settings.get("color_space", "RGB"),
@@ -53,27 +55,7 @@ def create_output_dir(base_path, serial, view_name, device_info, profile, settin
 
     return out_dir
 
-
-def save_calibration(profile, out_dir):
-    intr = profile.get_stream(rs.stream.infrared, 1).as_video_stream_profile().get_intrinsics()
-    extr = profile.get_stream(rs.stream.infrared, 1).get_extrinsics_to(profile.get_stream(rs.stream.infrared, 2))
-    baseline = np.linalg.norm([extr.translation[0], extr.translation[1], extr.translation[2]])
-
-    calib = {
-        "fx": intr.fx,
-        "fy": intr.fy,
-        "ppx": intr.ppx,
-        "ppy": intr.ppy,
-        "distortion": intr.coeffs,
-        "K_matrix": [[intr.fx, 0, intr.ppx], [0, intr.fy, intr.ppy], [0, 0, 1]],
-        "baseline_mm": baseline * 1000
-    }
-
-    with open(os.path.join(out_dir, "calib.json"), "w") as f:
-        json.dump(calib, f, indent=4)
-
-def main():
-    import argparse
+def parseArguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("view_name")
     parser.add_argument("--output", default="DATA")
@@ -81,18 +63,23 @@ def main():
     parser.add_argument("--settings", default="settings_jsons/rs_settings.json")
     parser.add_argument("--autostart_time", default=0, help="Select a fixed time for capture to start")
     parser.add_argument("--show_streams", default=False, help="Show all the running streams. If false, only shows the left frame")
-    args = parser.parse_args()
+    return parser.parse_args()
 
+def process_argument_logic(args):
     if args.autostart_time:
         today = datetime.date.today()
         time_part = datetime.time.fromisoformat(args.autostart_time)
         wait = datetime.datetime.combine(today, time_part)
     else:
         wait = 0
-
     if args.autostart_time: args.autostart = 0
-
     show_streams = args.show_streams
+    return args, wait, show_streams
+
+def main():
+    args = parseArguments()
+    args, wait, show_streams = process_argument_logic(args)
+
 
     with open(args.settings) as f:
         settings = json.load(f)
@@ -124,6 +111,11 @@ def main():
     out_dir = None
     save = False
     count = 0
+
+    output = []
+    for stream in streams:
+        if streams[stream]:
+            output.append(stream)
 
     while count < num_frames:
         now = time.time()
@@ -165,15 +157,19 @@ def main():
         if show_streams:
             if streams.get("left", False):
                 visualize_frame("left", left_np, timestamp, serial)
+                # cv2.imshow("left", left_np)
             if streams.get("right", False):
                 visualize_frame("right", right_np, timestamp, serial)
+                # cv2.imshow("right", right_np)
             if streams.get("depth", False):
-                visualize_frame("depth", color_depth, timestamp, serial)
+                visualize_frame("depth", depth_np, timestamp, serial)
+                # cv2.imshow("depth", color_depth)
             if streams.get("rgb", False):
                 visualize_frame("rgb", color_np, timestamp, serial)
+                # cv2.imshow("rgb", color_np)
         elif not show_streams:
             if streams.get("left", False):
-                visualize_frame_info("left", left_np, timestamp, serial, ['left', 'right', 'depth', 'rgb'])
+                visualize_frame_info("left", left_np, timestamp, serial, output)
 
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):
@@ -183,7 +179,7 @@ def main():
             out_dir = create_output_dir(args.output, serial, args.view_name, profile.get_device(), profile, settings)
             print(f"Capture started: {all_frames} frames")
 
-    print("Capture finished")
+    print("Exiting script")
     pipeline.stop()
     cv2.destroyAllWindows()
 

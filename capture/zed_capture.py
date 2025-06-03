@@ -6,6 +6,7 @@ import os
 import json
 import time
 import datetime
+import argparse
 from utils.capture_universal import colorize_depth
 from utils.generate_calib import generate_depthai_calib_from_zed
 from oak_capture import visualize_frame_info, visualize_frame
@@ -81,8 +82,7 @@ def count_output_streams(output_streams):
             stream_names.append(item)
     return stream_names
 
-def main():
-    import argparse
+def parseArguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("view_name")
     parser.add_argument("--output", default="DATA")
@@ -90,19 +90,22 @@ def main():
     parser.add_argument("--settings", default="settings_jsons/zed_settings.json")
     parser.add_argument("--autostart_time", default=0, help="Select a fixed time for capture to start")
     parser.add_argument("--show_streams", default=False, help="Show all the running streams. If false, only shows the left frame")
-    args = parser.parse_args()
+    return parser.parse_args()
 
+def process_argument_logic(args):
     if args.autostart_time:
         today = datetime.date.today()
         time_part = datetime.time.fromisoformat(args.autostart_time)
         wait = datetime.datetime.combine(today, time_part)
     else:
         wait = 0
-
     if args.autostart_time: args.autostart = 0
-
     show_streams = args.show_streams
+    return args, wait, show_streams
 
+def main():
+    args = parseArguments()
+    args, wait, show_streams = process_argument_logic(args)
 
     settings = load_zed_settings(args.settings)
     num_frames = settings.get("num_captures", 20)
