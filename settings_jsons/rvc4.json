@@ -4,7 +4,7 @@
     "flood_light": false,
     "flood_light_intensity": 1,
     "stereoResolution": {"x": 1280, "y": 800},
-    "rgbResolution": {"x": 640, "y": 480},
+    "rgbResolution": {"x": 1280, "y": 800},
     "sync_on_host": true,
     "monoSettings": {
         "luma_denoise": 1,
@@ -20,12 +20,12 @@
 
     "output_settings": {
         "left": true,
-        "left_raw": true,
+        "left_raw": false,
         "right": true,
-        "right_raw": true,
-        "rgb": true,
-        "depth": true,
-        "disparity": true,
+        "right_raw": false,
+        "rgb": false,
+        "depth": false,
+        "disparity": false,
         "sync": true
     },
 
@@ -33,6 +33,6 @@
     "LRcheck": true,
     "extendedDisparity": true,
 
-    "FPS": 5,
+    "FPS": 15,
     "num_captures": 20
 }

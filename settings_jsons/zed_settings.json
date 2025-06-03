@@ -8,7 +8,7 @@
     "left": true,
     "right": true,
     "depth": true,
-    "depth_png": true
+    "depth_png": false
   },
-  "fps": 5
+  "fps": 15
 }
