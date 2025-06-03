@@ -1,7 +1,7 @@
 {
   "depth_mode": "NEURAL",
   "coordinate_units": "MILLIMETER",
-  "resolution": "HD2K",
+  "resolution": "HD1080",
   "color_space": "RGB",
   "num_captures": 20,
   "output_settings": {
@@ -10,5 +10,5 @@
     "depth": true,
     "depth_png": true
   },
-  "fps": 10
+  "fps": 5
 }

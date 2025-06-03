@@ -117,9 +117,22 @@ def main():
     init_params.depth_mode = getattr(sl.DEPTH_MODE, settings.get("depth_mode", "NEURAL"))
     init_params.coordinate_units = getattr(sl.UNIT, settings.get("coordinate_units", "MILLIMETER"))
     init_params.camera_resolution = getattr(sl.RESOLUTION, settings.get("resolution", "HD2K"))
-    init_params.camera_fps = settings.get("fps", 30)
 
-    # todo fps not set correctly
+    def format_fps(fps):
+        multiple = fps // 15 + 1
+        zed_fps = multiple * 15
+
+        drop_factor = int(multiple * 15 / fps)
+
+        return zed_fps, drop_factor
+
+    desired_fps = settings.get("fps", 15)
+    zed_fps, drop_factor = format_fps(desired_fps)
+
+    init_params.camera_fps = zed_fps
+
+    num_frames *= drop_factor
+
 
     if zed.open(init_params) != sl.ERROR_CODE.SUCCESS:
         exit("Failed to open ZED camera")
@@ -161,15 +174,22 @@ def main():
         if show_streams:
             if output_settings.get("left", False):
                 visualize_frame("left", cv2.cvtColor(left_np, cv2.COLOR_BGR2RGB), timestamp, "ZED")
+                # cv2.imshow("left", left_np)
             if output_settings.get("right", False):
                 visualize_frame("right", cv2.cvtColor(right_np, cv2.COLOR_BGR2RGB), timestamp, "ZED")
+                # cv2.imshow("right", right_np)
             if output_settings.get("depth", False):
-                visualize_frame("depth", color_depth, timestamp, "ZED")
+                visualize_frame("depth", depth_np, timestamp, "ZED")
+                # cv2.imshow("depth", color_depth)
         elif not show_streams:
             if output_settings.get("left", False):
                 visualize_frame_info("left", cv2.cvtColor(left_np, cv2.COLOR_BGR2RGB), timestamp, "ZED", ['left', 'right', 'depth'])
 
         if save:
+            if not count % drop_factor == 0:
+                print(f"dropping {count}/{num_frames} to match FPS")
+                count += 1
+                continue
             if output_settings.get("depth", False):
                 np.save(os.path.join(out_dir, f"depth_{timestamp}.npy"), depth_np)
             if output_settings.get("depth_png", False):
