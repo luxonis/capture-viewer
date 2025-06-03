@@ -103,42 +103,40 @@ def process_argument_logic(args):
     show_streams = args.show_streams
     return args, wait, show_streams
 
+def format_fps(fps):
+    multiple = fps // 15 + 1
+    zed_fps = multiple * 15
+    drop_factor = int(multiple * 15 / fps)
+    return zed_fps, drop_factor
+
+def set_device(zed, settings, zed_fps):
+    init_params = sl.InitParameters()
+    init_params.depth_mode = getattr(sl.DEPTH_MODE, settings.get("depth_mode", "NEURAL"))
+    init_params.coordinate_units = getattr(sl.UNIT, settings.get("coordinate_units", "MILLIMETER"))
+    init_params.camera_resolution = getattr(sl.RESOLUTION, settings.get("resolution", "HD2K"))
+    init_params.camera_fps = zed_fps
+
+    if zed.open(init_params) != sl.ERROR_CODE.SUCCESS:
+        exit("Failed to open ZED camera")
+
 def main():
     args = parseArguments()
     args, wait, show_streams = process_argument_logic(args)
 
     settings = load_zed_settings(args.settings)
-    num_frames = settings.get("num_captures", 20)
+
     output_settings = settings.get("output_settings", {})
-
     streams = count_output_streams(output_settings)
-
-    all_frames = len(streams) * num_frames
-
-    zed = sl.Camera()
-    init_params = sl.InitParameters()
-    init_params.depth_mode = getattr(sl.DEPTH_MODE, settings.get("depth_mode", "NEURAL"))
-    init_params.coordinate_units = getattr(sl.UNIT, settings.get("coordinate_units", "MILLIMETER"))
-    init_params.camera_resolution = getattr(sl.RESOLUTION, settings.get("resolution", "HD2K"))
-
-    def format_fps(fps):
-        multiple = fps // 15 + 1
-        zed_fps = multiple * 15
-
-        drop_factor = int(multiple * 15 / fps)
-
-        return zed_fps, drop_factor
 
     desired_fps = settings.get("fps", 15)
     zed_fps, drop_factor = format_fps(desired_fps)
 
-    init_params.camera_fps = zed_fps
+    zed = sl.Camera()
+    set_device(zed, settings, zed_fps)
 
+    num_frames = settings.get("num_captures", 20)
+    all_frames = len(streams) * num_frames
     num_frames *= drop_factor
-
-
-    if zed.open(init_params) != sl.ERROR_CODE.SUCCESS:
-        exit("Failed to open ZED camera")
 
     print("Press 's' to start capture or 'q' to quit")
     save = False
