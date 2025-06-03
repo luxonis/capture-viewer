@@ -143,13 +143,7 @@ def downscale_to_fit(frame, max_width, max_height):
     return cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_AREA)
 
 def visualize_frame(name, frame, timestamp, mxid):
-    if name == "tof_depth":
-        max_depth = 5 * 1500  # 100MHz modulation freq.
-        depth_colorized = colorize_depth(frame, min_depth=0, max_depth=max_depth)
-        depth_colorized = cv2.putText(depth_colorized, f"{timestamp} ms", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1,
-                                      (255, 255, 255), 2)
-        cv2.imshow(f"{mxid} {name}", depth_colorized)
-    elif name in ["left", "right", "rgb", "left_raw", "right_raw", "rgb_raw"]:
+    if name in ["left", "right", "rgb", "left_raw", "right_raw", "rgb_raw"]:
         frame_timestamp = frame.copy()
         frame_timestamp = cv2.putText(frame_timestamp, f"{timestamp} ms", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
 
@@ -159,15 +153,6 @@ def visualize_frame(name, frame, timestamp, mxid):
         if h > screen_height or w > screen_width:
             frame_timestamp = downscale_to_fit(frame_timestamp, screen_width, screen_height)
         cv2.imshow(f"{mxid} {name}", frame_timestamp)
-
-        # cv2.imshow(f"{mxid} {name}", frame)
-
-    elif name == "tof_amplitude":
-        depth_vis = (frame * 255 / frame.max()).astype(np.uint8)
-        depth_vis = cv2.applyColorMap(depth_vis, cv2.COLORMAP_JET)
-        cv2.imshow(f"{mxid} {name}", depth_vis)
-    elif name == "tof_intensity":
-        cv2.imshow(f"{mxid} {name}", frame)
     elif name == "depth":
         depth_vis = colorize_depth(frame)
         depth_vis = cv2.putText(depth_vis, f"{timestamp} ms", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
@@ -176,6 +161,21 @@ def visualize_frame(name, frame, timestamp, mxid):
         depth_vis = colorize_depth(frame, min_depth=0, max_depth=frame.max())
         depth_vis = cv2.putText(depth_vis, f"{timestamp} ms", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
         cv2.imshow(f"{mxid} {name}", depth_vis)
+
+    elif name == "tof_depth":
+        max_depth = 5 * 1500  # 100MHz modulation freq.
+        depth_colorized = colorize_depth(frame, min_depth=0, max_depth=max_depth)
+        depth_colorized = cv2.putText(depth_colorized, f"{timestamp} ms", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1,
+                                      (255, 255, 255), 2)
+        cv2.imshow(f"{mxid} {name}", depth_colorized)
+
+    elif name == "tof_amplitude":
+        depth_vis = (frame * 255 / frame.max()).astype(np.uint8)
+        depth_vis = cv2.applyColorMap(depth_vis, cv2.COLORMAP_JET)
+        cv2.imshow(f"{mxid} {name}", depth_vis)
+    elif name == "tof_intensity":
+        cv2.imshow(f"{mxid} {name}", frame)
+
 
 def visualize_frame_info(name, frame, timestamp, mxid, streams):
     frame_timestamp = frame.copy()
