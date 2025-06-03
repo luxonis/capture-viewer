@@ -59,7 +59,7 @@ def initialize_pipeline(pipeline, settings):
         monoRight = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_C)
         monoRightOut = configure_cam(monoRight, settings["stereoResolution"]["x"], settings["stereoResolution"]["y"], settings["FPS"])
 
-    if output_settings["rgb"] or output_settings["rgb_png"]:
+    if output_settings["rgb"]:
         color = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_A)
         colorOut = configure_cam(color, settings["rgbResolution"]["x"], settings["rgbResolution"]["y"], settings["FPS"])
 
