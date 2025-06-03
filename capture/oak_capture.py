@@ -40,9 +40,12 @@ def parseArguments():
     parser.add_argument("--ram", default=2, type=float, help="Maximum RAM to be used while saving, in GB")
     parser.add_argument("--att_connection", default=False, help="try to find the devices on the network before connecting immediately")
     parser.add_argument("--autostart_time", default=0, help="Select a fixed time when the script is supposed to start")
+    parser.add_argument("--autostart_end", default=0, help="Select a fixed time for capture to end")
     parser.add_argument("--show_streams", default=False, help="Show all the running streams. If false, only shows the left frame")
 
-    args = parser.parse_args()
+    return parser.parse_args()
+
+def process_argument_logic(args):
     settings_path = args.settings_file_path
     view_name = args.view_name
     root_path = args.output
@@ -59,17 +62,22 @@ def parseArguments():
 
     devices = [d.upper() for d in args.devices]
 
+    today = datetime.date.today()
+
     if args.autostart_time:
-        today = datetime.date.today()
-        time_part = datetime.time.fromisoformat(args.autostart_time)
-        wait = datetime.datetime.combine(today, time_part)
+        wait = datetime.datetime.combine(today, datetime.time.fromisoformat(args.autostart_time))
     else:
         wait = 0
+
+    if args.autostart_end:
+        wait_end = datetime.datetime.combine(today, datetime.time.fromisoformat(args.autostart_end))
+    else:
+        wait_end = 0
 
     if devices == []: args.att_connection = True
     if args.autostart_time: args.autostart = 0
 
-    return settings_path, view_name, devices, args.autostart, args.ram, root_path, args.att_connection, wait, args.show_streams
+    return settings_path, view_name, devices, args.autostart, args.ram, root_path, args.att_connection, wait, wait_end, args.show_streams
 
 def worker(mxid, stack, devices, settings, num, shared_devices, exception_queue):
     try:
@@ -239,7 +247,8 @@ def attempt_connection(devices, attempts=10):
             return mxids
 
 if __name__ == "__main__":
-    settings_path, view_name, devices, autostart, ram, root_path, att_connect, autostart_time, show_streams = parseArguments()
+    args = parseArguments()
+    settings_path, view_name, devices, autostart, ram, root_path, att_connect, autostart_time, wait_end, show_streams = process_argument_logic(args)
 
     with contextlib.ExitStack() as stack:
         if att_connect: mxids = attempt_connection(devices)
@@ -384,8 +393,10 @@ if __name__ == "__main__":
                         capture_ended, save = True, False
 
             # finalise capture if enough frames were captured
+
+            now = time.time()
             for mxid in shared_devices.keys():
-                if num_captures[mxid] >= final_num_captures:
+                if (not wait_end and num_captures[mxid] >= final_num_captures) or (wait_end and now >= wait_end.timestamp()):
                     end_time = time.time()
                     print(mxid, end=' ')
                     finalise_capture(start_time, end_time, num_captures[mxid], streams)

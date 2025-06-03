@@ -141,9 +141,12 @@ def parseArguments():
     # parser.add_argument("--devices", default=[], dest="mxids", nargs="+", help="MXIDS of devices to connect to")
     parser.add_argument("--ip", default=None, dest="ip", help="IP to connect to")
     parser.add_argument("--autostart_time", default=0, help="Select a fixed time when the script is supposed to start")
+    parser.add_argument("--autostart_end", default=0, help="Select a fixed time for capture to end")
     parser.add_argument("--show_streams", default=False, help="Show all the running streams. If false, only shows the left frame")
 
-    args = parser.parse_args()
+    return parser.parse_args()
+
+def process_argument_logic(args):
     settings_path = args.settings_file_path
     view_name = args.view_name
     ip = args.ip
@@ -158,16 +161,21 @@ def parseArguments():
             settings_path = settings_path_2
         else: raise FileNotFoundError(f"Settings file '{settings_path}' does not exist.")
 
+    today = datetime.date.today()
+
     if args.autostart_time:
-        today = datetime.date.today()
-        time_part = datetime.time.fromisoformat(args.autostart_time)
-        wait = datetime.datetime.combine(today, time_part)
+        wait = datetime.datetime.combine(today, datetime.time.fromisoformat(args.autostart_time))
     else:
         wait = 0
 
+    if args.autostart_end:
+        wait_end = datetime.datetime.combine(today, datetime.time.fromisoformat(args.autostart_end))
+    else:
+        wait_end = 0
+
     if args.autostart_time: args.autostart = 0
 
-    return settings_path, view_name, ip, args.autostart, wait, args.show_streams
+    return settings_path, view_name, ip, args.autostart, wait, wait_end, args.show_streams
 
 def controlQueueSend(input_queues, ctrl):
     for queue in input_queues.values():
@@ -189,7 +197,8 @@ def initialize_mono_control(settings):
     return ctrl
 
 if __name__ == "__main__":
-    settings_path, view_name, ip, autostart, autostart_time, show_streams = parseArguments()
+    args = parseArguments()
+    settings_path, view_name, ip, autostart, autostart_time, wait_end, show_streams = process_argument_logic(args)
 
     print(f"connecting to device... IP: {ip}")
 
@@ -305,7 +314,8 @@ if __name__ == "__main__":
                     capture_ended, save = True, False
                     pipeline.stop()
 
-            if num_captures[mxid] >= final_num_captures:
+            now = time.time()
+            if (not wait_end and num_captures[mxid] >= final_num_captures) or (wait_end and now >= wait_end.timestamp()):
                 end_time = time.time()
                 print(mxid, end=' ')
                 finalise_capture(start_time, end_time, num_captures[mxid], streams)

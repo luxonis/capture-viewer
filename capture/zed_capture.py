@@ -89,19 +89,22 @@ def parseArguments():
     parser.add_argument("--autostart", default=-1, type=int)
     parser.add_argument("--settings", default="settings_jsons/zed_settings.json")
     parser.add_argument("--autostart_time", default=0, help="Select a fixed time for capture to start")
+    parser.add_argument("--autostart_end", default=0, help="Select a fixed time for capture to end")
     parser.add_argument("--show_streams", default=False, help="Show all the running streams. If false, only shows the left frame")
     return parser.parse_args()
 
 def process_argument_logic(args):
-    if args.autostart_time:
-        today = datetime.date.today()
-        time_part = datetime.time.fromisoformat(args.autostart_time)
-        wait = datetime.datetime.combine(today, time_part)
-    else:
-        wait = 0
+    today = datetime.date.today()
+
+    if args.autostart_time: wait = datetime.datetime.combine(today, datetime.time.fromisoformat(args.autostart_time))
+    else: wait = 0
+
+    if args.autostart_end: wait_end = datetime.datetime.combine(today, datetime.time.fromisoformat(args.autostart_end))
+    else: wait_end = 0
+
     if args.autostart_time: args.autostart = 0
     show_streams = args.show_streams
-    return args, wait, show_streams
+    return args, wait, wait_end, show_streams
 
 def format_fps(fps):
     multiple = fps // 15 + 1
@@ -121,7 +124,7 @@ def set_device(zed, settings, zed_fps):
 
 def main():
     args = parseArguments()
-    args, wait, show_streams = process_argument_logic(args)
+    args, wait, wait_end, show_streams = process_argument_logic(args)
 
     settings = load_zed_settings(args.settings)
 
@@ -149,8 +152,16 @@ def main():
     else:
         initialize_capture_time = initial_time + args.autostart
 
-    while count < num_frames:
+    while True:
         now = time.time()
+
+        if not wait_end and count >= num_frames:
+            break
+
+        if wait_end and now >= wait_end.timestamp():
+            print("Capture finish time:", now)
+            break
+
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):
             break
