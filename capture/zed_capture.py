@@ -106,11 +106,11 @@ def process_argument_logic(args):
     show_streams = args.show_streams
     return args, wait, wait_end, show_streams
 
-def format_fps(fps):
-    multiple = fps // 15 + 1
-    zed_fps = multiple * 15
-    drop_factor = int(multiple * 15 / fps)
-    return zed_fps, drop_factor
+# def format_fps(fps):
+#     multiple = fps // 15 + 1
+#     zed_fps = multiple * 15
+#     drop_factor = int(multiple * 15 / fps)
+#     return zed_fps, drop_factor
 
 def set_device(zed, settings, zed_fps):
     init_params = sl.InitParameters()
@@ -131,15 +131,15 @@ def main():
     output_settings = settings.get("output_settings", {})
     streams = count_output_streams(output_settings)
 
-    desired_fps = settings.get("fps", 15)
-    zed_fps, drop_factor = format_fps(desired_fps)
+    fps = settings.get("fps", 15)
+    # zed_fps, drop_factor = format_fps(fps)
 
     zed = sl.Camera()
-    set_device(zed, settings, zed_fps)
+    set_device(zed, settings, fps)
 
     num_frames = settings.get("num_captures", 20)
     all_frames = len(streams) * num_frames
-    num_frames *= drop_factor
+    # num_frames *= drop_factor
 
     print("Press 's' to start capture or 'q' to quit")
     save = False
@@ -198,10 +198,10 @@ def main():
                 visualize_frame_info("left", cv2.cvtColor(left_np, cv2.COLOR_BGR2RGB), timestamp, "ZED", ['left', 'right', 'depth'])
 
         if save:
-            if not count % drop_factor == 0:
-                print(f"dropping {count}/{num_frames} to match FPS")
-                count += 1
-                continue
+            # if not count % drop_factor == 0:
+            #     print(f"dropping {count}/{num_frames} to match FPS")
+            #     count += 1
+            #     continue
             if output_settings.get("depth", False):
                 np.save(os.path.join(out_dir, f"depth_{timestamp}.npy"), depth_np)
             if output_settings.get("depth_png", False):
