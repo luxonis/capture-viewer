@@ -5,7 +5,7 @@ def generate_depthai_calib_from_zed(calib_params, width, height):
     """
     Generates a 3-camera DepthAI-compatible calib.json using ZED stereo calibration data
     """
-    baseline = calib_params.get_camera_baseline()
+    baseline_mm = calib_params.get_camera_baseline()
 
     def camera_block(fx, fy, cx, cy, disto, K, translation, socket):
         return {
@@ -61,6 +61,7 @@ def generate_depthai_calib_from_zed(calib_params, width, height):
     cy_r = calib_params.right_cam.cy
     K_right = [[fx_r, 0, cx_r], [0, fy_r, cy_r], [0, 0, 1]]
 
+    baseline = baseline_mm / 10
     left_translation = -baseline / 2
     right_translation = baseline / 2
 
@@ -167,7 +168,8 @@ def generate_depthai_calib_from_realsense(intr_left, intr_right, extrinsics, wid
     disto_l = intr_left.coeffs
     disto_r = intr_right.coeffs
 
-    baseline = extrinsics.translation[0]
+    baseline_m = extrinsics.translation[0]
+    baseline = baseline_m * 100
     left_translation = -baseline / 2
     right_translation = baseline / 2
 
