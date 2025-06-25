@@ -3,9 +3,11 @@
 import os
 import json
 import tkinter as tk
-from tkinter import filedialog, ttk, Canvas, Scrollbar
+from tkinter import ttk, Canvas, Scrollbar
 import numpy as np
 from PIL import Image, ImageTk
+
+from FileSelection import FolderExplorer
 
 class FileSection(tk.LabelFrame):
     def __init__(self, master):
@@ -58,10 +60,11 @@ class FileSection(tk.LabelFrame):
             self.analyze_folder()
 
     def browse_folder(self):
-        path = filedialog.askdirectory()
-        if path:
+        def set_path(path):
             self.folder_path.set(path)
             self.analyze_folder()
+
+        FolderExplorer(self, on_select_callback=set_path, initial_dir=self.folder_path.get() or ".")
 
     def analyze_folder(self):
         path = self.folder_path.get()
