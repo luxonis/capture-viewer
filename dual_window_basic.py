@@ -7,9 +7,9 @@ from tkinter import filedialog, ttk, Canvas, Scrollbar
 import numpy as np
 from PIL import Image, ImageTk
 
-class FileSection(tk.Frame):
+class FileSection(tk.LabelFrame):
     def __init__(self, master):
-        super().__init__(master)
+        super().__init__(master, bd=2, relief="groove", bg="#1c1c1e", fg="white")
         self.folder_path = tk.StringVar()
         self.file_types = []
         self.selected_type = tk.StringVar()
@@ -22,20 +22,22 @@ class FileSection(tk.Frame):
         for widget in self.winfo_children():
             widget.destroy()
 
-        tk.Entry(self, textvariable=self.folder_path, width=50).pack(pady=5)
-        tk.Button(self, text="Browse", command=self.browse_folder).pack()
+        tk.Label(self, textvariable=self.folder_path, bg="#1c1c1e", fg="white", font=("Arial", 12, "bold"))\
+            .pack(pady=(10, 0))
+        tk.Entry(self, textvariable=self.folder_path, width=50, bg="#2c2c2e", fg="white", insertbackground="white").pack(pady=5)
+        tk.Button(self, text="Browse", command=self.browse_folder, bg="#5e5ce6", fg="white", relief="flat").pack()
         self.type_combo = ttk.Combobox(self, textvariable=self.selected_type)
         self.type_combo.pack(pady=5)
-        tk.Button(self, text="Load", command=self.load_files).pack(pady=5)
+        tk.Button(self, text="Load", command=self.load_files, bg="#5e5ce6", fg="white", relief="flat").pack(pady=5)
 
-        self.metadata_canvas = Canvas(self, width=300, height=150)
+        self.metadata_canvas = Canvas(self, width=300, height=150, bg="#1c1c1e", highlightthickness=0)
         self.metadata_scrollbar = Scrollbar(self, orient="vertical", command=self.metadata_canvas.yview)
-        self.metadata_frame = tk.Frame(self.metadata_canvas)
+        self.metadata_frame = tk.Frame(self.metadata_canvas, bg="#1c1c1e")
 
         self.metadata_canvas.create_window((0, 0), window=self.metadata_frame, anchor="nw")
         self.metadata_canvas.configure(yscrollcommand=self.metadata_scrollbar.set)
 
-        self.metadata_canvas.pack(side="left", fill="both", expand=True)
+        self.metadata_canvas.pack(side="left", fill="both", expand=True, padx=10)
         self.metadata_scrollbar.pack(side="right", fill="y")
 
         self.metadata_frame.bind("<Configure>", lambda e: self.metadata_canvas.configure(scrollregion=self.metadata_canvas.bbox("all")))
@@ -82,11 +84,11 @@ class FileSection(tk.Frame):
                 try:
                     data = json.load(f)
                     for k, v in data.items():
-                        tk.Label(self.metadata_frame, text=f"{k}: {v}", anchor='w', justify='left').pack(fill='x')
+                        tk.Label(self.metadata_frame, text=f"{k}: {v}", anchor='w', justify='left', bg="#1c1c1e", fg="white").pack(fill='x')
                 except json.JSONDecodeError:
-                    tk.Label(self.metadata_frame, text="Invalid metadata.json", fg="red").pack()
+                    tk.Label(self.metadata_frame, text="Invalid metadata.json", fg="red", bg="#1c1c1e").pack()
         else:
-            tk.Label(self.metadata_frame, text="No metadata.json present", fg="gray").pack()
+            tk.Label(self.metadata_frame, text="No metadata.json present", fg="gray", bg="#1c1c1e").pack()
 
     def load_files(self):
         type_str = self.selected_type.get()
@@ -104,24 +106,27 @@ class FileSection(tk.Frame):
         for widget in self.winfo_children():
             widget.destroy()
 
-        nav_frame = tk.Frame(self)
-        nav_frame.pack()
-        tk.Button(nav_frame, text="<", command=self.prev_file).pack(side="left")
-        tk.Label(nav_frame, text=self.files[self.current_index]).pack(side="left")
-        tk.Button(nav_frame, text=">", command=self.next_file).pack(side="left")
-        tk.Button(self, text="MENU", command=self.return_to_menu).pack(pady=5)
+        tk.Label(self, textvariable=self.folder_path, bg="#1c1c1e", fg="white", font=("Arial", 12, "bold"))\
+            .pack(pady=(10, 0))
+
+        nav_frame = tk.Frame(self, bg="#1c1c1e")
+        nav_frame.pack(pady=5)
+        tk.Button(nav_frame, text="<", command=self.prev_file, bg="#5e5ce6", fg="white", relief="flat").pack(side="left")
+        tk.Label(nav_frame, text=self.files[self.current_index], bg="#1c1c1e", fg="white").pack(side="left", padx=10)
+        tk.Button(nav_frame, text=">", command=self.next_file, bg="#5e5ce6", fg="white", relief="flat").pack(side="left")
+        tk.Button(self, text="MENU", command=self.return_to_menu, bg="#5e5ce6", fg="white", relief="flat").pack(pady=5)
 
         file_path = os.path.join(self.folder_path.get(), self.files[self.current_index])
         if file_path.endswith(".npy"):
             arr = np.load(file_path)
             img = ImageTk.PhotoImage(Image.fromarray((arr / arr.max() * 255).astype(np.uint8)))
-            label = tk.Label(self, image=img)
+            label = tk.Label(self, image=img, bg="#1c1c1e")
             label.image = img
             label.pack()
         elif file_path.endswith(".png"):
             img = Image.open(file_path)
             img = ImageTk.PhotoImage(img)
-            label = tk.Label(self, image=img)
+            label = tk.Label(self, image=img, bg="#1c1c1e")
             label.image = img
             label.pack()
 
@@ -143,13 +148,17 @@ class DualApp(tk.Tk):
         super().__init__()
         self.title("Dual File Viewer")
         self.geometry("1600x1600")
+        self.configure(bg="#1c1c1e")
 
         top_section = FileSection(self)
         bottom_section = FileSection(self)
 
-        top_section.pack(side="top", fill="both", expand=True, padx=10, pady=10)
-        bottom_section.pack(side="bottom", fill="both", expand=True, padx=10, pady=10)
+        top_section.pack(side="top", fill="both", expand=True, padx=20, pady=20)
+        bottom_section.pack(side="top", fill="both", expand=True, padx=20, pady=20)
 
 if __name__ == '__main__':
     app = DualApp()
+    style = ttk.Style()
+    style.theme_use('default')
+    style.configure("TCombobox", fieldbackground="#2c2c2e", background="#2c2c2e", foreground="white")
     app.mainloop()
