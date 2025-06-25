@@ -15,6 +15,18 @@ class FileSection(tk.LabelFrame):
         self.selected_type = tk.StringVar()
         self.files = []
         self.current_index = 0
+        self.original_image = None
+        self.scaled_image = None
+        self.scale_factor = 1.0
+        self.monitor_width = self.winfo_screenwidth() // 2
+        self.monitor_height = self.winfo_screenheight() // 2
+        self.image_label = None
+        self.width_entry = None
+        self.height_entry = None
+        self.max_label = None
+        self.image_size = (0, 0)
+        self.width_var = tk.StringVar()
+        self.height_var = tk.StringVar()
 
         self.build_menu()
 
@@ -106,8 +118,7 @@ class FileSection(tk.LabelFrame):
         for widget in self.winfo_children():
             widget.destroy()
 
-        tk.Label(self, textvariable=self.folder_path, bg="#1c1c1e", fg="white", font=("Arial", 12, "bold"))\
-            .pack(pady=(10, 0))
+        tk.Label(self, textvariable=self.folder_path, bg="#1c1c1e", fg="white", font=("Arial", 12, "bold")).pack(pady=(10, 0))
 
         nav_frame = tk.Frame(self, bg="#1c1c1e")
         nav_frame.pack(pady=5)
@@ -119,16 +130,65 @@ class FileSection(tk.LabelFrame):
         file_path = os.path.join(self.folder_path.get(), self.files[self.current_index])
         if file_path.endswith(".npy"):
             arr = np.load(file_path)
-            img = ImageTk.PhotoImage(Image.fromarray((arr / arr.max() * 255).astype(np.uint8)))
-            label = tk.Label(self, image=img, bg="#1c1c1e")
-            label.image = img
-            label.pack()
+            self.original_image = Image.fromarray((arr / arr.max() * 255).astype(np.uint8))
         elif file_path.endswith(".png"):
-            img = Image.open(file_path)
-            img = ImageTk.PhotoImage(img)
-            label = tk.Label(self, image=img, bg="#1c1c1e")
-            label.image = img
-            label.pack()
+            self.original_image = Image.open(file_path)
+        else:
+            return
+
+        self.image_size = self.original_image.size
+
+        if not self.width_var.get() or not self.height_var.get():
+            self.width_var.set(str(self.image_size[0]))
+            self.height_var.set(str(self.image_size[1]))
+
+        resize_frame = tk.Frame(self, bg="#1c1c1e")
+        resize_frame.pack(pady=5)
+        tk.Label(resize_frame, text="Size:", bg="#1c1c1e", fg="white").pack(side="left")
+
+        self.width_entry = tk.Entry(resize_frame, textvariable=self.width_var, width=6)
+        self.height_entry = tk.Entry(resize_frame, textvariable=self.height_var, width=6)
+
+        self.width_entry.pack(side="left")
+        tk.Label(resize_frame, text="x", bg="#1c1c1e", fg="white").pack(side="left")
+        self.height_entry.pack(side="left", padx=(0, 10))
+        tk.Label(resize_frame, text=f"(max: {self.image_size[0]}x{self.image_size[1]})", bg="#1c1c1e", fg="gray").pack(side="left")
+
+        self.width_entry.bind("<Return>", self.update_resize)
+        self.height_entry.bind("<Return>", self.update_resize)
+
+        self.display_rescaled_image()
+
+    def update_resize(self, event=None):
+        try:
+            if event and event.widget == self.width_entry:
+                new_width = int(self.width_var.get())
+                aspect_ratio = self.image_size[1] / self.image_size[0]
+                new_height = int(new_width * aspect_ratio)
+                self.height_var.set(str(new_height))
+            elif event and event.widget == self.height_entry:
+                new_height = int(self.height_var.get())
+                aspect_ratio = self.image_size[0] / self.image_size[1]
+                new_width = int(new_height * aspect_ratio)
+                self.width_var.set(str(new_width))
+            self.display_rescaled_image()
+        except ValueError:
+            pass
+
+    def display_rescaled_image(self):
+        if self.image_label:
+            self.image_label.destroy()
+
+        if self.original_image:
+            try:
+                width = int(self.width_var.get())
+                height = int(self.height_var.get())
+                self.scaled_image = ImageTk.PhotoImage(self.original_image.resize((width, height), Image.LANCZOS))
+                self.image_label = tk.Label(self, image=self.scaled_image, bg="#1c1c1e")
+                self.image_label.image = self.scaled_image
+                self.image_label.pack()
+            except Exception:
+                pass
 
     def return_to_menu(self):
         self.build_menu()
