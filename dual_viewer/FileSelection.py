@@ -104,10 +104,13 @@ class FolderExplorer(tk.Toplevel):
 
     def on_mouse_hover(self, event):
         index = self.folder_listbox.nearest(event.y)
+
+        if index < 0 or index >= self.folder_listbox.size():
+            return  # Ignore if the mouse is outside valid items
+
         if index != self.last_hover_index:
-            # Reset previous hover
-            if self.last_hover_index is not None:
+            if self.last_hover_index is not None and 0 <= self.last_hover_index < self.folder_listbox.size():
                 self.folder_listbox.itemconfig(self.last_hover_index, bg="#f1edff")
-            # Set new hover
+
             self.folder_listbox.itemconfig(index, bg="#e2dbff")
             self.last_hover_index = index
