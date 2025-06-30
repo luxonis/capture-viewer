@@ -143,6 +143,7 @@ def parseArguments():
     parser.add_argument("--autostart_time", default=0, help="Select a fixed time when the script is supposed to start")
     parser.add_argument("--autostart_end", default=0, help="Select a fixed time for capture to end")
     parser.add_argument("--show_streams", default=False, help="Show all the running streams. If false, only shows the left frame")
+    parser.add_argument("--alternating_capture", default=False, help="Turn IR projector ON/OFF")
 
     return parser.parse_args()
 
@@ -238,8 +239,11 @@ if __name__ == "__main__":
         pipeline, q, input_queues = initialize_pipeline(pipeline, settings)
         pipeline.start()
 
-        control = initialize_mono_control(settings)
-        controlQueueSend(input_queues, control)
+        platform = pipeline.getDefaultDevice().getPlatform()
+        print(platform)
+        if platform == dai.Platform.RVC4:
+            control = initialize_mono_control(settings)
+            controlQueueSend(input_queues, control)
 
         if settings['ir']: pipeline.getDefaultDevice().setIrLaserDotProjectorIntensity(settings['ir_value'])
         if settings['flood_light']: pipeline.getDefaultDevice().setIrFloodLightIntensity(settings['flood_light_intensity'])
@@ -275,7 +279,7 @@ if __name__ == "__main__":
                     if show_streams:
                         visualize_frame(name, cvFrame, timestamp, mxid)
                     elif not show_streams and name == 'left':
-                        visualize_frame_info(name, cvFrame, timestamp, mxid, streams)
+                        visualize_frame_info(name, cvFrame, timestamp, mxid, streams, save)
             else:
                 for name in q.keys():
                     frame = q[name].get()
@@ -293,7 +297,7 @@ if __name__ == "__main__":
                     if show_streams:
                         visualize_frame(name, cvFrame, timestamp, mxid)
                     elif not show_streams and name == 'left':
-                        visualize_frame_info(name, cvFrame, timestamp, mxid, streams)
+                        visualize_frame_info(name, cvFrame, timestamp, mxid, streams, save)
 
             key = cv2.waitKey(1)
             if key == ord('q'):
