@@ -185,11 +185,11 @@ def visualize_frame(name, frame, timestamp, mxid):
         cv2.imshow(f"{mxid} {name}", frame)
 
 
-def visualize_frame_info(name, frame, timestamp, mxid, streams):
+def visualize_frame_info(name, frame, timestamp, mxid, streams, save=False):
     frame_timestamp = frame.copy()
     frame_timestamp = cv2.putText(frame_timestamp, f"{timestamp} ms", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
 
-    h, _ = frame_timestamp.shape[:2]
+    h, w = frame_timestamp.shape[:2]
     y_start = h - 10 - len(streams) * 30
     frame_timestamp = cv2.putText(
         frame_timestamp,
@@ -212,6 +212,20 @@ def visualize_frame_info(name, frame, timestamp, mxid, streams):
             (0, 255, 0),
             2
         )
+
+    if save:
+        text = "Saving..!"
+    else:
+        text = "Waiting..."
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = 1
+    thickness = 2
+    color = (0, 0, 255)
+    (text_width, text_height), _ = cv2.getTextSize(text, font, font_scale, thickness)
+    x = w - text_width - 10
+    y = text_height + 10
+    frame_timestamp = cv2.putText(frame_timestamp, text, (x, y), font, font_scale, color, thickness)
+
 
     screen = screeninfo.get_monitors()[0]
     screen_width, screen_height = screen.width, screen.height
