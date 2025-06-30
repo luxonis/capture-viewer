@@ -3,6 +3,7 @@ import queue
 import numpy as np
 import tempfile
 import open3d as o3d
+import cv2
 
 from utils.capture_tools import process_pointcloud
 
@@ -52,6 +53,15 @@ class ReplayThread(threading.Thread):
             })
         )
 
+    def process_image(self, img):
+        MAX_WIDTH = 1280
+        if len(img.shape) == 3 and img.shape[2] == 3:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        if img.shape[1] > MAX_WIDTH:
+            scale = MAX_WIDTH / img.shape[1]
+            img = cv2.resize(img, (MAX_WIDTH, int(img.shape[0] * scale)), interpolation=cv2.INTER_AREA)
+        return img
+
     def process_frame(self, frame_data):
         left = frame_data.left
         right = frame_data.right
@@ -59,6 +69,9 @@ class ReplayThread(threading.Thread):
         calib = frame_data.calib
         config = frame_data.config
         section = frame_data.section
+
+        left = self.process_image(left)
+        right = self.process_image(right)
 
         replayed = tuple(self.replayer.replay(
             ((left, right, color), (left, right, color)),

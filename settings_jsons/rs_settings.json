@@ -1,0 +1,15 @@
+{
+  "depth_mode": "HIGH_ACCURACY",
+  "coordinate_units": "MILLIMETER",
+  "resolution": "HD720",
+  "color_space": "RGB",
+  "num_captures": 20,
+  "output_settings": {
+    "left": true,
+    "right": true,
+    "depth": true,
+    "depth_png": false,
+    "rgb": false
+  },
+  "fps": 15
+}

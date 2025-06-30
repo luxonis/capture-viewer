@@ -12,6 +12,7 @@ import argparse
 import numpy as np
 import time
 import screeninfo
+import datetime
 
 print(dai.__version__)
 
@@ -37,8 +38,14 @@ def parseArguments():
     parser.add_argument("--autostart", default=-1, type=int, help="Automatically start capturing after given number of seconds (-1 to disable)")
     parser.add_argument("--devices", default=[], dest="devices", nargs="+", help="MXIDS or IPs of devices to connect to")
     parser.add_argument("--ram", default=2, type=float, help="Maximum RAM to be used while saving, in GB")
+    parser.add_argument("--att_connection", default=False, help="try to find the devices on the network before connecting immediately")
+    parser.add_argument("--autostart_time", default=0, help="Select a fixed time when the script is supposed to start")
+    parser.add_argument("--autostart_end", default=0, help="Select a fixed time for capture to end")
+    parser.add_argument("--show_streams", default=False, help="Show all the running streams. If false, only shows the left frame")
 
-    args = parser.parse_args()
+    return parser.parse_args()
+
+def process_argument_logic(args):
     settings_path = args.settings_file_path
     view_name = args.view_name
     root_path = args.output
@@ -55,7 +62,22 @@ def parseArguments():
 
     devices = [d.upper() for d in args.devices]
 
-    return settings_path, view_name, devices, args.autostart, args.ram, root_path
+    today = datetime.date.today()
+
+    if args.autostart_time:
+        wait = datetime.datetime.combine(today, datetime.time.fromisoformat(args.autostart_time))
+    else:
+        wait = 0
+
+    if args.autostart_end:
+        wait_end = datetime.datetime.combine(today, datetime.time.fromisoformat(args.autostart_end))
+    else:
+        wait_end = 0
+
+    if devices == []: args.att_connection = True
+    if args.autostart_time: args.autostart = 0
+
+    return settings_path, view_name, devices, args.autostart, args.ram, root_path, args.att_connection, wait, wait_end, args.show_streams
 
 def worker(mxid, stack, devices, settings, num, shared_devices, exception_queue):
     try:
@@ -129,13 +151,7 @@ def downscale_to_fit(frame, max_width, max_height):
     return cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_AREA)
 
 def visualize_frame(name, frame, timestamp, mxid):
-    if name == "tof_depth":
-        max_depth = 5 * 1500  # 100MHz modulation freq.
-        depth_colorized = colorize_depth(frame, min_depth=0, max_depth=max_depth)
-        depth_colorized = cv2.putText(depth_colorized, f"{timestamp} ms", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1,
-                                      (255, 255, 255), 2)
-        cv2.imshow(f"{mxid} {name}", depth_colorized)
-    elif name in ["left", "right", "rgb", "left_raw", "right_raw", "rgb_raw"]:
+    if name in ["left", "right", "rgb", "left_raw", "right_raw", "rgb_raw"]:
         frame_timestamp = frame.copy()
         frame_timestamp = cv2.putText(frame_timestamp, f"{timestamp} ms", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
 
@@ -145,15 +161,6 @@ def visualize_frame(name, frame, timestamp, mxid):
         if h > screen_height or w > screen_width:
             frame_timestamp = downscale_to_fit(frame_timestamp, screen_width, screen_height)
         cv2.imshow(f"{mxid} {name}", frame_timestamp)
-
-        # cv2.imshow(f"{mxid} {name}", frame)
-
-    elif name == "tof_amplitude":
-        depth_vis = (frame * 255 / frame.max()).astype(np.uint8)
-        depth_vis = cv2.applyColorMap(depth_vis, cv2.COLORMAP_JET)
-        cv2.imshow(f"{mxid} {name}", depth_vis)
-    elif name == "tof_intensity":
-        cv2.imshow(f"{mxid} {name}", frame)
     elif name == "depth":
         depth_vis = colorize_depth(frame)
         depth_vis = cv2.putText(depth_vis, f"{timestamp} ms", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
@@ -162,6 +169,56 @@ def visualize_frame(name, frame, timestamp, mxid):
         depth_vis = colorize_depth(frame, min_depth=0, max_depth=frame.max())
         depth_vis = cv2.putText(depth_vis, f"{timestamp} ms", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
         cv2.imshow(f"{mxid} {name}", depth_vis)
+
+    elif name == "tof_depth":
+        max_depth = 5 * 1500  # 100MHz modulation freq.
+        depth_colorized = colorize_depth(frame, min_depth=0, max_depth=max_depth)
+        depth_colorized = cv2.putText(depth_colorized, f"{timestamp} ms", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1,
+                                      (255, 255, 255), 2)
+        cv2.imshow(f"{mxid} {name}", depth_colorized)
+
+    elif name == "tof_amplitude":
+        depth_vis = (frame * 255 / frame.max()).astype(np.uint8)
+        depth_vis = cv2.applyColorMap(depth_vis, cv2.COLORMAP_JET)
+        cv2.imshow(f"{mxid} {name}", depth_vis)
+    elif name == "tof_intensity":
+        cv2.imshow(f"{mxid} {name}", frame)
+
+
+def visualize_frame_info(name, frame, timestamp, mxid, streams):
+    frame_timestamp = frame.copy()
+    frame_timestamp = cv2.putText(frame_timestamp, f"{timestamp} ms", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+
+    h, _ = frame_timestamp.shape[:2]
+    y_start = h - 10 - len(streams) * 30
+    frame_timestamp = cv2.putText(
+        frame_timestamp,
+        "Active streams:",
+        (10, y_start - 30),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        1,
+        (0, 255, 255),
+        2
+    )
+
+    for i, stream in enumerate(reversed(streams)):
+        y = h - 10 - i * 30
+        frame_timestamp = cv2.putText(
+            frame_timestamp,
+            stream,
+            (10, y),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1,
+            (0, 255, 0),
+            2
+        )
+
+    screen = screeninfo.get_monitors()[0]
+    screen_width, screen_height = screen.width, screen.height
+    h, w = frame_timestamp.shape[:2]
+    if h > screen_height or w > screen_width:
+        frame_timestamp = downscale_to_fit(frame_timestamp, screen_width, screen_height)
+    cv2.imshow(f"{mxid} {name}", frame_timestamp)
 
 def attempt_connection(devices, attempts=10):
     mxids = []
@@ -190,10 +247,12 @@ def attempt_connection(devices, attempts=10):
             return mxids
 
 if __name__ == "__main__":
-    settings_path, view_name, devices, autostart, ram, root_path = parseArguments()
+    args = parseArguments()
+    settings_path, view_name, devices, autostart, ram, root_path, att_connect, autostart_time, wait_end, show_streams = process_argument_logic(args)
 
     with contextlib.ExitStack() as stack:
-        mxids = attempt_connection(devices)
+        if att_connect: mxids = attempt_connection(devices)
+        else: mxids = devices
 
         devices, shared_devices, output_folders = {}, {}, {}
         num_captures = {mxid: 0 for mxid in mxids}
@@ -236,7 +295,7 @@ if __name__ == "__main__":
         print(f"Number of streams: {len(streams)}")
         print(f"Will capture max frames ({settings['num_captures']}) * number of streams ({len(streams)}) = {final_num_captures}")
 
-        MAX_RAM_USAGE = 1 * 1024 * 1024 * 1024  # 1GB
+        MAX_RAM_USAGE = 2 * 1024 * 1024 * 1024  # 1GB
         current_ram_usage = 0
         lock = threading.Lock()  # Ensure thread-safe RAM tracking
         save_queue = queue.Queue()
@@ -245,9 +304,15 @@ if __name__ == "__main__":
         save_thread.start()
 
         print("Starting loop...")
+
         initial_time = time.time()
-        initialize_capture_time = initial_time + autostart
+        if autostart_time:
+            print("waiting till:", autostart_time)
+            initialize_capture_time = autostart_time.timestamp()
+        else:
+            initialize_capture_time = initial_time + autostart
         while True:
+            # print(time.time(), initialize_capture_time)
             if not save and autostart > -1 and time.time() > initialize_capture_time:
                 for mxid in shared_devices.keys():
                     device = shared_devices[mxid]
@@ -278,7 +343,11 @@ if __name__ == "__main__":
                             with lock: current_ram_usage += frame_size
                             save_queue.put((mxid, name, timestamp, cvFrame, output_folders, settings, frame_size))
                             num_captures[mxid] += 1
-                        visualize_frame(name, cvFrame, timestamp, mxid)
+
+                        if show_streams:
+                            visualize_frame(name, cvFrame, timestamp, mxid)
+                        elif not show_streams and name == 'left':
+                            visualize_frame_info(name, cvFrame, timestamp, mxid, streams)
             else:
                 for mxid, q in devices.items():
                     for name in q.keys():
@@ -298,7 +367,11 @@ if __name__ == "__main__":
                             with lock: current_ram_usage += frame_size
                             save_queue.put((mxid, name, timestamp, cvFrame, output_folders, settings, frame_size))
                             num_captures[mxid] += 1
-                        visualize_frame(name, cvFrame, timestamp, mxid)
+
+                        if show_streams:
+                            visualize_frame(name, cvFrame, timestamp, mxid)
+                        elif not show_streams and name == 'left':
+                            visualize_frame_info(name, cvFrame, timestamp, mxid, streams)
 
             key = cv2.waitKey(1) & 0xFF
             if key == ord('q'): break
@@ -320,8 +393,10 @@ if __name__ == "__main__":
                         capture_ended, save = True, False
 
             # finalise capture if enough frames were captured
+
+            now = time.time()
             for mxid in shared_devices.keys():
-                if num_captures[mxid] >= final_num_captures:
+                if (not wait_end and num_captures[mxid] >= final_num_captures) or (wait_end and now >= wait_end.timestamp()):
                     end_time = time.time()
                     print(mxid, end=' ')
                     finalise_capture(start_time, end_time, num_captures[mxid], streams)

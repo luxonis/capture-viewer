@@ -1,0 +1,14 @@
+{
+  "depth_mode": "NEURAL",
+  "coordinate_units": "MILLIMETER",
+  "resolution": "HD1080",
+  "color_space": "RGB",
+  "num_captures": 20,
+  "output_settings": {
+    "left": true,
+    "right": true,
+    "depth": true,
+    "depth_png": false
+  },
+  "fps": 15
+}

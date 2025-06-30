@@ -8,6 +8,7 @@ import numpy as np
 import argparse
 import time
 import json
+import datetime
 
 print(dai.__version__)
 
@@ -21,7 +22,7 @@ root_path = os.path.join(os.path.dirname(script_dir), 'DATA')
 
 from utils.capture_universal import initialize_capture, finalise_capture
 from utils.raw_data_utils import unpackRaw10
-from oak_capture import visualize_frame, count_output_streams
+from oak_capture import visualize_frame, visualize_frame_info, count_output_streams
 
 def set_stereo_node(pipeline, settings):
     stereo = pipeline.create(dai.node.StereoDepth)
@@ -58,7 +59,7 @@ def initialize_pipeline(pipeline, settings):
         monoRight = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_C)
         monoRightOut = configure_cam(monoRight, settings["stereoResolution"]["x"], settings["stereoResolution"]["y"], settings["FPS"])
 
-    if output_settings["rgb"] or output_settings["rgb_png"]:
+    if output_settings["rgb"]:
         color = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_A)
         colorOut = configure_cam(color, settings["rgbResolution"]["x"], settings["rgbResolution"]["y"], settings["FPS"])
 
@@ -139,8 +140,13 @@ def parseArguments():
     parser.add_argument("--autostart", default=-1, type=int, help='Automatically start capturing after given number of seconds (-1 to disable)')
     # parser.add_argument("--devices", default=[], dest="mxids", nargs="+", help="MXIDS of devices to connect to")
     parser.add_argument("--ip", default=None, dest="ip", help="IP to connect to")
+    parser.add_argument("--autostart_time", default=0, help="Select a fixed time when the script is supposed to start")
+    parser.add_argument("--autostart_end", default=0, help="Select a fixed time for capture to end")
+    parser.add_argument("--show_streams", default=False, help="Show all the running streams. If false, only shows the left frame")
 
-    args = parser.parse_args()
+    return parser.parse_args()
+
+def process_argument_logic(args):
     settings_path = args.settings_file_path
     view_name = args.view_name
     ip = args.ip
@@ -155,7 +161,21 @@ def parseArguments():
             settings_path = settings_path_2
         else: raise FileNotFoundError(f"Settings file '{settings_path}' does not exist.")
 
-    return settings_path, view_name, ip, args.autostart
+    today = datetime.date.today()
+
+    if args.autostart_time:
+        wait = datetime.datetime.combine(today, datetime.time.fromisoformat(args.autostart_time))
+    else:
+        wait = 0
+
+    if args.autostart_end:
+        wait_end = datetime.datetime.combine(today, datetime.time.fromisoformat(args.autostart_end))
+    else:
+        wait_end = 0
+
+    if args.autostart_time: args.autostart = 0
+
+    return settings_path, view_name, ip, args.autostart, wait, wait_end, args.show_streams
 
 def controlQueueSend(input_queues, ctrl):
     for queue in input_queues.values():
@@ -177,7 +197,8 @@ def initialize_mono_control(settings):
     return ctrl
 
 if __name__ == "__main__":
-    settings_path, view_name, ip, autostart = parseArguments()
+    args = parseArguments()
+    settings_path, view_name, ip, autostart, autostart_time, wait_end, show_streams = process_argument_logic(args)
 
     print(f"connecting to device... IP: {ip}")
 
@@ -207,7 +228,11 @@ if __name__ == "__main__":
     print(f"Will capture max frames ({settings['num_captures']}) * number of streams ({len(streams)}) = {final_num_captures}")
 
     initial_time = time.time()
-    initialize_capture_time = initial_time + autostart
+    if autostart_time:
+        print("waiting till:", autostart_time)
+        initialize_capture_time = autostart_time.timestamp()
+    else:
+        initialize_capture_time = initial_time + autostart
 
     with dai.Pipeline(device) as pipeline:
         pipeline, q, input_queues = initialize_pipeline(pipeline, settings)
@@ -220,9 +245,6 @@ if __name__ == "__main__":
         if settings['flood_light']: pipeline.getDefaultDevice().setIrFloodLightIntensity(settings['flood_light_intensity'])
 
         print("Starting loop...")
-        initial_time = time.time()
-        initialize_capture_time = initial_time + autostart
-
         while pipeline.isRunning():
             if not save and autostart > -1 and time.time() > initialize_capture_time:
                 out_dir = initialize_capture(root_path, device, settings_path, view_name)
@@ -250,7 +272,10 @@ if __name__ == "__main__":
                                 cvFrame = cv2.cvtColor(cvFrame, cv2.COLOR_BGR2GRAY)
                         np.save(f'{output_folders[mxid]}/{name}_{timestamp}.npy', cvFrame)
                         num_captures[mxid] += 1
-                    visualize_frame(name, cvFrame, timestamp, mxid)
+                    if show_streams:
+                        visualize_frame(name, cvFrame, timestamp, mxid)
+                    elif not show_streams and name == 'left':
+                        visualize_frame_info(name, cvFrame, timestamp, mxid, streams)
             else:
                 for name in q.keys():
                     frame = q[name].get()
@@ -265,7 +290,10 @@ if __name__ == "__main__":
                                 cvFrame = cv2.cvtColor(cvFrame, cv2.COLOR_BGR2GRAY)
                         np.save(f'{output_folders[mxid]}/{name}_{timestamp}.npy', cvFrame)
                         num_captures[mxid] += 1
-                    visualize_frame(name, cvFrame, timestamp, mxid)
+                    if show_streams:
+                        visualize_frame(name, cvFrame, timestamp, mxid)
+                    elif not show_streams and name == 'left':
+                        visualize_frame_info(name, cvFrame, timestamp, mxid, streams)
 
             key = cv2.waitKey(1)
             if key == ord('q'):
@@ -286,7 +314,8 @@ if __name__ == "__main__":
                     capture_ended, save = True, False
                     pipeline.stop()
 
-            if num_captures[mxid] >= final_num_captures:
+            now = time.time()
+            if (not wait_end and num_captures[mxid] >= final_num_captures) or (wait_end and now >= wait_end.timestamp()):
                 end_time = time.time()
                 print(mxid, end=' ')
                 finalise_capture(start_time, end_time, num_captures[mxid], streams)

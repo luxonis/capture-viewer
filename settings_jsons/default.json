@@ -3,7 +3,7 @@
     "ir_value": 1,
     "flood_light": false,
     "flood_light_intensity": 1,
-    "stereoResolution": "THE_800_P",
+    "stereoResolution": "THE_720_P",
     "rgbResolution": "THE_1080_P",
     "stereoAlign": true,
     "alignSocket": "COLOR",
@@ -13,16 +13,16 @@
     "output_settings": {
         "left": true,
         "right": true,
-        "left_raw": true,
-        "right_raw": true,
-        "rgb": true,
+        "left_raw": false,
+        "right_raw": false,
+        "rgb": false,
         "rgb_png": false,
-        "depth": true,
+        "depth": false,
         "disparity": false,
-        "sync": true
+        "sync": false
     },
     "LRcheck": true,
-    "extendedDisparity": false,
+    "extendedDisparity": true,
     "subpixelDisparity": true,
     "subpixelValue": 3,
     "profilePreset": "DEFAULT",
@@ -49,6 +49,6 @@
         "median_filter": false,
         "median_size": "KERNEL_3x3"
     },
-    "FPS": 30,
+    "FPS": 15,
     "num_captures": 20
 }
