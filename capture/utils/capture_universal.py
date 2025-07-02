@@ -38,11 +38,16 @@ def create_and_save_metadata(device, settings_path, output_dir,
     print(f"Metadata saved to {filepath}")
 
 
-def initialize_capture(root_path, device, settings_path, view_name):
+def initialize_capture(root_path, device, settings_path, view_name, projector=None):
     date = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-    out_dir = f"{root_path}/{device.getDeviceName()}_{device.getMxId()}_{date}"
+    if projector is None:
+        out_dir = f"{root_path}/{device.getDeviceName()}_{device.getMxId()}_{date}"
+    else:
+        out_dir = f"{root_path}/{device.getDeviceName()}_{device.getMxId()}_{date}_{projector}"
+
     if not os.path.exists(root_path):
         os.makedirs(root_path)
+
     if not os.path.exists(os.path.join(root_path, out_dir)):
         os.makedirs(out_dir)
         print(f"Folder '{out_dir}' created.")
