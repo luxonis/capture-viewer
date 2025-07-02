@@ -143,7 +143,6 @@ def parseArguments():
     parser.add_argument("--autostart_time", default=0, help="Select a fixed time when the script is supposed to start")
     parser.add_argument("--autostart_end", default=0, help="Select a fixed time for capture to end")
     parser.add_argument("--show_streams", default=False, help="Show all the running streams. If false, only shows the left frame")
-    parser.add_argument("--alternating_capture", default=False, help="Turn IR projector ON/OFF")
 
     return parser.parse_args()
 
