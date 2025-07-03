@@ -8,7 +8,8 @@ print(start_time)
 print(end_time)
 
 capture_name = "alternating"
-settings = 'dai3_raw'
+settings_RVC4 = 'dai3_raw'
+settings_RVC2 = 'dai3'
 
 
 # Define the scripts, their environments, and arguments
@@ -17,12 +18,12 @@ jobs = [
     {
         "env": "dai3",
         "script": "capture/da3_alternating.py",
-        "args": [settings, capture_name, "--alternating_capture", "True", "--ip", "184430106176351300"]
+        "args": [settings_RVC2, capture_name, "--alternating_capture", "True", "--ip", "184430106176351300"]
     },
     {
         "env": "dai3",
         "script": "capture/da3_alternating.py",
-        "args": [settings, capture_name, "--alternating_capture", "True", "--ip", "1844301051F3860E00"]
+        "args": [settings_RVC2, capture_name, "--alternating_capture", "True", "--ip", "1844301051F3860E00"]
     },
     # {
     #     "env": "dai3",
