@@ -1,6 +1,6 @@
 {
     "ir": true,
-    "ir_value": 1,
+    "ir_value": 0.8,
     "flood_light": false,
     "flood_light_intensity": 1,
     "stereoResolution": {"x": 1280, "y": 800},
