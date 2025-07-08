@@ -18,7 +18,12 @@ CONFIG_FILE = os.path.join(os.path.dirname(__file__), "devices_config.json")
 with open(CONFIG_FILE) as f:
     devices_config = json.load(f)
 
-env = "dai3"
+import os
+env = os.environ.get("CONDA_DEFAULT_ENV") or (
+    os.path.basename(os.environ.get("VIRTUAL_ENV")) if os.environ.get("VIRTUAL_ENV") else "base"
+)
+print("Environment:", env)
+
 capture_script = os.path.join(os.path.dirname(__file__), "dai3_port_capture.py")
 
 # ----- Command sender -----
