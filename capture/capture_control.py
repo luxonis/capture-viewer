@@ -78,7 +78,6 @@ class MultiDeviceControlApp:
 
             row += 1
 
-        # Start and Exit buttons
         self.start_sequence_button = ttk.Button(main_frame, text="Start Capture Sequence", command=self.start_sequence, state="disabled")
         self.start_sequence_button.grid(row=row, column=0, pady=10)
         ttk.Button(main_frame, text="End Capture (Exit)", command=self.end_capture).grid(row=row, column=1, pady=10)
@@ -138,7 +137,7 @@ class MultiDeviceControlApp:
         self.running = False
 
     def _finalize_exit(self):
-        time.sleep(0.5)  # Ensure any current capture finishes
+        time.sleep(0.5)
         for device, port in self.device_ports.items():
             response = send_command(port, "exit")
             if response.get("status") == "shutting_down":
@@ -147,6 +146,9 @@ class MultiDeviceControlApp:
 
     def restart_device(self, port):
         capture_name = self.capture_name_var.get()
+        if " " in capture_name:
+            print("Capture name must not contain spaces.")
+            return
         config = devices_config.get(str(port))
         if not config:
             print(f"No config found for port {port}")
@@ -162,8 +164,11 @@ class MultiDeviceControlApp:
         subprocess.Popen(args)
 
     def launch_all_devices(self):
+        capture_name = self.capture_name_var.get()
+        if " " in capture_name:
+            print("Capture name must not contain spaces.")
+            return
         for port, config in devices_config.items():
-            capture_name = self.capture_name_var.get()
             args = [
                 "conda", "run", "-n", env, "python", capture_script,
                 config["settings"], capture_name,
