@@ -215,6 +215,8 @@ def visualize_frame_info(name, frame, timestamp, mxid, streams, save=False):
 
     if save:
         text = "Saving..!"
+    elif save is None:
+        text = " "
     else:
         text = "Waiting..."
     font = cv2.FONT_HERSHEY_SIMPLEX
