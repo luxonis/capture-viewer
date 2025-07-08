@@ -238,7 +238,6 @@ if __name__ == "__main__":
     frame_num = 0
     projector_on = False
 
-    save = True
     capture_ended = False
 
     streams = count_output_streams(settings['output_settings'])
@@ -284,7 +283,7 @@ if __name__ == "__main__":
                         if show_streams:
                             visualize_frame(name+" "+str(args.port), cvFrame, int(time.time() * 1000), mxid)
                         elif name == 'left':
-                            visualize_frame_info(name+" "+str(args.port), cvFrame, int(time.time() * 1000), mxid, streams)
+                            visualize_frame_info(name+" "+str(args.port), cvFrame, int(time.time() * 1000), mxid, streams, None)
 
                 # --- Command handling ---
                 socks = dict(poller.poll(timeout=1))
