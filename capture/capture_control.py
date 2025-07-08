@@ -111,6 +111,7 @@ class MultiDeviceControlApp:
 
     def _run_loop_sequence(self):
         while self.running:
+            time.sleep(0.5)
             for device, port in self.device_ports.items():
                 self.status_vars[device].set("Capturing (off)")
                 send_command(port, "capture_frame")
@@ -118,10 +119,9 @@ class MultiDeviceControlApp:
             for device, port in self.device_ports.items():
                 self.status_vars[device].set("Projector ON")
                 send_command(port, "projector_on")
-                time.sleep(0.3)
+                time.sleep(1)
                 self.status_vars[device].set("Capturing (on)")
                 send_command(port, "capture_frame")
-                time.sleep(0.3)
                 self.status_vars[device].set("Projector OFF")
                 send_command(port, "projector_off")
                 self.status_vars[device].set("Done")
