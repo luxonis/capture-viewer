@@ -53,6 +53,7 @@ class MultiDeviceControlApp:
         self.poll_statuses()
 
     def build_ui(self):
+        self.message_var = tk.StringVar(value="Idle")
         self.capture_name_var = tk.StringVar(value="test_capture")
         main_frame = ttk.Frame(self.root, padding=10)
         main_frame.grid(row=0, column=0, sticky="nsew")
@@ -82,15 +83,21 @@ class MultiDeviceControlApp:
         self.start_sequence_button.grid(row=row, column=0, pady=10)
         ttk.Button(main_frame, text="End Capture (Exit)", command=self.end_capture).grid(row=row, column=1, pady=10)
 
+        # Message Label
+        row += 1
+        ttk.Label(main_frame, textvariable=self.message_var, foreground="blue").grid(row=row, column=0, columnspan=3, sticky="w", pady=(10, 0))
+
     def poll_statuses(self):
         for device, port in self.device_ports.items():
             threading.Thread(target=self.update_status, args=(device, port), daemon=True).start()
-        self.check_launch_ready()
+        if not self.running: self.check_launch_ready()
         self.root.after(500, self.poll_statuses)
 
     def check_launch_ready(self):
         self.all_ready = all(self.status_vars[device].get().lower() == "ready" for device in self.device_ports)
-        if self.all_ready: self.start_sequence_button.config(state="enabled")
+        if self.all_ready:
+            self.start_sequence_button.config(state="enabled")
+            self.set_message("Devices Ready!")
 
     def update_status(self, device, port):
         response = send_command(port, "status")
@@ -108,9 +115,13 @@ class MultiDeviceControlApp:
             label.config(foreground="black")
             self.restart_buttons[device].grid_remove()
 
+    def set_message(self, msg):
+        self.message_var.set(msg)
+
     def start_sequence(self):
         if not self.all_ready:
             return
+        self.set_message("Capturing...")
         self.running = True
         threading.Thread(target=self._run_loop_sequence, daemon=True).start()
 
@@ -133,8 +144,10 @@ class MultiDeviceControlApp:
         threading.Thread(target=self._finalize_exit, daemon=True).start()
 
     def end_capture(self):
-        if not self.running: threading.Thread(target=self._finalize_exit, daemon=True).start()
+        if not self.running:
+            threading.Thread(target=self._finalize_exit, daemon=True).start()
         self.running = False
+        self.set_message("Capture ending..")
 
     def _finalize_exit(self):
         time.sleep(0.5)
@@ -144,10 +157,13 @@ class MultiDeviceControlApp:
                 self.status_vars[device].set("Shutting down")
                 self.status_labels[device].config(foreground="red")
 
+            self.set_message("Capture ended")
+
     def restart_device(self, port):
         capture_name = self.capture_name_var.get()
         if " " in capture_name:
             print("Capture name must not contain spaces.")
+            self.set_message("Capture name must not contain spaces.")
             return
         config = devices_config.get(str(port))
         if not config:
@@ -164,9 +180,11 @@ class MultiDeviceControlApp:
         subprocess.Popen(args)
 
     def launch_all_devices(self):
+        self.set_message("Launching devices...")
         capture_name = self.capture_name_var.get()
         if " " in capture_name:
             print("Capture name must not contain spaces.")
+            self.set_message("Capture name must not contain spaces.")
             return
         for port, config in devices_config.items():
             args = [
