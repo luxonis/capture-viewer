@@ -20,7 +20,6 @@ with open(CONFIG_FILE) as f:
 
 env = "dai3"
 capture_script = os.path.join(os.path.dirname(__file__), "dai3_port_capture.py")
-capture_name = "test_4_device"
 
 # ----- Command sender -----
 def send_command(port, cmd):
@@ -49,16 +48,21 @@ class MultiDeviceControlApp:
         self.status_labels = {}
         self.restart_buttons = {}
         self.running = False
-        self.all_ready = False
 
         self.build_ui()
         self.poll_statuses()
 
     def build_ui(self):
+        self.capture_name_var = tk.StringVar(value="test_capture")
         main_frame = ttk.Frame(self.root, padding=10)
         main_frame.grid(row=0, column=0, sticky="nsew")
 
-        ttk.Button(main_frame, text="Launch Capture", command=self.launch_all_devices).grid(row=0, column=0, columnspan=3, pady=(0, 10))
+        ttk.Label(main_frame, text="Capture Name:").grid(row=0, column=0, sticky="e")
+        entry = ttk.Entry(main_frame, textvariable=self.capture_name_var)
+        entry.grid(row=0, column=1, sticky="w")
+
+        self.launch_button = ttk.Button(main_frame, text="Launch Capture", command=self.launch_all_devices, state="enabled")
+        self.launch_button.grid(row=0, column=2, pady=(0, 10), padx=5)
 
         row = 1
         for device, port in self.device_ports.items():
@@ -75,17 +79,19 @@ class MultiDeviceControlApp:
             row += 1
 
         # Start and Exit buttons
-        ttk.Button(main_frame, text="Start Capture Sequence", command=self.start_sequence).grid(row=row, column=0, pady=10)
+        self.start_sequence_button = ttk.Button(main_frame, text="Start Capture Sequence", command=self.start_sequence, state="disabled")
+        self.start_sequence_button.grid(row=row, column=0, pady=10)
         ttk.Button(main_frame, text="End Capture (Exit)", command=self.end_capture).grid(row=row, column=1, pady=10)
 
     def poll_statuses(self):
         for device, port in self.device_ports.items():
             threading.Thread(target=self.update_status, args=(device, port), daemon=True).start()
         self.check_launch_ready()
-        self.root.after(5000, self.poll_statuses)  # Repeat every 5s
+        self.root.after(500, self.poll_statuses)
 
     def check_launch_ready(self):
         self.all_ready = all(self.status_vars[device].get().lower() == "ready" for device in self.device_ports)
+        if self.all_ready: self.start_sequence_button.config(state="enabled")
 
     def update_status(self, device, port):
         response = send_command(port, "status")
@@ -128,6 +134,7 @@ class MultiDeviceControlApp:
         threading.Thread(target=self._finalize_exit, daemon=True).start()
 
     def end_capture(self):
+        if not self.running: threading.Thread(target=self._finalize_exit, daemon=True).start()
         self.running = False
 
     def _finalize_exit(self):
@@ -139,6 +146,7 @@ class MultiDeviceControlApp:
                 self.status_labels[device].config(foreground="red")
 
     def restart_device(self, port):
+        capture_name = self.capture_name_var.get()
         config = devices_config.get(str(port))
         if not config:
             print(f"No config found for port {port}")
@@ -155,6 +163,7 @@ class MultiDeviceControlApp:
 
     def launch_all_devices(self):
         for port, config in devices_config.items():
+            capture_name = self.capture_name_var.get()
             args = [
                 "conda", "run", "-n", env, "python", capture_script,
                 config["settings"], capture_name,
