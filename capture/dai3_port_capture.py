@@ -350,7 +350,6 @@ if __name__ == "__main__":
                             num_captures[mxid] += captured
                             print(f"Captured {captured} frames")
                             socket.send_json({"status": "ok", "frames": captured})
-                            status = "ready"
 
                         elif cmd == "status":
                             socket.send_json({"status": status})
