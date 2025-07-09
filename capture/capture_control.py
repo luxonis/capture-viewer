@@ -91,7 +91,6 @@ class MultiDeviceControlApp:
 
         # Message Label
         row += 1
-        ttk.Label(main_frame, textvariable=self.message_var, foreground="blue").grid(row=row, column=0, columnspan=3, sticky="w", pady=(10, 0))
 
         ttk.Label(main_frame, text="Max Captures:").grid(row=row, column=0, sticky="e")
         max_caps_entry = ttk.Entry(main_frame, textvariable=self.max_captures_var, foreground='gray')
@@ -109,6 +108,10 @@ class MultiDeviceControlApp:
 
         max_caps_entry.bind("<FocusIn>", on_focus_in)
         max_caps_entry.bind("<FocusOut>", on_focus_out)
+
+        row += 1
+        ttk.Label(main_frame, textvariable=self.message_var, foreground="blue").grid(row=row, column=0, columnspan=3,
+                                                                                     sticky="w", pady=(10, 0))
 
     def poll_statuses(self):
         for device, port in self.device_ports.items():
