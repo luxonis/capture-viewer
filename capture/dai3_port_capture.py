@@ -281,9 +281,9 @@ if __name__ == "__main__":
                             cvFrame = frame.getCvFrame()
 
                         if show_streams:
-                            visualize_frame(name+" "+str(args.port), cvFrame, int(time.time() * 1000), mxid)
+                            visualize_frame(device_name + " " + name+" "+str(args.port), cvFrame, int(time.time() * 1000), mxid)
                         elif name == 'left':
-                            visualize_frame_info(name+" "+str(args.port), cvFrame, int(time.time() * 1000), mxid, streams, None)
+                            visualize_frame_info(device_name + " " + name+" "+str(args.port), cvFrame, int(time.time() * 1000), mxid, streams, None)
 
                 # --- Command handling ---
                 socks = dict(poller.poll(timeout=1))
