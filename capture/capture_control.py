@@ -53,6 +53,7 @@ class MultiDeviceControlApp:
         self.status_labels = {}
         self.restart_buttons = {}
         self.running = False
+        self.max_captures_var = tk.StringVar(value="Unlimited")
 
         self.build_ui()
         self.poll_statuses()
@@ -91,6 +92,23 @@ class MultiDeviceControlApp:
         # Message Label
         row += 1
         ttk.Label(main_frame, textvariable=self.message_var, foreground="blue").grid(row=row, column=0, columnspan=3, sticky="w", pady=(10, 0))
+
+        ttk.Label(main_frame, text="Max Captures:").grid(row=row, column=0, sticky="e")
+        max_caps_entry = ttk.Entry(main_frame, textvariable=self.max_captures_var, foreground='gray')
+        max_caps_entry.grid(row=row, column=1, sticky="w")
+
+        def on_focus_in(event):
+            if self.max_captures_var.get() == "Unlimited":
+                self.max_captures_var.set("")
+                max_caps_entry.config(foreground='black')
+
+        def on_focus_out(event):
+            if self.max_captures_var.get() == "":
+                self.max_captures_var.set("Unlimited")
+                max_caps_entry.config(foreground='gray')
+
+        max_caps_entry.bind("<FocusIn>", on_focus_in)
+        max_caps_entry.bind("<FocusOut>", on_focus_out)
 
     def poll_statuses(self):
         for device, port in self.device_ports.items():
@@ -131,7 +149,14 @@ class MultiDeviceControlApp:
         threading.Thread(target=self._run_loop_sequence, daemon=True).start()
 
     def _run_loop_sequence(self):
-        while self.running:
+        try:
+            max_captures = self.max_captures_var.get()
+            max_captures = int(max_captures) if max_captures.strip().isdigit() else None
+        except Exception:
+            max_captures = None
+
+        count = 0
+        while self.running and (max_captures is None or count < max_captures):
             time.sleep(0.5)
             for device, port in self.device_ports.items():
                 self.status_vars[device].set("Capturing (off)")
@@ -146,6 +171,10 @@ class MultiDeviceControlApp:
                 self.status_vars[device].set("Projector OFF")
                 send_command(port, "projector_off")
                 self.status_vars[device].set("Done")
+
+            count += 1
+
+        self.running = False
         threading.Thread(target=self._finalize_exit, daemon=True).start()
 
     def end_capture(self):
