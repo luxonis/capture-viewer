@@ -59,6 +59,10 @@ class MultiDeviceControlApp:
         self.poll_statuses()
 
     def build_ui(self):
+        style = ttk.Style()
+        style.configure("On.TButton", foreground="white", background="green")
+        style.configure("Off.TButton", foreground="white", background="red")
+
         self.message_var = tk.StringVar(value="Idle")
         self.capture_name_var = tk.StringVar(value="test_capture")
         main_frame = ttk.Frame(self.root, padding=10)
@@ -92,8 +96,9 @@ class MultiDeviceControlApp:
         # Message Label
         row += 1
 
-        self.projector_toggle_button = ttk.Button(main_frame, text="Toggle Projector On/Off",
+        self.projector_toggle_button = ttk.Button(main_frame, text="Projector OFF",
                                                   command=self.toggle_projectors)
+        self.projector_toggle_button.config(style="Off.TButton")
         self.projector_toggle_button.grid(row=row, column=1, pady=(5, 10))
         self.projectors_on = False
 
@@ -227,8 +232,18 @@ class MultiDeviceControlApp:
         for device, port in self.device_ports.items():
             send_command(port, cmd)
             self.status_vars[device].set("Projector ON" if not self.projectors_on else "Projector OFF")
+
         self.projectors_on = not self.projectors_on
-        self.set_message("Projectors " + ("ON" if self.projectors_on else "OFF"))
+        state_text = "Projector ON" if self.projectors_on else "Projector OFF"
+        self.projector_toggle_button.config(text=state_text)
+
+        # Optional color indication
+        if self.projectors_on:
+            self.projector_toggle_button.config(style="On.TButton")
+        else:
+            self.projector_toggle_button.config(style="Off.TButton")
+
+        self.set_message(f"{'ON' if self.projectors_on else 'OFF'}")
 
     def end_capture(self):
         if not self.running:
