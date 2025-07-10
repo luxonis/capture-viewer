@@ -43,6 +43,19 @@ def send_command(port, cmd):
     finally:
         socket.close()
 
+def kill_process_on_port(port):
+    try:
+        output = subprocess.check_output(["lsof", "-t", f"-i:{port}"]).decode().strip()
+        if output:
+            pids = output.split("\n")
+            for pid in pids:
+                subprocess.run(["kill", "-9", pid])
+                print(f"[Cleanup] Killed process {pid} on port {port}")
+    except subprocess.CalledProcessError:
+        # lsof returns non-zero if nothing found, that's fine
+        print(f"[Cleanup] No process found on port {port}")
+
+
 # ----- GUI Application -----
 class MultiDeviceControlApp:
     def __init__(self, root):
@@ -279,6 +292,7 @@ class MultiDeviceControlApp:
             "--port", str(port)
         ]
         print(f"Restarting device on port {port} with IP {config['ip']}")
+        kill_process_on_port(int(port))
         subprocess.Popen(args)
 
     def launch_all_devices(self):
@@ -297,6 +311,7 @@ class MultiDeviceControlApp:
             ]
             print(f"[Launch] Launching device on port {port} with args: {args}")
             try:
+                kill_process_on_port(int(port))
                 subprocess.Popen(args)
             except Exception as e:
                 print(f"[ERROR] Failed to launch on port {port}: {e}")
