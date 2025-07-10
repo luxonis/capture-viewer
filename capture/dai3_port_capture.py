@@ -206,6 +206,23 @@ def save_frame(cvFrame, projector_on):
             cvFrame = cv2.cvtColor(cvFrame, cv2.COLOR_BGR2GRAY)
     np.save(f'{output_folders[mxid][projector_on]}/{name}_{timestamp}.npy', cvFrame)
 
+def cleanup_empty_folders(folder_list):
+    whitelist = {"metadata.json", "calib.json"}
+    for folder in folder_list:
+        if not os.path.isdir(folder):
+            continue
+        contents = set(os.listdir(folder))
+        print(contents)
+        if contents.issubset(whitelist) or len(contents) == 0:
+            print(f"[Cleanup] Removing unused folder: {folder}")
+            try:
+                for f in contents:
+                    os.remove(os.path.join(folder, f))
+                os.rmdir(folder)
+            except Exception as e:
+                print(f"[Cleanup Error] Could not remove {folder}: {e}")
+
+
 if __name__ == "__main__":
     args = parseArguments()
     settings_path, view_name, ip, autostart, autostart_time, wait_end, show_streams, alternating = process_argument_logic(args)
@@ -353,6 +370,9 @@ if __name__ == "__main__":
                         elif cmd == "status":
                             socket.send_json({"status": status})
 
+                        elif cmd == "cleanup":
+                            cleanup_empty_folders([...])
+                            socket.send_json({"status": "cleaned"})
 
                         elif cmd == "exit":
                             print("Exit received.")
@@ -372,12 +392,6 @@ if __name__ == "__main__":
                     socket.send_json({"status": "Quit"})
                     break
 
-            # Finalize
-            end_time = time.time()
-            finalise_capture(end_time - 5, end_time, num_captures[mxid], streams)
-            pipeline.stop()
-            print("Pipeline stopped.")
-
         except KeyboardInterrupt:
             status = "interrupted"
             print("KeyboardInterrupt: interrupted by user")
@@ -385,3 +399,14 @@ if __name__ == "__main__":
                 socket.send_json({"status": "interrupted"})
             except:
                 pass
+
+        finally:
+            # Finalize
+            end_time = time.time()
+            finalise_capture(end_time - 5, end_time, num_captures[mxid], streams)
+            pipeline.stop()
+            print("Pipeline stopped.")
+            cleanup_empty_folders([
+                output_folders[mxid][True],
+                output_folders[mxid][False]
+            ])

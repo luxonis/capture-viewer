@@ -87,9 +87,19 @@ class MultiDeviceControlApp:
 
         self.start_sequence_button = ttk.Button(main_frame, text="Start Capture Sequence", command=self.start_sequence, state="disabled")
         self.start_sequence_button.grid(row=row, column=0, pady=10)
-        ttk.Button(main_frame, text="End Capture (Exit)", command=self.end_capture).grid(row=row, column=1, pady=10)
+        ttk.Button(main_frame, text="End Capture (Exit)", command=self.end_capture).grid(row=row, column=2, pady=10)
 
         # Message Label
+        row += 1
+
+        self.projector_toggle_button = ttk.Button(main_frame, text="Toggle Projector On/Off",
+                                                  command=self.toggle_projectors)
+        self.projector_toggle_button.grid(row=row, column=1, pady=(5, 10))
+        self.projectors_on = False
+
+        self.simple_sequence_button = ttk.Button(main_frame, text="Start Simple Capture", command=self.start_simple_sequence, state="disabled")
+        self.simple_sequence_button.grid(row=row, column=0, pady=10)
+
         row += 1
 
         ttk.Label(main_frame, text="Max Captures:").grid(row=row, column=0, sticky="e")
@@ -123,6 +133,7 @@ class MultiDeviceControlApp:
         self.all_ready = all(self.status_vars[device].get().lower() == "ready" for device in self.device_ports)
         if self.all_ready:
             self.start_sequence_button.config(state="enabled")
+            self.simple_sequence_button.config(state="enabled")
             self.set_message("Devices Ready!")
 
     def update_status(self, device, port):
@@ -145,6 +156,11 @@ class MultiDeviceControlApp:
         self.message_var.set(msg)
 
     def start_sequence(self):
+        for device, port in self.device_ports.items():
+            send_command(port, "projector_off")
+        self.set_message("Turning off all projectors...")
+        time.sleep(0.5)
+
         if not self.all_ready:
             return
         self.set_message("Capturing...")
@@ -179,6 +195,40 @@ class MultiDeviceControlApp:
 
         self.running = False
         threading.Thread(target=self._finalize_exit, daemon=True).start()
+
+    def start_simple_sequence(self):
+        if not self.all_ready:
+            return
+        self.set_message("Starting simple capture...")
+        self.running = True
+        threading.Thread(target=self._run_simple_sequence, daemon=True).start()
+
+    def _run_simple_sequence(self):
+        try:
+            max_captures = self.max_captures_var.get()
+            max_captures = int(max_captures) if max_captures.strip().isdigit() else None
+        except Exception:
+            max_captures = None
+
+        count = 0
+        while self.running and (max_captures is None or count < max_captures):
+            time.sleep(0.5)
+            for device, port in self.device_ports.items():
+                self.status_vars[device].set("Capturing")
+                send_command(port, "capture_frame")
+                self.status_vars[device].set("Done")
+            count += 1
+
+        self.running = False
+        threading.Thread(target=self._finalize_exit, daemon=True).start()
+
+    def toggle_projectors(self):
+        cmd = "projector_on" if not self.projectors_on else "projector_off"
+        for device, port in self.device_ports.items():
+            send_command(port, cmd)
+            self.status_vars[device].set("Projector ON" if not self.projectors_on else "Projector OFF")
+        self.projectors_on = not self.projectors_on
+        self.set_message("Projectors " + ("ON" if self.projectors_on else "OFF"))
 
     def end_capture(self):
         if not self.running:
@@ -230,8 +280,12 @@ class MultiDeviceControlApp:
                 "--ip", config["ip"],
                 "--port", str(port)
             ]
-            print(f"Launching device on port {port} with IP {config['ip']}")
-            subprocess.Popen(args)
+            print(f"[Launch] Launching device on port {port} with args: {args}")
+            try:
+                subprocess.Popen(args)
+            except Exception as e:
+                print(f"[ERROR] Failed to launch on port {port}: {e}")
+
 
 # ----- Run GUI -----
 if __name__ == "__main__":
