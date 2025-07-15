@@ -148,7 +148,8 @@ class MultiDeviceControlApp:
         self.root.after(500, self.poll_statuses)
 
     def check_launch_ready(self):
-        self.all_ready = all(self.status_vars[device].get().lower() == "ready" for device in self.device_ports)
+        self.all_ready = self.all_ready = all(self.status_vars[device].get().lower() in ["ready", "projector on", "projector off"] for device in self.device_ports)
+
         if self.all_ready:
             self.start_sequence_button.config(state="enabled")
             self.simple_sequence_button.config(state="enabled")
@@ -181,6 +182,8 @@ class MultiDeviceControlApp:
 
         if not self.all_ready:
             return
+        self.start_sequence_button.config(state="disabled")
+        self.simple_sequence_button.config(state="disabled")
         self.set_message("Capturing...")
         self.running = True
         threading.Thread(target=self._run_loop_sequence, daemon=True).start()
@@ -216,7 +219,10 @@ class MultiDeviceControlApp:
 
     def start_simple_sequence(self):
         if not self.all_ready:
+            print("not all ready")
             return
+        self.start_sequence_button.config(state="disabled")
+        self.simple_sequence_button.config(state="disabled")
         self.set_message("Starting simple capture...")
         self.running = True
         threading.Thread(target=self._run_simple_sequence, daemon=True).start()
@@ -298,6 +304,9 @@ class MultiDeviceControlApp:
     def launch_all_devices(self):
         self.set_message("Launching devices...")
         capture_name = self.capture_name_var.get()
+
+        self.projector_toggle_button.config(text="Projector OFF")
+        self.projector_toggle_button.config(style="Off.TButton")
 
         script_dir = os.path.dirname(os.path.abspath(__file__))
         root_path = os.path.join(os.path.dirname(script_dir), 'DATA', capture_name)
