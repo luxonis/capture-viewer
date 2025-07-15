@@ -26,8 +26,6 @@ print("Environment:", env)
 
 capture_script = os.path.join(os.path.dirname(__file__), "dai3_port_capture.py")
 
-#todo make capture script create a subfolder!!!
-
 # ----- Command sender -----
 def send_command(port, cmd):
     try:
