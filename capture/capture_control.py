@@ -26,6 +26,8 @@ print("Environment:", env)
 
 capture_script = os.path.join(os.path.dirname(__file__), "dai3_port_capture.py")
 
+#todo make capture script create a subfolder!!!
+
 # ----- Command sender -----
 def send_command(port, cmd):
     try:
@@ -298,6 +300,11 @@ class MultiDeviceControlApp:
     def launch_all_devices(self):
         self.set_message("Launching devices...")
         capture_name = self.capture_name_var.get()
+
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        root_path = os.path.join(os.path.dirname(script_dir), 'DATA', capture_name)
+        os.makedirs(root_path, exist_ok=True)
+
         if " " in capture_name:
             print("Capture name must not contain spaces.")
             self.set_message("Capture name must not contain spaces.")
@@ -307,7 +314,8 @@ class MultiDeviceControlApp:
                 "conda", "run", "-n", env, "python", capture_script,
                 config["settings"], capture_name,
                 "--ip", config["ip"],
-                "--port", str(port)
+                "--port", str(port),
+                "--output", root_path,
             ]
             print(f"[Launch] Launching device on port {port} with args: {args}")
             try:

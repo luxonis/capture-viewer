@@ -227,6 +227,8 @@ if __name__ == "__main__":
     args = parseArguments()
     settings_path, view_name, ip, autostart, autostart_time, wait_end, show_streams, alternating = process_argument_logic(args)
 
+    root_path = args.output
+
     # ZMQ setup
     context = zmq.Context()
     socket = context.socket(zmq.REP)
