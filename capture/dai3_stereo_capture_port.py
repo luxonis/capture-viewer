@@ -49,8 +49,7 @@ def cleanup_empty_folders(folder_list):
                 print(f"[Cleanup Error] Could not remove {folder}: {e}")
 
 
-if __name__ == "__main__":
-    args = parseArguments(root_path)
+def main(args):
     settings_path, view_name, ip, autostart, autostart_time, wait_end, show_streams, alternating = process_argument_logic(args)
 
     root_path = args.output
@@ -238,3 +237,7 @@ if __name__ == "__main__":
                 output_folders[mxid][True],
                 output_folders[mxid][False]
             ])
+
+if __name__ == "__main__":
+    args = parseArguments(root_path)
+    main(args)

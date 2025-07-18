@@ -31,8 +31,7 @@ def save_frame(cvFrame, projector_on):
             cvFrame = cv2.cvtColor(cvFrame, cv2.COLOR_BGR2GRAY)
     np.save(f'{output_folders[mxid][projector_on]}/{name}_{timestamp}.npy', cvFrame)
 
-if __name__ == "__main__":
-    args = parseArguments(root_path)
+def main(args):
     settings_path, view_name, ip, autostart, autostart_time, wait_end, show_streams, alternating = process_argument_logic(args)
 
     print("Starting ALTERNATING CAPTURE script")
@@ -195,3 +194,7 @@ if __name__ == "__main__":
                 finalise_capture(start_time, end_time, num_captures[mxid], streams)
                 capture_ended, save = True, False
                 pipeline.stop()
+
+if __name__ == "__main__":
+    args = parseArguments(root_path)
+    main(args)

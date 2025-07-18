@@ -25,11 +25,8 @@ from utils.isp_control import initialize_mono_control, controlQueueSend
 
 from pipelines.dai3_stereo_pipeline import initialize_pipeline
 
-
-if __name__ == "__main__":
-    args = parseArguments(root_path)
+def main(args):
     settings_path, view_name, ip, autostart, autostart_time, wait_end, show_streams, _ = process_argument_logic(args)
-
     print(f"connecting to device... IP: {ip}")
 
     if ip is not None: device = dai.Device(ip)
@@ -154,3 +151,7 @@ if __name__ == "__main__":
                 finalise_capture(start_time, end_time, num_captures[mxid], streams)
                 capture_ended, save = True, False
                 pipeline.stop()
+
+if __name__ == "__main__":
+    args = parseArguments(root_path)
+    main(args)
