@@ -22,27 +22,9 @@ from utils.raw_data_utils import unpackRaw10
 from utils.show_frames import visualize_frame, visualize_frame_info
 from utils.capture_universal import initialize_capture, finalise_capture, count_output_streams
 from utils.parse_arguments import parseArguments, process_argument_logic
+from utils.isp_control import initialize_mono_control, controlQueueSend
 
 from pipelines.dai3_stereo_pipeline import initialize_pipeline
-
-def controlQueueSend(input_queues, ctrl):
-    for queue in input_queues.values():
-        queue.send(ctrl)
-
-def initialize_mono_control(settings):
-    ctrl = dai.CameraControl()
-
-    mono_settings = settings["monoSettings"]
-    ctrl.setLumaDenoise(mono_settings["luma_denoise"])
-    ctrl.setChromaDenoise(mono_settings["chroma_denoise"])
-    ctrl.setSharpness(mono_settings["sharpness"])
-    ctrl.setContrast(mono_settings["contrast"])
-
-    exposure_settings = settings["exposureSettings"]
-    if not exposure_settings["autoexposure"]:
-        ctrl.setManualExposure(exposure_settings["expTime"], exposure_settings["sensIso"])
-
-    return ctrl
 
 def save_frame(cvFrame, projector_on):
     if name in ['left', 'right']:
