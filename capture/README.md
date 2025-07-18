@@ -1,7 +1,7 @@
 # CAPTURE GUIDE
 
 This is a guide on how to run capture with one device either using Depthai v2 or Depthai v3. For guide on how to capture using multiple devices 
-refer to `README_multiple_devices.md`.
+refer to `README_multiple_devices.md`. For RVC2 capture. you can use both Depthai v2 and v3 capture scripts.
 
 ## Depthai 2 Capture (for RVC2 Stereo and TOF)
 
