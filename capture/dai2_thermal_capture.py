@@ -6,7 +6,7 @@ import cv2
 import os
 
 from utils.capture_universal import initialize_capture
-from utils.parse_arguments import parseArguments
+from utils.parse_arguments import parseArguments_thermal
 
 # Get the directory where the script is located and choose it as the destination for DATA folder
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -54,7 +54,7 @@ def get_pipeline(settings):
 
 if __name__ == "__main__":
     print("Running OAK capture script")
-    settings_path, view_name, device_info, autostart = parseArguments()
+    settings_path, view_name, device_info, autostart = parseArguments_thermal()
 
     with open(settings_path, 'r') as file:
         settings = json.load(file)

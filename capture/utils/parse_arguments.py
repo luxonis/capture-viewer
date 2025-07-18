@@ -1,6 +1,8 @@
+import depthai as dai
+import argparse
+import os
 
-
-def parseArguments():
+def parseArguments_thermal():
     # PARSE ARGUMENTS
     parser = argparse.ArgumentParser()
     # Mandatory arguments
