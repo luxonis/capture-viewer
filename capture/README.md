@@ -2,134 +2,41 @@
 
 You can now run capture for OAKs stereo and OAK-D-SR-POE using one script.
 
-```bash
-python capture/dai2_stereo_capture.py default my_capture
-```
-
-Arguments:
-- **settings** - choose `default`, `default_tof` or add path to your own [settings.json](#settings).
-- **view_name** - the name of capture that will be saved in metadata file
-- **--output** (optional) - path to custom output folder, where the output of capture will be created. By default, it will be saved in DATA folder in capture-viewer
-- **--autostart** (optional) - number of seconds after which the capture automatically starts
-  - If you did not select **--autostart** you can start the capture by pressing `S`. The script will automatically save predefined number of frames to a folder named `DATA`. 
-- **--devices** (optional) - the **MXIDs** or **IPs** of devices to connnect to. If left blank, it will connect to the first available device.
-
----
-## 🚨 UPDATE: Multi-Device Capture GUI
-
-### 🧠 What is it?
-
-This update introduces a **Python GUI controller** to manage multiple Luxonis DepthAI devices for synchronized capture with dot projector control.
-
-It replaces manual script launching with a graphical interface and supports:
-
-- 🔌 Viewing live connection status for each device
-- 🖥️ Launching capture scripts (`dai3_port_capture.py`) via `conda run`
-- 📷 Starting & stopping synchronized capture loops
-- 🔄 Restarting individual devices if they disconnect
-- 📣 Displaying real-time status messages
 
 
-### ▶️ How to Run
-
-From the `capture/` folder (or wherever the GUI script is located), run:
+## Depthai 2 Capture (for RVC2 Stereo and TOF)
 
 ```bash
-python capture/capture_control.py
-```
-🧪 This will open a graphical interface showing all devices, their status, and control buttons.
-
-### 📁 Where to Specify Devices
-Edit this file: `capture/devices_config.json`
-
-This JSON defines the list of devices, IPs, ports, and their settings.
-
-``` json
-{
-  "5555": { "ip": "192.168.50.102", "settings": "dai3" },
-  "5556": { "ip": "192.168.50.103", "settings": "dai3" },
-  "5557": { "ip": "192.168.50.118", "settings": "dai3_raw" },
-  "5558": { "ip": "192.168.50.130", "settings": "dai3_raw" }
-}
+python capture/dai2_capture.py default <capture_name> --devices <camera_ip>
 ```
 
-### ✅ Requirements
-- Python packages: tkinter, zmq, subprocess
+### Arguments:
+- **settings_file_path** – path to the settings JSON file. You can choose from `default`, `default_tof`, or choose from others in `settings_jsons` 
+or provide a custom path `/path/to/your/settings`. More details can be found in the Settings section.
+- **view_name** – name of the capture session; this name will be saved in the metadata file.
+- **--output** (optional) – path to a custom output folder where the capture results will be stored. If not provided, output will be saved in the `DATA` folder relative to the script root.
+- **--autostart** (optional) – specify the number of seconds to wait before the capture starts automatically. Set to `-1` to disable autostart.
+  - If this option is not used, you can manually start capture by pressing `S`. The script will then save a predefined number of frames to the `DATA` folder.
+- **--devices** (optional) – list of **MXIDs** or **IP addresses** of devices to connect to. If left empty, the script will attempt to connect to the first available device.
+- **--ram** (optional) – maximum RAM (in GB) that the capture process is allowed to use while saving data. Default is `2`.
+- **--att_connection** (optional) – if set to `True`, the script will attempt to find all devices on the network before attempting direct connection.
+- **--autostart_time** (optional) – specify a fixed system time (in seconds since epoch or formatted string depending on script behavior) when the capture should start.
+- **--autostart_end** (optional) – specify a fixed system time when the capture should end automatically.
+- **--show_streams** (optional) – set to `True` to show all active streams; if `False`, only the left frame will be shown.
 
+### Settings
 
----
-## Settings
+For capture, you can configure various parameters. Below is an example settings configuration.
 
-For capture, you can configure various parameters. Below is an example settings configuration:
-
-```json
-{
-    "ir": true,
-    "ir_value": 1,
-    "flood_light": false,
-    "flood_light_intensity": 1,
-    "stereoResolution": "THE_800_P",
-    "rgbResolution": "THE_1080_P",
-    "stereoAlign": true,
-    "alignSocket": "COLOR",
-    "autoexposure": true,
-    "expTime": 200,
-    "sensIso": 800,
-    "output_settings": {
-        "left": true,
-        "right": true,
-        "left_raw": false,
-        "right_raw": false,
-        "rgb": false,
-        "rgb_png": false,
-        "depth": true,
-        "disparity": true
-    },
-    "LRcheck": true,
-    "extendedDisparity": false,
-    "subpixelDisparity": true,
-    "subpixelValue": 3,
-    "profilePreset": "ROBOTICS",
-    "use_filter_settings": false,
-    "filters": {
-        "threshold_filter": false,
-        "lower_threshold_filter": 1000,
-        "upper_threshold_filter": 5000,
-        "decimation_filter": false,
-        "decimation_factor": 1,
-        "decimation_mode" : "PIXEL_SKIPPING",
-        "spacial_filter": false,
-        "spatial_alfa": 0.5,
-        "spatial_delta": 3,
-        "spatial_num_iterations": 1,
-        "spatial_hole_filling_radius": 1,
-        "temporal_filter": false,
-        "temporal_alfa": 0.5,
-        "temporal_delta": 3,
-        "speckle_filter": false,
-        "speckle_range": 200,
-        "speckle_difference_threshold": 2,
-
-        "median_filter": false,
-        "median_size": "KERNEL_3x3"
-    },
-    "FPS": 30,
-    "num_captures": 20
-}
-
-
-```
-
-This settings need to be configured before the capture start. To change the settings, simply 
-edit parameters in the json and restart the capture script.
+This settings need to be configured before the capture start. To change the settings, simply edit parameters in the json and restart the capture script.
+The json settings can be found in the `settings_jsons` folder.
 
 - `ir` : IR dot projector, available on PRO models.
 - `flood_light` : IR floodlight, available on PRO models.
 - If `autoexposure` is set to false, `expTime` and `sensIso` will be used.
 - `extendedDisparity` : extendedDisparity
 - `subpixelDisparity`: subpixelDisparity with the selected `subpixelValue`
-- `profilePreset`: select a Profile Preset such as `DEFAULT`, `HIGH_DETAIL`, `FACE` or `ROBOTICS` based on your needs. 
-Profiles `HIGH_ACCURACY` and `HIGH_DENSITY` are also available but will be removed in future versions/
+- `profilePreset` : choose a preset to optimize processing for different use cases. Options include `DEFAULT`, `HIGH_DETAIL`, `FACE`, `ROBOTICS`. (Note: `HIGH_ACCURACY` and `HIGH_DENSITY` may be deprecated in future releases.)
 - `output_settings` : select what streams you'd like to visualize. Some stream combinations might not be valid 
 (such as choosing depth stream but not selecting left and right)
 - `use_filter_settings`: **if set to false, none of the following filters will be used**. Set to true to use custom filter settings.
@@ -139,68 +46,60 @@ Profiles `HIGH_ACCURACY` and `HIGH_DENSITY` are also available but will be remov
 
 These are the basic information about the capture. Settings for the capture can be edited and re-applied using the **Replay** feature 
 in the capture viewer. 
----
-## RVC4 capture
-To make a capture with OAK4 devices, use `rvc4_capture.py` script.
+
+## Depthai 3 Capture (for RVC2 & RVC4)
 
 ```bash
-python capture/rvc4_capture.py rvc4 <view_name> --ip <ip>
+python capture/dai3_stereo_capture.py dai3 <capture_name> --ip <camera_ip>
 ```
 
-the available settings for rvc4 are the following:
-```json
-{
-    "ir": true,
-    "ir_value": 1,
-    "flood_light": false,
-    "flood_light_intensity": 1,
-    "stereoResolution": {"x": 1280, "y": 800},
-    "rgbResolution": {"x": 640, "y": 480},
-    "monoSettings": {
-        "luma_denoise": 1,  // levels are 0, 1, 2, 3, 4 but the difference is only between 1 (off) and 2 (on)
-        "sharpness": 2,
-        "contrast": 0
-    },
+### Arguments:
 
-    "output_settings": {
-        "left": true,
-        "right": true,
-        "rgb": true,
-        "depth": true,
-        "disparity": true,
-        "sync": true
-    },
+- **settings_file_path** – path to the settings JSON file. You can use `dai3`, or choose from others in `settings_jsons`
+or provide a custom path `/path/to/your/settings`. More details can be found in the Settings section.
+- **view_name** – name of the capture session; this name will be saved in the metadata file.
+- **--output** (optional) – path to a custom output folder where the capture results will be stored. If not provided, output will be saved in the `DATA` folder relative to the script root.
+- **--autostart** (optional) – specify the number of seconds to wait before the capture starts automatically. Set to `-1` to disable autostart.
+  - If this option is not used, you can manually start capture by pressing `S`. The script will then save a predefined number of frames to the `DATA` folder.
+- **--ip** (optional) – provide the **IP address** of the device to connect to. If omitted, it will connect to the first available device.
+- **--autostart_time** (optional) – specify a fixed system time (in seconds since epoch or formatted string depending on script behavior) when the capture should start.
+- **--autostart_end** (optional) – specify a fixed system time when the capture should end automatically.
+- **--show_streams** (optional) – set to `True` to show all active streams; if `False`, only the left frame will be shown.
+- **--alternating_capture** (optional) – toggles the IR projector on or off for alternating capture behavior.
+- **--port** (optional) – ZMQ control port to communicate with the device. Default is `5555`. Only used in multiple device capture
 
-    "profilePreset": "DEFAULT",
-    "LRcheck": true,
-    "extendedDisparity": true,
+### Settings
 
-    "FPS": 5,
-    "num_captures": 20
-}
+For capture, you can configure various parameters. Below is an example settings configuration.
 
-```
+These settings need to be configured before the capture starts. To change them, simply edit the parameters in the JSON file and restart the capture script.
+The json settings can be found in the `settings_jsons` folder.
+
+- `ir` : enables the IR dot projector (set to `true` to activate). Available on PRO models.
+- `ir_value` : controls the intensity of the IR projector (1 = ON).
+- `flood_light` : enables the IR floodlight. Available on PRO models.
+- `flood_light_intensity` : intensity of the IR floodlight. Currently set to `1`.
+- `stereoResolution` : resolution of the stereo mono cameras. Example: `"x": 1280, "y": 800`.
+- `rgbResolution` : resolution of the RGB camera. Example: `"x": 1280, "y": 800`.
+- `sync_on_host` : when `true`, all streams will be synchronized on the host.
+- `monoSettings` : tuning parameters for the mono (grayscale) streams:
+  - `luma_denoise`, `chroma_denoise`, `sharpness`, `contrast` – all set to `0` in this example.
+- `exposureSettings` :
+  - `autoexposure` – if `true`, the device handles exposure automatically.
+  - If `autoexposure` is set to `false`, the script will use `expTime` (exposure time) and `sensIso` (ISO sensitivity) values.
+- `output_settings` : defines which streams to visualize and save:
+  - `left`, `right`, `rgb`, `depth` – enabled.
+  - `left_raw`, `right_raw`, `disparity`, `sync` – disabled.
+- `profilePreset`: select a Profile Preset such as `DEFAULT`, `HIGH_DETAIL`, `FACE`, `ROBOTICS`, `FAST_ACCURACY`, `FAST_DENSITY`.
+- `LRcheck` : enables left-right consistency check for better depth accuracy.
+- `extendedDisparity` : enables extended disparity range, improving depth for closer objects.
+- `FPS` : frame rate for mono and RGB streams. Example: `15`.
+- `num_captures` : number of frames to save before capture ends. Example: `1`.
+
+These are the core parameters for configuring your capture session. You can later re-edit and apply these settings using the **Replay** feature in the Capture Viewer.
 
 
----
 
-## Multiple TOF capture
-
-For multiple TOF capture you need to configure the appropriate settings json as:
-- turn ON RIGHT stream and turn OFF LEFT stream
-- turn OFF sync node - that configures software synchronization which might interfere with fsync
-- Connect the cameras with FSYNC cables
-
-Appropriate settings are saved in `tof_multiple.json`
-
-If the devices are OAK D SR POE and connected with fsync, the script will automatically
-configure the appropriate fsync settings. Trying to run multiple TOFs without fsync cable connected might cause problems.
-
-```bash
-python capture/dai2_stereo_capture.py <appropriate_tof_config> <capture_name> --devices <mxids_of_tofs>
-```
-
----
 ## Thermal capture
 
 To make a capture with thermal devices, use `thermal_capture.py` script.
@@ -209,63 +108,13 @@ To make a capture with thermal devices, use `thermal_capture.py` script.
 python capture/dai2_thermal_capture.py default_thermal <view_name> --device-ip <ip>
 ```
 
-Most of the settings are not implemented yet.
+Most of the settings are not implemented yet. 
 
 
----
-
-## Depthai 3 Capture (for RVC4)
-Capture with RVC4 still has limited settings as not all the functions were implemented and/or are reliably running on all devices.
-
-To change settings for RVC4 capture, edit the `rvc4.json` file.
-
-```bash
-python capture/rvc4_capture.py rvc4 <rvc4_capture_name> --ip <camera_ip>
-```
 
 
-# ZED capture
-This module allows capturing left, right and neural stereo depth ZED device, saving data in a format compatible with DepthAI pipelines (e.g., ZED-to-OAK mimic format).
-
-OAK-like calibration file is generated. This file includes a dummy rgb camera to allow for replay functions to work normally.
 
 
-## Requirements
-To use this script, install the [ZED SDK](https://www.stereolabs.com/developers/) and its [Python API](https://www.stereolabs.com/docs/api/python/getting-started/). After installing the SDK, run `pip install pyzed` to get the Python bindings.
-
-## Run
-
-```bash
-python capture/zed_capture.py my_scene --output DATA --settings settings_jsons/zed_settings.json
-```
-
-- Press s to start capturing frames
-- Press q to quit
-- Use --autostart 5 to begin automatically after 5 seconds
-
-## Settings
-You can modify the capture settings in the `settings_jsons/zed_settings.json`
 
 
-# Intel Realsense capture
-This module allows capturing left, right, depth, and optional RGB streams from an Intel RealSense device, saving data in a format compatible with DepthAI pipelines (e.g., Realsense-to-OAK mimic format).
-
-OAK-like calibration file is generated.
-## Requirements
-
-```bash
-   pip install pyrealsense2
-```
-
-## Run
-```bash
-python capture/realsense_capture.py my_scene --output DATA --settings settings_jsons/rs_settings.json
-```
-
-- Press s to start capturing frames
-- Press q to quit
-- Use --autostart 5 to begin automatically after 5 seconds
-
-## Settings
-You can modify the capture settings in the `settings_jsons/rs_settings.json`
 
