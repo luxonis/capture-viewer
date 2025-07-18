@@ -44,8 +44,8 @@ def process_argument_logic(args):
     root_path = args.output
 
     if not os.path.exists(settings_path):
-        settings_path_1 = f"settings_jsons/{settings_path}.json"
-        settings_path_2 = f"settings_jsons/{settings_path}"
+        settings_path_1 = f"capture/settings_jsons/{settings_path}.json"
+        settings_path_2 = f"capture/settings_jsons/{settings_path}"
         if os.path.exists(settings_path_1):
             settings_path = settings_path_1
         elif os.path.exists(settings_path_2):
