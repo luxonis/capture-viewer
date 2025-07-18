@@ -2,8 +2,6 @@
 
 import depthai as dai
 import numpy as np
-import argparse
-import datetime
 import time
 import json
 import cv2
@@ -52,7 +50,7 @@ def save_frame(cvFrame, projector_on):
     np.save(f'{output_folders[mxid][projector_on]}/{name}_{timestamp}.npy', cvFrame)
 
 if __name__ == "__main__":
-    args = parseArguments()
+    args = parseArguments(root_path)
     settings_path, view_name, ip, autostart, autostart_time, wait_end, show_streams, alternating = process_argument_logic(args)
 
     print("Starting ALTERNATING CAPTURE script")

@@ -2,8 +2,6 @@
 
 import depthai as dai
 import numpy as np
-import argparse
-import datetime
 import time
 import json
 import cv2
