@@ -14,7 +14,7 @@ import subprocess
 context = zmq.Context()
 
 # Device configurations from JSON
-CONFIG_FILE = os.path.join(os.path.dirname(__file__), "devices_config.json")
+CONFIG_FILE = os.path.join(os.path.dirname(__file__), "capture_control_config.json")
 with open(CONFIG_FILE) as f:
     devices_config = json.load(f)
 
