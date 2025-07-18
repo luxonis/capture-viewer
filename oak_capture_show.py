@@ -53,7 +53,10 @@ def check_settings(capture_folder):
     except json.JSONDecodeError:
         return ValueError("Error: Failed to parse {metadata_file}.")
 
-    settings = data['settings']
+    try:
+        settings = data['settings']
+    except KeyError:
+        settings = {}
     if 'stereoAlign' in settings and settings['stereoAlign']:
         return True
     else:

@@ -9,7 +9,7 @@ import datetime
 import argparse
 from utils.capture_universal import colorize_depth
 from utils.generate_calib import generate_depthai_calib_from_zed
-from oak_capture import visualize_frame_info, visualize_frame
+from dai2_stereo_capture import visualize_frame_info, visualize_frame
 
 
 def load_zed_settings(settings_path):

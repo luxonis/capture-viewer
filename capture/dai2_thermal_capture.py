@@ -1,14 +1,12 @@
 import depthai as dai
 import numpy as np
+import json
+import time
 import cv2
 import os
-import json
-import datetime
-from datetime import timedelta
-import argparse
-import time
 
-from utils.capture_universal import parseArguments, initialize_capture, colorize_depth
+from utils.capture_universal import initialize_capture
+from utils.parse_arguments import parseArguments
 
 # Get the directory where the script is located and choose it as the destination for DATA folder
 script_dir = os.path.dirname(os.path.abspath(__file__))

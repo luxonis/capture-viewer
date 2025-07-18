@@ -2,7 +2,7 @@ import subprocess
 
 # Common parameters
 env = "dai3"
-capture_script = "capture/dai3_port_capture.py"
+capture_script = "capture/dai3_stereo_capture_port.py"
 capture_name = "test_4_device"
 
 # Device configurations

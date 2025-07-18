@@ -20,9 +20,9 @@ if str(dai.__version__)[0] != "3":
 script_dir = os.path.dirname(os.path.abspath(__file__))
 root_path = os.path.join(os.path.dirname(script_dir), 'DATA')
 
-from utils.capture_universal import initialize_capture, finalise_capture
+from utils.capture_universal import initialize_capture, finalise_capture, count_output_streams
 from utils.raw_data_utils import unpackRaw10
-from oak_capture import visualize_frame, visualize_frame_info, count_output_streams
+from utils.show_frames import visualize_frame, visualize_frame_info
 
 def set_stereo_node(pipeline, settings):
     stereo = pipeline.create(dai.node.StereoDepth)
@@ -275,9 +275,9 @@ if __name__ == "__main__":
                 start_time = time.time()
 
             # turning projector on/off logic
-            if int(frame_num/len(streams)) % (settings["FPS"] * 2) == 0:
+            if int(frame_num/len(streams)) % (settings["FPS"] * 4) == 0:
                 turn_on, turn_off = True, False
-            elif int(frame_num/len(streams)) % (settings["FPS"]) == 0:
+            elif int(frame_num/len(streams)) % (settings["FPS"] * 2) == 0:
                 turn_on, turn_off = False, True
             else: turn_on, turn_off = False, False
 
@@ -326,11 +326,13 @@ if __name__ == "__main__":
 
             if alternating:
                 if turn_on:
-                    pipeline.getDefaultDevice().setIrLaserDotProjectorIntensity(1)
+                    pipeline.getDefaultDevice().setIrLaserDotProjectorIntensity(settings['ir_value'])
                     projector_on = True
+                    print("Projector ON")
                 elif turn_off:
                     pipeline.getDefaultDevice().setIrLaserDotProjectorIntensity(0)
                     projector_on = False
+                    print("Projector OFF")
                 else: pass
 
 

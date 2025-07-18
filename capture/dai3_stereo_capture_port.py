@@ -22,9 +22,9 @@ if str(dai.__version__)[0] != "3":
 script_dir = os.path.dirname(os.path.abspath(__file__))
 root_path = os.path.join(os.path.dirname(script_dir), 'DATA')
 
-from utils.capture_universal import initialize_capture, finalise_capture
+from utils.capture_universal import initialize_capture, finalise_capture, count_output_streams
 from utils.raw_data_utils import unpackRaw10
-from oak_capture import visualize_frame, visualize_frame_info, count_output_streams
+from utils.show_frames import visualize_frame, visualize_frame_info
 
 def set_stereo_node(pipeline, settings):
     stereo = pipeline.create(dai.node.StereoDepth)

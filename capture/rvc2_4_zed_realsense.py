@@ -30,7 +30,7 @@ jobs = [
     },
     {
         "env": "capture_viewer",
-        "script": "capture/oak_capture.py",
+        "script": "capture/dai2_stereo_capture.py",
         "args": ["default", capture_name, "--devices", "192.168.50.102"]
     }
 ]

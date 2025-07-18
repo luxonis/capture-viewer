@@ -2,12 +2,12 @@ import subprocess
 import time
 
 now = time.time()
-start_time = time.strftime('%H:%M:%S', time.localtime(now + 20))
-end_time = time.strftime('%H:%M:%S', time.localtime(now + 20 + 30))
+start_time = time.strftime('%H:%M:%S', time.localtime(now + 30))
+end_time = time.strftime('%H:%M:%S', time.localtime(now + 30 + 30))
 print(start_time)
 print(end_time)
 
-capture_name = "alternating"
+capture_name = "test_4_device"
 settings_RVC4 = 'dai3_raw'
 settings_RVC2 = 'dai3'
 
@@ -17,24 +17,24 @@ jobs = [
 
     {
         "env": "dai3",
-        "script": "capture/da3_alternating.py",
-        "args": [settings_RVC2, capture_name, "--alternating_capture", "True", "--ip", "184430106176351300"]
+        "script": "capture/dai3_stereo_capture_alternating.py",
+        "args": [settings_RVC2, capture_name, "--alternating_capture", "True", "--ip", "192.168.50.102"]
     },
     {
         "env": "dai3",
-        "script": "capture/da3_alternating.py",
-        "args": [settings_RVC2, capture_name, "--alternating_capture", "True", "--ip", "1844301051F3860E00"]
+        "script": "capture/dai3_stereo_capture_alternating.py",
+        "args": [settings_RVC2, capture_name, "--alternating_capture", "True", "--ip", "192.168.50.103"]
     },
-    # {
-    #     "env": "dai3",
-    #     "script": "capture/da3_alternating.py",
-    #     "args": [settings, capture_name, "--alternating_capture", "True", "--ip", "184430106176351300"]
-    # },
-    # {
-    #     "env": "dai3",
-    #     "script": "capture/da3_alternating.py",
-    #     "args": [settings, capture_name, "--alternating_capture", "True", "--ip", "1844301051F3860E00"]
-    # }
+    {
+        "env": "dai3",
+        "script": "capture/dai3_stereo_capture_alternating.py",
+        "args": [settings_RVC4, capture_name, "--alternating_capture", "True", "--ip", "192.168.50.118"]
+    },
+    {
+        "env": "dai3",
+        "script": "capture/dai3_stereo_capture.py",
+        "args": [settings_RVC4, capture_name, "--ip", "192.168.50.130"]
+    }
 ]
 
 processes = []

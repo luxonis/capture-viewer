@@ -10,7 +10,7 @@ import time
 import datetime
 
 from utils.generate_calib import generate_depthai_calib_from_realsense
-from oak_capture import visualize_frame_info, visualize_frame
+from dai2_stereo_capture import visualize_frame_info, visualize_frame
 
 def create_output_dir(base_path, serial, view_name, device_info, profile, settings):
     timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")

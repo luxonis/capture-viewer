@@ -17,7 +17,7 @@ root_path = os.path.join(os.path.dirname(script_dir), 'DATA')
 
 
 if __name__ == "__main__":
-    print("This script is not fully compatible with all settings, use oak_capture.py, but specify only one device for the same functionality")
+    print("This script is not fully compatible with all settings, use dai2_stereo_capture.py, but specify only one device for the same functionality")
     print("This script is left in the repo for debugging purposes")
     print("Exiting script")
     exit(0)

@@ -24,7 +24,7 @@ env = os.environ.get("CONDA_DEFAULT_ENV") or (
 )
 print("Environment:", env)
 
-capture_script = os.path.join(os.path.dirname(__file__), "dai3_port_capture.py")
+capture_script = os.path.join(os.path.dirname(__file__), "dai3_stereo_capture_port.py")
 
 # ----- Command sender -----
 def send_command(port, cmd):
@@ -236,11 +236,10 @@ class MultiDeviceControlApp:
 
         count = 0
         while self.running and (max_captures is None or count < max_captures):
-            time.sleep(0.5)
+            time.sleep(0.05)
             for device, port in self.device_ports.items():
-                self.status_vars[device].set("Capturing")
+                self.status_vars[device].set(f"Capturing: {count}")
                 send_command(port, "capture_frame")
-                self.status_vars[device].set("Done")
             count += 1
 
         self.running = False

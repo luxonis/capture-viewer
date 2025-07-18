@@ -66,40 +66,21 @@ def finalise_capture(start_time, end_time, num_captures, streams):
     print(f"Capture has {num_captures} frames combined from all streams")
     print(f"Capture was {round((num_captures/len(streams)) / (end_time - start_time), 2)} FPS")
 
-def parseArguments():
-    # PARSE ARGUMENTS
-    parser = argparse.ArgumentParser()
-    # Mandatory arguments
-    parser.add_argument("settings_file_path", help="Path to settings JSON")
-    parser.add_argument("view_name", help="What part of the scene the camera is looking at")
-    # Optional argument with a flag for device_ip
-    parser.add_argument("--device-ip", dest="device_ip", help="IP of remote device", default=None)
-    parser.add_argument("--autostart", default=-1, type=int, help='Automatically start capturing after given number of frames (-1 to disable)')
-
-    args = parser.parse_args()
-    settings_path = args.settings_file_path
-    view_name = args.view_name
-    device_info = None
-    if args.device_ip:
-        device_info = dai.DeviceInfo(args.device_ip)
-
-    # SETTINGS loading
-    if not os.path.exists(settings_path):
-        settings_path_1 = f"settings_jsons/{settings_path}.json"
-        settings_path_2 = f"settings_jsons/{settings_path}"
-        if os.path.exists(settings_path_1):
-            settings_path = settings_path_1
-        elif os.path.exists(settings_path_2):
-            settings_path = settings_path_2
-        else: raise FileNotFoundError(f"Settings file '{settings_path}' does not exist.")
-
-    return settings_path, view_name, device_info, args.autostart
-
-
 
 def colorize_depth(frame, min_depth=20, max_depth=5000):
     depth_colorized = np.interp(frame, (min_depth, max_depth), (0, 255)).astype(np.uint8)
     return cv2.applyColorMap(depth_colorized, cv2.COLORMAP_JET)
 
+def downscale_to_fit(frame, max_width, max_height):
+    h, w = frame.shape[:2]
+    scale = min(max_width / w, max_height / h)
+    new_w, new_h = int(w * scale), int(h * scale)
+    return cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_AREA)
 
-
+def count_output_streams(output_streams):
+    stream_names = []
+    for item in output_streams.keys():
+        if item in ["tof", "sync", "rgb_png"]: continue
+        if output_streams[item]:
+            stream_names.append(item)
+    return stream_names

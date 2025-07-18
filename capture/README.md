@@ -3,7 +3,7 @@
 You can now run capture for OAKs stereo and OAK-D-SR-POE using one script.
 
 ```bash
-python capture/oak_capture.py default my_capture
+python capture/dai2_stereo_capture.py default my_capture
 ```
 
 Arguments:
@@ -197,7 +197,7 @@ If the devices are OAK D SR POE and connected with fsync, the script will automa
 configure the appropriate fsync settings. Trying to run multiple TOFs without fsync cable connected might cause problems.
 
 ```bash
-python capture/oak_capture.py <appropriate_tof_config> <capture_name> --devices <mxids_of_tofs>
+python capture/dai2_stereo_capture.py <appropriate_tof_config> <capture_name> --devices <mxids_of_tofs>
 ```
 
 ---
@@ -206,7 +206,7 @@ python capture/oak_capture.py <appropriate_tof_config> <capture_name> --devices 
 To make a capture with thermal devices, use `thermal_capture.py` script.
 
 ```bash
-python capture/thermal_capture.py default_thermal <view_name> --device-ip <ip>
+python capture/dai2_thermal_capture.py default_thermal <view_name> --device-ip <ip>
 ```
 
 Most of the settings are not implemented yet.
