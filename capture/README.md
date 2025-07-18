@@ -1,8 +1,7 @@
 # CAPTURE GUIDE
 
-You can now run capture for OAKs stereo and OAK-D-SR-POE using one script.
-
-
+This is a guide on how to run capture with one device either using Depthai v2 or Depthai v3. For guide on how to capture using multiple devices 
+refer to `README_multiple_devices.md`.
 
 ## Depthai 2 Capture (for RVC2 Stereo and TOF)
 
