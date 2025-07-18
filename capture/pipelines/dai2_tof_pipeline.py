@@ -5,7 +5,7 @@ LEFT_SOCKET = dai.CameraBoardSocket.CAM_B
 RIGHT_SOCKET = dai.CameraBoardSocket.CAM_C
 TOF_SOCKET = dai.CameraBoardSocket.CAM_A
 
-from .oak_stereo_pipeline import set_stereo_node
+from .dai2_stereo_pipeline import set_stereo_node
 
 def set_tof_node(pipeline, settings):
     tof = pipeline.create(dai.node.ToF)

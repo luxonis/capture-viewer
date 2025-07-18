@@ -8,7 +8,7 @@ from datetime import timedelta
 import argparse
 import time
 
-from pipelines.oak_stereo_pipeline import get_pipeline
+from pipelines.dai2_stereo_pipeline import get_pipeline
 from utils.capture_universal import parseArguments, initialize_capture, colorize_depth
 
 # Get the directory where the script is located and choose it as the destination for DATA folder

@@ -84,10 +84,10 @@ def worker(mxid, stack, devices, settings, num, shared_devices, exception_queue)
         print("=== Connected to ", mxid, device.getDeviceName())
 
         if device.getDeviceName() == "OAK-D-SR-POE":
-            from pipelines.oak_tof_pipeline import get_pipeline
+            from pipelines.dai2_tof_pipeline import get_pipeline
             pipeline_output = get_pipeline(settings, num)
         else:
-            from pipelines.oak_stereo_pipeline import get_pipeline
+            from pipelines.dai2_stereo_pipeline import get_pipeline
             pipeline_output = get_pipeline(settings)
 
         device.startPipeline(pipeline_output["pipeline"])
