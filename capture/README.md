@@ -93,7 +93,7 @@ The json settings can be found in the `settings_jsons` folder.
 - `LRcheck` : enables left-right consistency check for better depth accuracy.
 - `extendedDisparity` : enables extended disparity range, improving depth for closer objects.
 - `FPS` : frame rate for mono and RGB streams. Example: `15`.
-- `num_captures` : number of frames to save before capture ends. Example: `1`.
+- `num_captures` : number of frames to save before capture ends. set to "inf" if you don't want to limit your capture.
 
 These are the core parameters for configuring your capture session. You can later re-edit and apply these settings using the **Replay** feature in the Capture Viewer.
 

@@ -34,5 +34,5 @@
     "extendedDisparity": true,
 
     "FPS": 15,
-    "num_captures": 1
+    "num_captures": 20
 }
