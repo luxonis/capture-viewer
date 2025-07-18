@@ -4,7 +4,7 @@
     "flood_light": false,
     "flood_light_intensity": 1,
     "stereoResolution": {"x": 1280, "y": 800},
-    "rgbResolution": {"x": 1280, "y": 800},
+    "rgbResolution": {"x": 2560, "y": 1600},
     "sync_on_host": true,
     "monoSettings": {
         "luma_denoise": 0,
@@ -23,13 +23,13 @@
         "left_raw": true,
         "right": true,
         "right_raw": true,
-        "rgb": false,
+        "rgb": true,
         "depth": false,
         "disparity": false,
         "sync": false
     },
 
-    "profilePreset": "DEFAULT",
+    "profilePreset": "FAST_DENSITY",
     "LRcheck": true,
     "extendedDisparity": true,
 

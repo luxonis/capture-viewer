@@ -9,7 +9,7 @@ import datetime
 import argparse
 from utils.capture_universal import colorize_depth
 from utils.generate_calib import generate_depthai_calib_from_zed
-from dai2_stereo_capture import visualize_frame_info, visualize_frame
+from dai2_capture import visualize_frame_info, visualize_frame
 
 
 def load_zed_settings(settings_path):
@@ -87,7 +87,7 @@ def parseArguments():
     parser.add_argument("view_name")
     parser.add_argument("--output", default="DATA")
     parser.add_argument("--autostart", default=-1, type=int)
-    parser.add_argument("--settings", default="settings_jsons/zed_settings.json")
+    parser.add_argument("--settings", default="capture/settings_jsons/zed_settings.json")
     parser.add_argument("--autostart_time", default=0, help="Select a fixed time for capture to start")
     parser.add_argument("--autostart_end", default=0, help="Select a fixed time for capture to end")
     parser.add_argument("--show_streams", default=False, help="Show all the running streams. If false, only shows the left frame")

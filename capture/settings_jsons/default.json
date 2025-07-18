@@ -17,7 +17,7 @@
         "right_raw": false,
         "rgb": false,
         "rgb_png": false,
-        "depth": false,
+        "depth": true,
         "disparity": false,
         "sync": false
     },

@@ -10,7 +10,7 @@ import time
 import datetime
 
 from utils.generate_calib import generate_depthai_calib_from_realsense
-from dai2_stereo_capture import visualize_frame_info, visualize_frame
+from dai2_capture import visualize_frame_info, visualize_frame
 
 def create_output_dir(base_path, serial, view_name, device_info, profile, settings):
     timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
@@ -60,7 +60,7 @@ def parseArguments():
     parser.add_argument("view_name")
     parser.add_argument("--output", default="DATA")
     parser.add_argument("--autostart", default=-1, type=int)
-    parser.add_argument("--settings", default="settings_jsons/rs_settings.json")
+    parser.add_argument("--settings", default="capture/settings_jsons/rs_settings.json")
     parser.add_argument("--autostart_time", default=0, help="Select a fixed time for capture to start")
     parser.add_argument("--autostart_end", default=0, help="Select a fixed time for capture to end")
     parser.add_argument("--show_streams", default=False, help="Show all the running streams. If false, only shows the left frame")
