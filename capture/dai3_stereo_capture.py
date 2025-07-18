@@ -22,8 +22,9 @@ root_path = os.path.join(os.path.dirname(script_dir), 'DATA')
 from utils.raw_data_utils import unpackRaw10
 from utils.show_frames import visualize_frame, visualize_frame_info
 from utils.capture_universal import initialize_capture, finalise_capture, count_output_streams
-from pipelines.dai3_stereo_pipeline import initialize_pipeline
 from utils.parse_arguments import parseArguments, process_argument_logic
+
+from pipelines.dai3_stereo_pipeline import initialize_pipeline
 
 def controlQueueSend(input_queues, ctrl):
     for queue in input_queues.values():
@@ -46,7 +47,7 @@ def initialize_mono_control(settings):
 
 if __name__ == "__main__":
     args = parseArguments(root_path)
-    settings_path, view_name, ip, autostart, autostart_time, wait_end, show_streams = process_argument_logic(args)
+    settings_path, view_name, ip, autostart, autostart_time, wait_end, show_streams, _ = process_argument_logic(args)
 
     print(f"connecting to device... IP: {ip}")
 
