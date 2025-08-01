@@ -49,7 +49,7 @@ def main(args):
     capture_ended = False
 
     streams = count_output_streams(settings['output_settings'])
-    if settings['num_captures'] == 'inf' or 'INF': settings['num_captures'] = float('inf')
+    if settings['num_captures'] == 'inf' or settings['num_captures'] == 'INF': settings['num_captures'] = float('inf')
     final_num_captures = settings['num_captures'] * len(streams)
     print(f"Streams: {streams}")
     print(f"Number of streams: {len(streams)}")
