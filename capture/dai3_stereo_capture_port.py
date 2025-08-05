@@ -26,7 +26,7 @@ from utils.isp_control import initialize_mono_control, controlQueueSend
 
 from pipelines.dai3_stereo_pipeline import initialize_pipeline
 
-def save_frame(cvFrame, projector_on):
+def save_frame(name, cvFrame, output_folders, mxid, timestamp, projector_on):
     if name in ['left', 'right']:
         if len(cvFrame.shape) == 3:
             cvFrame = cv2.cvtColor(cvFrame, cv2.COLOR_BGR2GRAY)
@@ -115,19 +115,40 @@ def main(args):
         try:
             while pipeline.isRunning():
                 # --- Frame streaming ---
-                for name in q.keys():
-                    if q[name].has():
-                        frame = q[name].get()
-                        if 'raw' in name:
-                            dataRaw = frame.getData()
-                            cvFrame = unpackRaw10(dataRaw, frame.getWidth(), frame.getHeight(), frame.getStride())
-                        else:
-                            cvFrame = frame.getCvFrame()
+                if settings["output_settings"]["sync"]:
+                    start_wait = time.time()
+                    timeout_ms = 500  # max wait for frame availability
+                    while not q['sync'].has():
+                        if (time.time() - start_wait) > (timeout_ms / 1000):
+                            break
+                    if q['sync'].has():
+                        msgGrp = q['sync'].get()
+                        for name, msg in msgGrp:
+                            if 'raw' in name:
+                                dataRaw = msg.getData()
+                                cvFrame = unpackRaw10(dataRaw, msg.getWidth(), msg.getHeight(), msg.getStride())
+                            else:
+                                cvFrame = msg.getCvFrame()
+                            if show_streams:
+                                visualize_frame(device_name + " " + name + " " + str(args.port), cvFrame, int(time.time() * 1000), mxid)
+                            elif name == 'left':
+                                visualize_frame_info(device_name + " " + name + " " + str(args.port), cvFrame, int(time.time() * 1000), mxid, streams, None)
+                    else:
+                        print("Timeout waiting for sync queue.")
+                else:
+                    for name in q.keys():
+                        if q[name].has():
+                            frame = q[name].get()
+                            if 'raw' in name:
+                                dataRaw = frame.getData()
+                                cvFrame = unpackRaw10(dataRaw, frame.getWidth(), frame.getHeight(), frame.getStride())
+                            else:
+                                cvFrame = frame.getCvFrame()
 
-                        if show_streams:
-                            visualize_frame(device_name + " " + name+" "+str(args.port), cvFrame, int(time.time() * 1000), mxid)
-                        elif name == 'left':
-                            visualize_frame_info(device_name + " " + name+" "+str(args.port), cvFrame, int(time.time() * 1000), mxid, streams, None)
+                            if show_streams:
+                                visualize_frame(device_name + " " + name+" "+str(args.port), cvFrame, int(time.time() * 1000), mxid)
+                            elif name == 'left':
+                                visualize_frame_info(device_name + " " + name+" "+str(args.port), cvFrame, int(time.time() * 1000), mxid, streams, None)
 
                 # --- Command handling ---
                 socks = dict(poller.poll(timeout=1))
@@ -153,7 +174,6 @@ def main(args):
 
                         elif cmd == "capture_frame":
                             status = "capturing"
-                            timestamp = int(time.time() * 1000)
                             captured = 0
                             timeout_ms = 500  # max wait for frame availability
                             if settings["output_settings"]["sync"]:
@@ -169,7 +189,8 @@ def main(args):
                                             cvFrame = unpackRaw10(dataRaw, msg.getWidth(), msg.getHeight(), msg.getStride())
                                         else:
                                             cvFrame = msg.getCvFrame()
-                                        save_frame(cvFrame, projector_on)
+                                        timestamp = int(msg.getTimestamp().total_seconds() * 1000)
+                                        save_frame(name, cvFrame, output_folders, mxid, timestamp, projector_on)
                                         captured += 1
                                 else:
                                     print("Timeout waiting for sync queue.")
@@ -188,7 +209,8 @@ def main(args):
                                                                   frame.getStride())
                                         else:
                                             cvFrame = frame.getCvFrame()
-                                        save_frame(cvFrame, projector_on)
+                                        timestamp = int(frame.getTimestamp().total_seconds() * 1000)
+                                        save_frame(name, cvFrame, output_folders, mxid, timestamp, projector_on)
                                         captured += 1
                             num_captures[mxid] += captured
                             print(f"Captured {captured} frames")
@@ -211,6 +233,7 @@ def main(args):
 
                     except Exception as e:
                         print("Exception during command handling:", e)
+                        raise e
                         socket.send_json({"status": "error", "detail": str(e)})
 
                 key = cv2.waitKey(1)
