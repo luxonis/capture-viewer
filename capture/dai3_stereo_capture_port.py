@@ -38,7 +38,6 @@ def cleanup_empty_folders(folder_list):
         if not os.path.isdir(folder):
             continue
         contents = set(os.listdir(folder))
-        print(contents)
         if contents.issubset(whitelist) or len(contents) == 0:
             print(f"[Cleanup] Removing unused folder: {folder}")
             try:
