@@ -239,19 +239,19 @@ class MultiDeviceControlApp:
         while self.running:
             for device, port in self.device_ports.items():
                 send_command(port, "capturing_on")
-            time.sleep(0.5)
+            time.sleep(1)
 
             for device, port in self.device_ports.items():
                 send_command(port, "capturing_off")
 
             for device, port in self.device_ports.items():
                 send_command(port, "projector_on")
-                time.sleep(2)
+                time.sleep(3)
                 send_command(port, "capturing_on")
-                time.sleep(0.5)
+                time.sleep(1)
                 send_command(port, "capturing_off")
                 send_command(port, "projector_off")
-            time.sleep(2)
+            time.sleep(3)
 
             for device, port in self.device_ports.items():
                 counts[port] = self.get_count(port)

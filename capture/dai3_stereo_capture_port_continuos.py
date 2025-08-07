@@ -114,7 +114,7 @@ def main(args):
                 # --- Frame streaming ---
                 if settings["output_settings"]["sync"]:
                     start_wait = time.time()
-                    timeout_ms = 500  # max wait for frame availability
+                    timeout_ms = 50  # max wait for frame availability
                     while not q['sync'].has():
                         if (time.time() - start_wait) > (timeout_ms / 1000):
                             break
@@ -130,7 +130,7 @@ def main(args):
                             if show_streams:
                                 visualize_frame(device_name + " " + name + " " + str(args.port), cvFrame, int(time.time() * 1000), mxid)
                             elif name == 'left':
-                                visualize_frame_info(device_name + " " + name + " " + str(args.port), cvFrame, int(time.time() * 1000), mxid, streams, None)
+                                visualize_frame_info(device_name + " " + name + " " + str(args.port), cvFrame, int(time.time() * 1000), mxid, streams, saving)
 
                             if saving:
                                 timestamp = int(msg.getTimestamp().total_seconds() * 1000)
@@ -152,7 +152,7 @@ def main(args):
                             if show_streams:
                                 visualize_frame(device_name + " " + name+" "+str(args.port), cvFrame, int(time.time() * 1000), mxid)
                             elif name == 'left':
-                                visualize_frame_info(device_name + " " + name+" "+str(args.port), cvFrame, int(time.time() * 1000), mxid, streams, None)
+                                visualize_frame_info(device_name + " " + name+" "+str(args.port), cvFrame, int(time.time() * 1000), mxid, streams, saving)
 
                             if saving:
                                 timestamp = int(frame.getTimestamp().total_seconds() * 1000)
@@ -161,7 +161,7 @@ def main(args):
                                 status = f"captured: {num_captures[mxid]}"
 
                 # --- Command handling ---
-                socks = dict(poller.poll(timeout=1))
+                socks = dict(poller.poll(timeout=500))
                 if socket in socks and socks[socket] == zmq.POLLIN:
                     try:
                         msg = socket.recv_json()
