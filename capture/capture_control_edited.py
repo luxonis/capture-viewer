@@ -85,6 +85,8 @@ class MultiDeviceControlApp:
 
         self.message_var = tk.StringVar(value="Idle")
         self.capture_name_var = tk.StringVar(value="test_capture")
+        self.max_captures_var = tk.StringVar(value="Unlimited")
+
         main_frame = ttk.Frame(self.root, padding=10)
         main_frame.grid(row=0, column=0, sticky="nsew")
 
@@ -99,41 +101,57 @@ class MultiDeviceControlApp:
 
         row += 1
 
-
-        # === Row 2: Start Controls in their own frame ===
+        # === Row 1: Start Controls in their own frame ===
         start_controls_frame = ttk.LabelFrame(main_frame, text="Capture Controls", padding=(10, 5))
         start_controls_frame.grid(row=row, column=0, columnspan=3, sticky="ew", pady=(10, 5))
 
-        # === Row 1: Capture Name ===
+        # --- Capture Name ---
         ttk.Label(start_controls_frame, text="Capture Name:").grid(row=0, column=0, sticky="e")
         entry = ttk.Entry(start_controls_frame, textvariable=self.capture_name_var)
-        entry.grid(row=0, column=1, sticky="w")
+        entry.grid(row=0, column=1, sticky="w", padx=(0, 10))
 
-        # Start Alternating Capture (Yellow)
+        # --- Max Captures ---
+        ttk.Label(start_controls_frame, text="Max Captures:").grid(row=0, column=2, sticky="e")
+        max_caps_entry = ttk.Entry(start_controls_frame, textvariable=self.max_captures_var, foreground='gray',
+                                   width=12)
+        max_caps_entry.grid(row=0, column=3, sticky="w")
+
+        # Placeholder text behavior
+        def on_focus_in(event):
+            if self.max_captures_var.get() == "Unlimited":
+                self.max_captures_var.set("")
+                max_caps_entry.config(foreground='black')
+
+        def on_focus_out(event):
+            if self.max_captures_var.get() == "":
+                self.max_captures_var.set("Unlimited")
+                max_caps_entry.config(foreground='gray')
+
+        max_caps_entry.bind("<FocusIn>", on_focus_in)
+        max_caps_entry.bind("<FocusOut>", on_focus_out)
+
+        # --- Start/Stop Controls ---
         self.start_sequence_button = ttk.Button(start_controls_frame, text="Start Alternating Capture",
                                                 command=self.start_sequence, state="disabled", style="Start.TButton")
         self.start_sequence_button.grid(row=1, column=0, padx=5, pady=5)
 
-        # Start Simple Capture (Yellow)
         self.simple_sequence_button = ttk.Button(start_controls_frame, text="Start Simple Capture",
                                                  command=self.start_simple_sequence, state="disabled",
                                                  style="Start.TButton")
         self.simple_sequence_button.grid(row=1, column=1, padx=5, pady=5)
 
-        # Projector Toggle
         self.projector_toggle_button = ttk.Button(start_controls_frame, text="Projector OFF",
                                                   command=self.toggle_projectors)
         self.projector_toggle_button.config(style="Off.TButton")
         self.projector_toggle_button.grid(row=1, column=2, padx=5, pady=5)
         self.projectors_on = False
 
-        # End Capture
         ttk.Button(start_controls_frame, text="End Capture", command=self.end_capture).grid(row=1, column=3, padx=5,
                                                                                             pady=5)
 
         row += 1
 
-        # === Rows for Device Status and Restart Buttons ===
+        # === Device Statuses ===
         for device, port in self.device_ports.items():
             ttk.Label(main_frame, text=f"{device} (Port {port})").grid(row=row, column=0, sticky="w")
             label = ttk.Label(main_frame, textvariable=self.status_vars[device])
@@ -147,7 +165,7 @@ class MultiDeviceControlApp:
 
             row += 1
 
-        # === Final Row: Message Label ===
+        # === Final Row: Status Message ===
         ttk.Label(main_frame, textvariable=self.message_var, foreground="blue").grid(row=row, column=0, sticky="w",
                                                                                      pady=(10, 0))
 
@@ -336,9 +354,13 @@ class MultiDeviceControlApp:
         self.running = False
         self.set_message("Capture ending..")
 
+        for device, port in self.device_ports.items():
+            send_command(port, 'cleanup')
+
     def _finalize_exit(self):
         time.sleep(0.5)
         for device, port in self.device_ports.items():
+            send_command(port, 'cleanup')
             response = send_command(port, "exit")
             if response.get("status") == "shutting_down":
                 self.status_vars[device].set("Shutting down")
