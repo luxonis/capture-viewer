@@ -108,26 +108,6 @@ def assign_colors_to_timestamps(timestamps, time_threshold_ms):
     group_colors = {group: cmap(i % 20) for i, group in enumerate(group_list)}
     return {ts: group_colors[group] for ts, group in color_groups.items()}
 
-def assign_temporal_stripes_to_timestamps(timestamps, break_threshold_ms=1000):
-    """
-    Assigns group colors based on timestamp continuity. When there's a large jump
-    (e.g., > break_threshold_ms), we switch to a new group.
-    """
-    group_map = {}
-    current_group = 0
-    last_ts = None
-
-    for ts in sorted(timestamps):
-        if last_ts is not None and ts - last_ts > break_threshold_ms:
-            current_group += 1
-        group_map[ts] = current_group
-        last_ts = ts
-
-    # Assign colors (cycling through a colormap)
-    cmap = plt.cm.get_cmap('tab20')
-    group_colors = {group: cmap(group % 20) for group in set(group_map.values())}
-    return {ts: group_colors[group_map[ts]] for ts in timestamps}
-
 
 def plot_matrix(ax, folder_name, data, dtypes, timestamps, colors, avg_diff_ms=None):
     matrix = np.zeros((len(timestamps), len(dtypes)))
@@ -175,6 +155,9 @@ def visualize_all_folders(parent_folder, time_threshold_ms, group_colors=False):
     fig, axes = plt.subplots(rows, cols, figsize=(6 * cols, 4 * rows))
     axes = np.array(axes).reshape(-1)
 
+    if group_colors:
+        time_threshold_ms = 1000
+
     plotted = 0
     for i, subfolder in enumerate(subfolders):
         folder_name = os.path.basename(subfolder)
@@ -183,8 +166,7 @@ def visualize_all_folders(parent_folder, time_threshold_ms, group_colors=False):
         if not timestamps:
             continue  # skip empty folders
 
-        if group_colors: colors = assign_temporal_stripes_to_timestamps(timestamps, break_threshold_ms=1000)
-        else: colors = assign_colors_to_timestamps(timestamps, time_threshold_ms)
+        colors = assign_colors_to_timestamps(timestamps, time_threshold_ms)
 
         avg_diff = compute_avg_left_right_diff(timestamps, data)
         plot_matrix(axes[plotted], folder_name, data, dtypes, timestamps, colors, avg_diff)
