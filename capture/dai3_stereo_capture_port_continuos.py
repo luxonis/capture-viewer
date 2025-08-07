@@ -259,7 +259,8 @@ def main(args):
                             socket.send_json({"status": "inicialized"})
 
                         elif cmd == "cleanup":
-                            cleanup_empty_folders([...])
+                            cleanup_empty_folders([output_folders[mxid][True],
+                                                   output_folders[mxid][False]])
                             socket.send_json({"status": "cleaned"})
 
                         elif cmd == "exit":
