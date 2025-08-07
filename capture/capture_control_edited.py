@@ -75,22 +75,65 @@ class MultiDeviceControlApp:
 
     def build_ui(self):
         style = ttk.Style()
+        style.theme_use('default')  # Ensure theme allows custom styles
         style.configure("On.TButton", foreground="white", background="green")
         style.configure("Off.TButton", foreground="white", background="red")
+        style.configure("Start.TButton", background="yellow", foreground="black")
+        style.map("Start.TButton",
+                  background=[("active", "#f7d200")],
+                  foreground=[("disabled", "gray")])
 
         self.message_var = tk.StringVar(value="Idle")
         self.capture_name_var = tk.StringVar(value="test_capture")
         main_frame = ttk.Frame(self.root, padding=10)
         main_frame.grid(row=0, column=0, sticky="nsew")
 
-        ttk.Label(main_frame, text="Capture Name:").grid(row=0, column=0, sticky="e")
-        entry = ttk.Entry(main_frame, textvariable=self.capture_name_var)
+        row = 0
+
+        # === Row 0: Launch (left), Exit (right) ===
+        self.launch_button = ttk.Button(main_frame, text="Launch Devices", command=self.launch_all_devices)
+        self.launch_button.grid(row=row, column=0, sticky="w", padx=(0, 10))
+
+        exit_button = ttk.Button(main_frame, text="Exit Devices", command=self.exit)
+        exit_button.grid(row=row, column=2, sticky="e")
+
+        row += 1
+
+
+        # === Row 2: Start Controls in their own frame ===
+        start_controls_frame = ttk.LabelFrame(main_frame, text="Capture Controls", padding=(10, 5))
+        start_controls_frame.grid(row=row, column=0, columnspan=3, sticky="ew", pady=(10, 5))
+
+        # === Row 1: Capture Name ===
+        ttk.Label(start_controls_frame, text="Capture Name:").grid(row=0, column=0, sticky="e")
+        entry = ttk.Entry(start_controls_frame, textvariable=self.capture_name_var)
         entry.grid(row=0, column=1, sticky="w")
 
-        self.launch_button = ttk.Button(main_frame, text="Launch Capture", command=self.launch_all_devices, state="enabled")
-        self.launch_button.grid(row=0, column=2, pady=(0, 10), padx=5)
+        # Start Alternating Capture (Yellow)
+        self.start_sequence_button = ttk.Button(start_controls_frame, text="Start Alternating Capture",
+                                                command=self.start_sequence, state="disabled", style="Start.TButton")
+        self.start_sequence_button.grid(row=1, column=0, padx=5, pady=5)
 
-        row = 1
+        # Start Simple Capture (Yellow)
+        self.simple_sequence_button = ttk.Button(start_controls_frame, text="Start Simple Capture",
+                                                 command=self.start_simple_sequence, state="disabled",
+                                                 style="Start.TButton")
+        self.simple_sequence_button.grid(row=1, column=1, padx=5, pady=5)
+
+        # Projector Toggle
+        self.projector_toggle_button = ttk.Button(start_controls_frame, text="Projector OFF",
+                                                  command=self.toggle_projectors)
+        self.projector_toggle_button.config(style="Off.TButton")
+        self.projector_toggle_button.grid(row=1, column=2, padx=5, pady=5)
+        self.projectors_on = False
+
+        # End Capture
+        ttk.Button(start_controls_frame, text="End Capture", command=self.end_capture).grid(row=1, column=3, padx=5,
+                                                                                            pady=5)
+
+        row += 1
+
+        # === Rows for Device Status and Restart Buttons ===
         for device, port in self.device_ports.items():
             ttk.Label(main_frame, text=f"{device} (Port {port})").grid(row=row, column=0, sticky="w")
             label = ttk.Label(main_frame, textvariable=self.status_vars[device])
@@ -99,50 +142,14 @@ class MultiDeviceControlApp:
 
             restart_btn = ttk.Button(main_frame, text="Restart", command=lambda p=port: self.restart_device(p))
             restart_btn.grid(row=row, column=2, padx=5)
-            restart_btn.grid_remove()  # hidden by default
+            restart_btn.grid_remove()
             self.restart_buttons[device] = restart_btn
 
             row += 1
 
-        self.start_sequence_button = ttk.Button(main_frame, text="Start Capture Sequence", command=self.start_sequence, state="disabled")
-        self.start_sequence_button.grid(row=row, column=0, pady=10)
-
-        ttk.Button(main_frame, text="End Capture", command=self.end_capture).grid(row=row, column=2, pady=10)
-        row += 1
-        ttk.Button(main_frame, text="Exit Devices", command=self.exit).grid(row=row, column=2, pady=10)
-        row += 1
-
-        self.projector_toggle_button = ttk.Button(main_frame, text="Projector OFF",
-                                                  command=self.toggle_projectors)
-        self.projector_toggle_button.config(style="Off.TButton")
-        self.projector_toggle_button.grid(row=row, column=1, pady=(5, 10))
-        self.projectors_on = False
-
-        self.simple_sequence_button = ttk.Button(main_frame, text="Start Simple Capture", command=self.start_simple_sequence, state="disabled")
-        self.simple_sequence_button.grid(row=row, column=0, pady=10)
-
-        row += 1
-
-        ttk.Label(main_frame, text="Max Captures:").grid(row=row, column=0, sticky="e")
-        max_caps_entry = ttk.Entry(main_frame, textvariable=self.max_captures_var, foreground='gray')
-        max_caps_entry.grid(row=row, column=1, sticky="w")
-
-        def on_focus_in(event):
-            if self.max_captures_var.get() == "Unlimited":
-                self.max_captures_var.set("")
-                max_caps_entry.config(foreground='black')
-
-        def on_focus_out(event):
-            if self.max_captures_var.get() == "":
-                self.max_captures_var.set("Unlimited")
-                max_caps_entry.config(foreground='gray')
-
-        max_caps_entry.bind("<FocusIn>", on_focus_in)
-        max_caps_entry.bind("<FocusOut>", on_focus_out)
-
-        row += 1
-        ttk.Label(main_frame, textvariable=self.message_var, foreground="blue").grid(row=row, column=0, columnspan=3,
-                                                                                     sticky="w", pady=(10, 0))
+        # === Final Row: Message Label ===
+        ttk.Label(main_frame, textvariable=self.message_var, foreground="blue").grid(row=row, column=0, sticky="w",
+                                                                                     pady=(10, 0))
 
     def poll_statuses(self):
         for device, port in self.device_ports.items():
