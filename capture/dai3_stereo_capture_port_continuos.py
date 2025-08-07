@@ -27,7 +27,6 @@ from utils.isp_control import initialize_mono_control, controlQueueSend
 
 from pipelines.dai3_stereo_pipeline import initialize_pipeline
 
-# todo capture name is not updating
 
 def save_frame(name, cvFrame, output_folders, mxid, timestamp, projector_on):
     if name in ['left', 'right']:

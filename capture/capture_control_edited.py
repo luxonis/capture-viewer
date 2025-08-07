@@ -26,7 +26,6 @@ print("Environment:", env)
 
 capture_script = os.path.join(os.path.dirname(__file__), "dai3_stereo_capture_port_continuos.py")
 
-# todo send capture name - capture name is not updating
 
 # ----- Command sender -----
 def send_command(port, cmd):
