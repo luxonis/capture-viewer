@@ -96,7 +96,7 @@ class MultiDeviceControlApp:
         self.launch_button = ttk.Button(main_frame, text="Launch Devices", command=self.launch_all_devices)
         self.launch_button.grid(row=row, column=0, sticky="w", padx=(0, 10))
 
-        exit_button = ttk.Button(main_frame, text="Exit Devices", command=self.exit)
+        exit_button = ttk.Button(main_frame, text="Exit Devices", command=self.exit_devices)
         exit_button.grid(row=row, column=2, sticky="e")
 
         row += 1
@@ -344,10 +344,11 @@ class MultiDeviceControlApp:
 
         self.set_message(f"{'ON' if self.projectors_on else 'OFF'}")
 
-    def exit(self):
+    def exit_devices(self):
+        self.running = False
         if not self.running:
             threading.Thread(target=self._finalize_exit, daemon=True).start()
-        self.running = False
+
         self.set_message("Exiting")
 
     def end_capture(self):
@@ -358,9 +359,9 @@ class MultiDeviceControlApp:
             send_command(port, 'cleanup')
 
     def _finalize_exit(self):
+        self.end_capture()
         time.sleep(0.5)
         for device, port in self.device_ports.items():
-            send_command(port, 'cleanup')
             response = send_command(port, "exit")
             if response.get("status") == "shutting_down":
                 self.status_vars[device].set("Shutting down")
