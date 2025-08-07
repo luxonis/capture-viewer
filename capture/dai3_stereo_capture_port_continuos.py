@@ -52,8 +52,9 @@ def cleanup_empty_folders(folder_list):
                 print(f"[Cleanup Error] Could not remove {folder}: {e}")
 
 
+view_name = None
 def main(args):
-    settings_path, view_name, ip, autostart, autostart_time, wait_end, show_streams, alternating = process_argument_logic(args)
+    settings_path, _, ip, autostart, autostart_time, wait_end, show_streams, alternating = process_argument_logic(args)
 
     root_path = args.output
 
@@ -242,6 +243,7 @@ def main(args):
                             socket.send_json({"count": num_captures[mxid]})
 
                         elif msg["cmd"] == "set_capture_name":
+                            global view_name
                             view_name = msg.get("name")
                             socket.send_json({"status": "ok"})
                             status = 'view_name_changed'
@@ -249,9 +251,10 @@ def main(args):
                         elif cmd == "inicialize":
                             # Initialize output folders
                             num_captures = {mxid: 0}
-                            out_dir_on = initialize_capture(root_path, device, settings_path, view_name, projector=True)
-                            out_dir_off = initialize_capture(root_path, device, settings_path, view_name, projector=False)
-                            print(out_dir_on)
+                            os.makedirs(root_path, exist_ok=True)
+                            os.makedirs(os.path.join(root_path, view_name), exist_ok=True)
+                            out_dir_on = initialize_capture(os.path.join(root_path, view_name), device, settings_path, view_name, projector=True)
+                            out_dir_off = initialize_capture(os.path.join(root_path, view_name), device, settings_path, view_name, projector=False)
                             output_folders[mxid][True] = out_dir_on
                             output_folders[mxid][False] = out_dir_off
                             socket.send_json({"status": "inicialized"})

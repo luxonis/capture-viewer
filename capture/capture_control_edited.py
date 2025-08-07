@@ -27,7 +27,6 @@ print("Environment:", env)
 capture_script = os.path.join(os.path.dirname(__file__), "dai3_stereo_capture_port_continuos.py")
 
 # todo send capture name - capture name is not updating
-# todo fix counting
 
 # ----- Command sender -----
 def send_command(port, cmd):
@@ -167,7 +166,7 @@ class MultiDeviceControlApp:
 
         # ➕ Log status history
         self.status_history[device].append(status)
-        print(f"[{device}] Status update: {status}")  # Optional logging to console
+        # print(f"[{device}] Status update: {status}")  # Optional logging to console
 
         label = self.status_labels[device]
         if status.lower() == "ready":
@@ -292,7 +291,6 @@ class MultiDeviceControlApp:
         while self.running:
             for device, port in self.device_ports.items():
                 counts[port] = self.get_count(port)
-            print(counts)
             if max_captures is not None and all(count >= max_captures for count in counts.values()):
                 self.running = False
                 break
@@ -380,8 +378,7 @@ class MultiDeviceControlApp:
 
         script_dir = os.path.dirname(os.path.abspath(__file__))
         capture_name = self.get_current_capture_name()
-        root_path = os.path.join(os.path.dirname(script_dir), 'DATA', capture_name)
-        os.makedirs(root_path, exist_ok=True)
+        root_path = os.path.join(os.path.dirname(script_dir), 'DATA')
 
         for port, config in devices_config.items():
             args = [
