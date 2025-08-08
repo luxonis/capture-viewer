@@ -57,11 +57,13 @@ def initialize_pipeline(pipeline, settings):
         sync = pipeline.create(dai.node.Sync)
         sync.setRunOnHost(settings['sync_on_host'])  # Can also run on device
 
-        if output_settings["depth"]:
+        if output_settings["depth"] or output_settings["disparity"]:
             stereo.syncedLeft.link(sync.inputs["left"])
             stereo.syncedRight.link(sync.inputs["right"])
-            stereo.disparity.link(sync.inputs["disparity"])
-            stereo.depth.link(sync.inputs["depth"])
+            if output_settings["depth"]:
+                stereo.depth.link(sync.inputs["depth"])
+            if output_settings["disparity"]:
+                stereo.disparity.link(sync.inputs["disparity"])
         else:
             monoLeftOut.link(sync.inputs["left"])
             monoRightOut.link(sync.inputs["right"])
@@ -79,16 +81,20 @@ def initialize_pipeline(pipeline, settings):
         queues["sync"] = sync.out.createOutputQueue()
 
     elif not output_settings["sync"]:
-        if output_settings["depth"]:
+        if output_settings["depth"] or output_settings["disparity"]:
             syncedLeftQueue = stereo.syncedLeft.createOutputQueue()
             syncedRightQueue = stereo.syncedRight.createOutputQueue()
-            disparityQueue = stereo.disparity.createOutputQueue()
-            depthQueue = stereo.depth.createOutputQueue()
 
             queues['left'] = syncedLeftQueue
             queues['right'] = syncedRightQueue
-            queues['disparity'] = disparityQueue
-            queues['depth'] = depthQueue
+
+            if output_settings["depth"]:
+                depthQueue = stereo.depth.createOutputQueue()
+                queues['depth'] = depthQueue
+
+            if output_settings["disparity"]:
+                disparityQueue = stereo.disparity.createOutputQueue()
+                queues['disparity'] = disparityQueue
 
         else:
             queues['left'] = monoLeftOut.createOutputQueue()
