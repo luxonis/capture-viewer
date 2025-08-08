@@ -46,7 +46,7 @@ def initialize_pipeline(pipeline, settings):
 
 
 
-    if output_settings["depth"] or output_settings["disparity"]:
+    if output_settings["hw_sync"] or output_settings["depth"] or output_settings["disparity"]:
         stereo = set_stereo_node(pipeline, settings)
         monoLeftOut.link(stereo.left)
         monoRightOut.link(stereo.right)
@@ -57,7 +57,7 @@ def initialize_pipeline(pipeline, settings):
         sync = pipeline.create(dai.node.Sync)
         sync.setRunOnHost(settings['sync_on_host'])  # Can also run on device
 
-        if output_settings["depth"] or output_settings["disparity"]:
+        if output_settings["hw_sync"] or output_settings["depth"] or output_settings["disparity"]:
             stereo.syncedLeft.link(sync.inputs["left"])
             stereo.syncedRight.link(sync.inputs["right"])
             if output_settings["depth"]:
@@ -81,7 +81,7 @@ def initialize_pipeline(pipeline, settings):
         queues["sync"] = sync.out.createOutputQueue()
 
     elif not output_settings["sync"]:
-        if output_settings["depth"] or output_settings["disparity"]:
+        if output_settings["hw_sync"] or output_settings["depth"] or output_settings["disparity"]:
             syncedLeftQueue = stereo.syncedLeft.createOutputQueue()
             syncedRightQueue = stereo.syncedRight.createOutputQueue()
 
