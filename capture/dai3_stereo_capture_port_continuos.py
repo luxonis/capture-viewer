@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from os import mkdir
 
 import depthai as dai
 import numpy as np
@@ -26,6 +27,7 @@ from utils.isp_control import initialize_mono_control, controlQueueSend
 
 from pipelines.dai3_stereo_pipeline import initialize_pipeline
 
+
 def save_frame(name, cvFrame, output_folders, mxid, timestamp, projector_on):
     if name in ['left', 'right']:
         if len(cvFrame.shape) == 3:
@@ -38,6 +40,7 @@ def cleanup_empty_folders(folder_list):
         if not os.path.isdir(folder):
             continue
         contents = set(os.listdir(folder))
+        # print(contents)
         if contents.issubset(whitelist) or len(contents) == 0:
             print(f"[Cleanup] Removing unused folder: {folder}")
             try:
@@ -48,8 +51,9 @@ def cleanup_empty_folders(folder_list):
                 print(f"[Cleanup Error] Could not remove {folder}: {e}")
 
 
+view_name = None
 def main(args):
-    settings_path, view_name, ip, autostart, autostart_time, wait_end, show_streams, alternating = process_argument_logic(args)
+    settings_path, _, ip, autostart, autostart_time, wait_end, show_streams, alternating = process_argument_logic(args)
 
     root_path = args.output
 
@@ -78,10 +82,10 @@ def main(args):
     output_folders = {}
     output_folders[mxid] = {}
     num_captures = {mxid: 0}
-    frame_num = 0
     projector_on = False
 
-    capture_ended = False
+    saving = False
+
 
     streams = count_output_streams(settings['output_settings'])
     print(f"Streams: {streams}")
@@ -102,12 +106,6 @@ def main(args):
         if settings['flood_light']:
             device.setIrFloodLightIntensity(settings['flood_light_intensity'])
 
-        # Initialize output folders
-        out_dir_on = initialize_capture(root_path, device, settings_path, view_name, projector=True)
-        out_dir_off = initialize_capture(root_path, device, settings_path, view_name, projector=False)
-        output_folders[mxid][True] = out_dir_on
-        output_folders[mxid][False] = out_dir_off
-
         print(f"Listening for commands on port {args.port}...")
         status = "ready"
 
@@ -116,7 +114,7 @@ def main(args):
                 # --- Frame streaming ---
                 if settings["output_settings"]["sync"]:
                     start_wait = time.time()
-                    timeout_ms = 500  # max wait for frame availability
+                    timeout_ms = 50  # max wait for frame availability
                     while not q['sync'].has():
                         if (time.time() - start_wait) > (timeout_ms / 1000):
                             break
@@ -128,10 +126,17 @@ def main(args):
                                 cvFrame = unpackRaw10(dataRaw, msg.getWidth(), msg.getHeight(), msg.getStride())
                             else:
                                 cvFrame = msg.getCvFrame()
+
                             if show_streams:
                                 visualize_frame(device_name + " " + name + " " + str(args.port), cvFrame, int(time.time() * 1000), mxid)
                             elif name == 'left':
-                                visualize_frame_info(device_name + " " + name + " " + str(args.port), cvFrame, int(time.time() * 1000), mxid, streams, None)
+                                visualize_frame_info(device_name + " " + name + " " + str(args.port), cvFrame, int(time.time() * 1000), mxid, streams, saving)
+
+                            if saving:
+                                timestamp = int(msg.getTimestamp().total_seconds() * 1000)
+                                save_frame(name, cvFrame, output_folders, mxid, timestamp, projector_on)
+                                num_captures[mxid] += 1
+                                status = f"captured: {num_captures[mxid]}"
                     else:
                         print("Timeout waiting for sync queue.")
                 else:
@@ -147,10 +152,16 @@ def main(args):
                             if show_streams:
                                 visualize_frame(device_name + " " + name+" "+str(args.port), cvFrame, int(time.time() * 1000), mxid)
                             elif name == 'left':
-                                visualize_frame_info(device_name + " " + name+" "+str(args.port), cvFrame, int(time.time() * 1000), mxid, streams, None)
+                                visualize_frame_info(device_name + " " + name+" "+str(args.port), cvFrame, int(time.time() * 1000), mxid, streams, saving)
+
+                            if saving:
+                                timestamp = int(frame.getTimestamp().total_seconds() * 1000)
+                                save_frame(name, cvFrame, output_folders, mxid, timestamp, projector_on)
+                                num_captures[mxid] += 1
+                                status = f"captured: {num_captures[mxid]}"
 
                 # --- Command handling ---
-                socks = dict(poller.poll(timeout=1))
+                socks = dict(poller.poll(timeout=500))
                 if socket in socks and socks[socket] == zmq.POLLIN:
                     try:
                         msg = socket.recv_json()
@@ -171,55 +182,88 @@ def main(args):
                             status = "projector off"
 
 
-                        elif cmd == "capture_frame":
-                            status = "capturing"
-                            captured = 0
-                            timeout_ms = 500  # max wait for frame availability
-                            if settings["output_settings"]["sync"]:
-                                start_wait = time.time()
-                                while not q['sync'].has():
-                                    if (time.time() - start_wait) > (timeout_ms / 1000):
-                                        break
-                                if q['sync'].has():
-                                    msgGrp = q['sync'].get()
-                                    for name, msg in msgGrp:
-                                        if 'raw' in name:
-                                            dataRaw = msg.getData()
-                                            cvFrame = unpackRaw10(dataRaw, msg.getWidth(), msg.getHeight(), msg.getStride())
-                                        else:
-                                            cvFrame = msg.getCvFrame()
-                                        timestamp = int(msg.getTimestamp().total_seconds() * 1000)
-                                        save_frame(name, cvFrame, output_folders, mxid, timestamp, projector_on)
-                                        captured += 1
-                                else:
-                                    print("Timeout waiting for sync queue.")
-                            else:
-                                for name, queue in q.items():
-                                    start_wait = time.time()
-                                    while not queue.has():
-                                        if (time.time() - start_wait) > (timeout_ms / 1000):
-                                            print(f"Timeout waiting for frame: {name}")
-                                            break
-                                    if queue.has():
-                                        frame = queue.get()
-                                        if 'raw' in name:
-                                            dataRaw = frame.getData()
-                                            cvFrame = unpackRaw10(dataRaw, frame.getWidth(), frame.getHeight(),
-                                                                  frame.getStride())
-                                        else:
-                                            cvFrame = frame.getCvFrame()
-                                        timestamp = int(frame.getTimestamp().total_seconds() * 1000)
-                                        save_frame(name, cvFrame, output_folders, mxid, timestamp, projector_on)
-                                        captured += 1
-                            num_captures[mxid] += captured
-                            print(f"Captured {captured} frames")
-                            socket.send_json({"status": "ok", "frames": captured})
+                        # elif cmd == "capture_frame":
+                        #     status = "capturing"
+                        #     captured = 0
+                        #     timeout_ms = 500  # max wait for frame availability
+                        #     if settings["output_settings"]["sync"]:
+                        #         start_wait = time.time()
+                        #         while not q['sync'].has():
+                        #             if (time.time() - start_wait) > (timeout_ms / 1000):
+                        #                 break
+                        #         if q['sync'].has():
+                        #             msgGrp = q['sync'].get()
+                        #             for name, msg in msgGrp:
+                        #                 if 'raw' in name:
+                        #                     dataRaw = msg.getData()
+                        #                     cvFrame = unpackRaw10(dataRaw, msg.getWidth(), msg.getHeight(), msg.getStride())
+                        #                 else:
+                        #                     cvFrame = msg.getCvFrame()
+                        #                 timestamp = int(msg.getTimestamp().total_seconds() * 1000)
+                        #                 save_frame(name, cvFrame, output_folders, mxid, timestamp, projector_on)
+                        #                 captured += 1
+                        #         else:
+                        #             print("Timeout waiting for sync queue.")
+                        #     else:
+                        #         for name, queue in q.items():
+                        #             start_wait = time.time()
+                        #             while not queue.has():
+                        #                 if (time.time() - start_wait) > (timeout_ms / 1000):
+                        #                     print(f"Timeout waiting for frame: {name}")
+                        #                     break
+                        #             if queue.has():
+                        #                 frame = queue.get()
+                        #                 if 'raw' in name:
+                        #                     dataRaw = frame.getData()
+                        #                     cvFrame = unpackRaw10(dataRaw, frame.getWidth(), frame.getHeight(),
+                        #                                           frame.getStride())
+                        #                 else:
+                        #                     cvFrame = frame.getCvFrame()
+                        #                 timestamp = int(frame.getTimestamp().total_seconds() * 1000)
+                        #                 save_frame(name, cvFrame, output_folders, mxid, timestamp, projector_on)
+                        #                 captured += 1
+                        #     num_captures[mxid] += captured
+                        #     print(f"Captured {captured} frames")
+                        #     socket.send_json({"status": "ok", "frames": captured})
+
+                        elif cmd == "capturing_on":
+                            saving = True
+                            socket.send_json({"status": "ok"})
+
+                        elif cmd == "capturing_off":
+                            saving = False
+                            socket.send_json({"status": "ok"})
+                            status = 'ready'
 
                         elif cmd == "status":
                             socket.send_json({"status": status})
 
+                        elif cmd == "count":
+                            socket.send_json({"count": num_captures[mxid]})
+
+                        elif msg["cmd"] == "set_capture_name":
+                            global view_name
+                            view_name = msg.get("name")
+                            socket.send_json({"status": "ok"})
+                            status = 'view_name_changed'
+
+                        elif cmd == "inicialize":
+                            # Initialize output folders
+                            num_captures = {mxid: 0}
+                            os.makedirs(root_path, exist_ok=True)
+                            os.makedirs(os.path.join(root_path, view_name), exist_ok=True)
+                            out_dir_on = initialize_capture(os.path.join(root_path, view_name), device, settings_path, view_name, projector=True)
+                            out_dir_off = initialize_capture(os.path.join(root_path, view_name), device, settings_path, view_name, projector=False)
+                            output_folders[mxid][True] = out_dir_on
+                            output_folders[mxid][False] = out_dir_off
+                            socket.send_json({"status": "inicialized"})
+
                         elif cmd == "cleanup":
-                            cleanup_empty_folders([...])
+                            try:
+                                cleanup_empty_folders([output_folders[mxid][True],
+                                                       output_folders[mxid][False]])
+                            except KeyError:
+                                pass
                             socket.send_json({"status": "cleaned"})
 
                         elif cmd == "exit":
@@ -232,8 +276,8 @@ def main(args):
 
                     except Exception as e:
                         print("Exception during command handling:", e)
-                        raise e
                         socket.send_json({"status": "error", "detail": str(e)})
+                        raise e
 
                 key = cv2.waitKey(1)
                 if key == ord('q'):
@@ -255,10 +299,11 @@ def main(args):
             finalise_capture(end_time - 5, end_time, num_captures[mxid], streams)
             pipeline.stop()
             print("Pipeline stopped.")
-            cleanup_empty_folders([
-                output_folders[mxid][True],
-                output_folders[mxid][False]
-            ])
+            try:
+                cleanup_empty_folders([output_folders[mxid][True],
+                                       output_folders[mxid][False]])
+            except KeyError:
+                pass
 
 if __name__ == "__main__":
     args = parseArguments(root_path)
