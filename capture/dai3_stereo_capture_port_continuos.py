@@ -259,8 +259,11 @@ def main(args):
                             socket.send_json({"status": "inicialized"})
 
                         elif cmd == "cleanup":
-                            cleanup_empty_folders([output_folders[mxid][True],
-                                                   output_folders[mxid][False]])
+                            try:
+                                cleanup_empty_folders([output_folders[mxid][True],
+                                                       output_folders[mxid][False]])
+                            except KeyError:
+                                pass
                             socket.send_json({"status": "cleaned"})
 
                         elif cmd == "exit":
@@ -296,10 +299,11 @@ def main(args):
             finalise_capture(end_time - 5, end_time, num_captures[mxid], streams)
             pipeline.stop()
             print("Pipeline stopped.")
-            cleanup_empty_folders([
-                output_folders[mxid][True],
-                output_folders[mxid][False]
-            ])
+            try:
+                cleanup_empty_folders([output_folders[mxid][True],
+                                       output_folders[mxid][False]])
+            except KeyError:
+                pass
 
 if __name__ == "__main__":
     args = parseArguments(root_path)
