@@ -24,8 +24,7 @@ env = os.environ.get("CONDA_DEFAULT_ENV") or (
 )
 print("Environment:", env)
 
-capture_script = os.path.join(os.path.dirname(__file__), "dai3_stereo_capture_port_continuos.py")
-
+capture_script = os.path.join(os.path.dirname(__file__), "dai3_stereo_capture_port.py")
 
 # ----- Command sender -----
 def send_command(port, cmd):
@@ -64,7 +63,6 @@ class MultiDeviceControlApp:
         self.root.title("Multi-Device Capture Controller")
         self.device_ports = {f"Device {i+1}": int(port) for i, port in enumerate(devices_config.keys())}
         self.status_vars = {name: tk.StringVar(value="Disconnected") for name in self.device_ports}
-        self.status_history = {device: [] for device in self.device_ports}
         self.status_labels = {}
         self.restart_buttons = {}
         self.running = False
@@ -75,48 +73,57 @@ class MultiDeviceControlApp:
 
     def build_ui(self):
         style = ttk.Style()
-        style.theme_use('default')  # Ensure theme allows custom styles
         style.configure("On.TButton", foreground="white", background="green")
         style.configure("Off.TButton", foreground="white", background="red")
-        style.configure("Start.TButton", background="yellow", foreground="black")
-        style.map("Start.TButton",
-                  background=[("active", "#f7d200")],
-                  foreground=[("disabled", "gray")])
 
         self.message_var = tk.StringVar(value="Idle")
         self.capture_name_var = tk.StringVar(value="test_capture")
-        self.max_captures_var = tk.StringVar(value="Unlimited")
-
         main_frame = ttk.Frame(self.root, padding=10)
         main_frame.grid(row=0, column=0, sticky="nsew")
 
-        row = 0
+        ttk.Label(main_frame, text="Capture Name:").grid(row=0, column=0, sticky="e")
+        entry = ttk.Entry(main_frame, textvariable=self.capture_name_var)
+        entry.grid(row=0, column=1, sticky="w")
 
-        # === Row 0: Launch (left), Exit (right) ===
-        self.launch_button = ttk.Button(main_frame, text="Launch Devices", command=self.launch_all_devices)
-        self.launch_button.grid(row=row, column=0, sticky="w", padx=(0, 10))
+        self.launch_button = ttk.Button(main_frame, text="Launch Capture", command=self.launch_all_devices, state="enabled")
+        self.launch_button.grid(row=0, column=2, pady=(0, 10), padx=5)
 
-        exit_button = ttk.Button(main_frame, text="Exit Devices", command=self.exit_devices)
-        exit_button.grid(row=row, column=2, sticky="e")
+        row = 1
+        for device, port in self.device_ports.items():
+            ttk.Label(main_frame, text=f"{device} (Port {port})").grid(row=row, column=0, sticky="w")
+            label = ttk.Label(main_frame, textvariable=self.status_vars[device])
+            label.grid(row=row, column=1, sticky="w")
+            self.status_labels[device] = label
+
+            restart_btn = ttk.Button(main_frame, text="Restart", command=lambda p=port: self.restart_device(p))
+            restart_btn.grid(row=row, column=2, padx=5)
+            restart_btn.grid_remove()  # hidden by default
+            self.restart_buttons[device] = restart_btn
+
+            row += 1
+
+        self.start_sequence_button = ttk.Button(main_frame, text="Start Capture Sequence", command=self.start_sequence, state="disabled")
+        self.start_sequence_button.grid(row=row, column=0, pady=10)
+        ttk.Button(main_frame, text="End Capture (Exit)", command=self.end_capture).grid(row=row, column=2, pady=10)
+
+        # Message Label
+        row += 1
+
+        self.projector_toggle_button = ttk.Button(main_frame, text="Projector OFF",
+                                                  command=self.toggle_projectors)
+        self.projector_toggle_button.config(style="Off.TButton")
+        self.projector_toggle_button.grid(row=row, column=1, pady=(5, 10))
+        self.projectors_on = False
+
+        self.simple_sequence_button = ttk.Button(main_frame, text="Start Simple Capture", command=self.start_simple_sequence, state="disabled")
+        self.simple_sequence_button.grid(row=row, column=0, pady=10)
 
         row += 1
 
-        # === Row 1: Start Controls in their own frame ===
-        start_controls_frame = ttk.LabelFrame(main_frame, text="Capture Controls", padding=(10, 5))
-        start_controls_frame.grid(row=row, column=0, columnspan=3, sticky="ew", pady=(10, 5))
+        ttk.Label(main_frame, text="Max Captures:").grid(row=row, column=0, sticky="e")
+        max_caps_entry = ttk.Entry(main_frame, textvariable=self.max_captures_var, foreground='gray')
+        max_caps_entry.grid(row=row, column=1, sticky="w")
 
-        # --- Capture Name ---
-        ttk.Label(start_controls_frame, text="Capture Name:").grid(row=0, column=0, sticky="e")
-        entry = ttk.Entry(start_controls_frame, textvariable=self.capture_name_var)
-        entry.grid(row=0, column=1, sticky="w", padx=(0, 10))
-
-        # --- Max Captures ---
-        ttk.Label(start_controls_frame, text="Max Captures:").grid(row=0, column=2, sticky="e")
-        max_caps_entry = ttk.Entry(start_controls_frame, textvariable=self.max_captures_var, foreground='gray',
-                                   width=12)
-        max_caps_entry.grid(row=0, column=3, sticky="w")
-
-        # Placeholder text behavior
         def on_focus_in(event):
             if self.max_captures_var.get() == "Unlimited":
                 self.max_captures_var.set("")
@@ -130,53 +137,18 @@ class MultiDeviceControlApp:
         max_caps_entry.bind("<FocusIn>", on_focus_in)
         max_caps_entry.bind("<FocusOut>", on_focus_out)
 
-        # --- Start/Stop Controls ---
-        self.start_sequence_button = ttk.Button(start_controls_frame, text="Start Alternating Capture",
-                                                command=self.start_sequence, state="disabled", style="Start.TButton")
-        self.start_sequence_button.grid(row=1, column=0, padx=5, pady=5)
-
-        self.simple_sequence_button = ttk.Button(start_controls_frame, text="Start Simple Capture",
-                                                 command=self.start_simple_sequence, state="disabled",
-                                                 style="Start.TButton")
-        self.simple_sequence_button.grid(row=1, column=1, padx=5, pady=5)
-
-        self.projector_toggle_button = ttk.Button(start_controls_frame, text="Projector OFF",
-                                                  command=self.toggle_projectors)
-        self.projector_toggle_button.config(style="Off.TButton")
-        self.projector_toggle_button.grid(row=1, column=2, padx=5, pady=5)
-        self.projectors_on = False
-
-        ttk.Button(start_controls_frame, text="End Capture", command=self.end_capture).grid(row=1, column=3, padx=5,
-                                                                                            pady=5)
-
         row += 1
-
-        # === Device Statuses ===
-        for device, port in self.device_ports.items():
-            ttk.Label(main_frame, text=f"{device} (Port {port})").grid(row=row, column=0, sticky="w")
-            label = ttk.Label(main_frame, textvariable=self.status_vars[device])
-            label.grid(row=row, column=1, sticky="w")
-            self.status_labels[device] = label
-
-            restart_btn = ttk.Button(main_frame, text="Restart", command=lambda p=port: self.restart_device(p))
-            restart_btn.grid(row=row, column=2, padx=5)
-            restart_btn.grid_remove()
-            self.restart_buttons[device] = restart_btn
-
-            row += 1
-
-        # === Final Row: Status Message ===
-        ttk.Label(main_frame, textvariable=self.message_var, foreground="blue").grid(row=row, column=0, sticky="w",
-                                                                                     pady=(10, 0))
+        ttk.Label(main_frame, textvariable=self.message_var, foreground="blue").grid(row=row, column=0, columnspan=3,
+                                                                                     sticky="w", pady=(10, 0))
 
     def poll_statuses(self):
         for device, port in self.device_ports.items():
             threading.Thread(target=self.update_status, args=(device, port), daemon=True).start()
         if not self.running: self.check_launch_ready()
-        self.root.after(200, self.poll_statuses)
+        self.root.after(500, self.poll_statuses)
 
     def check_launch_ready(self):
-        self.all_ready = all(self.status_vars[device].get().lower() in ["ready", "projector on", "projector off"] for device in self.device_ports)
+        self.all_ready = self.all_ready = all(self.status_vars[device].get().lower() in ["ready", "projector on", "projector off"] for device in self.device_ports)
 
         if self.all_ready:
             self.start_sequence_button.config(state="enabled")
@@ -187,10 +159,6 @@ class MultiDeviceControlApp:
         response = send_command(port, "status")
         status = response.get("status", "unknown")
         self.status_vars[device].set(status)
-
-        # ➕ Log status history
-        self.status_history[device].append(status)
-        # print(f"[{device}] Status update: {status}")  # Optional logging to console
 
         label = self.status_labels[device]
         if status.lower() == "ready":
@@ -206,36 +174,14 @@ class MultiDeviceControlApp:
     def set_message(self, msg):
         self.message_var.set(msg)
 
-    def get_count(self, port):
-        response = send_command(port, "count")
-        status = response.get("count", 0)
-        return int(status)
-
-    def send_capture_name(self, port, name):
-        try:
-            socket = context.socket(zmq.REQ)
-            socket.setsockopt(zmq.RCVTIMEO, 1000)
-            socket.setsockopt(zmq.LINGER, 0)
-            socket.connect(f"tcp://localhost:{port}")
-            socket.send_json({"cmd": "set_capture_name", "name": name})
-            response = socket.recv_json()
-            return response
-        except Exception as e:
-            return {"status": "error", "detail": str(e)}
-        finally:
-            socket.close()
-
-
     def start_sequence(self):
         for device, port in self.device_ports.items():
-            send_command(port, "capturing_off")
             send_command(port, "projector_off")
         self.set_message("Turning off all projectors...")
         time.sleep(0.5)
 
         if not self.all_ready:
             return
-
         self.start_sequence_button.config(state="disabled")
         self.simple_sequence_button.config(state="disabled")
         self.set_message("Capturing...")
@@ -249,41 +195,27 @@ class MultiDeviceControlApp:
         except Exception:
             max_captures = None
 
-        for device, port in self.device_ports.items():
-            self.send_capture_name(port, self.get_current_capture_name())
-            send_command(port, "inicialize")
-
-        counts = {port:0 for device, port in self.device_ports.items()}
-        while self.running:
+        count = 0
+        while self.running and (max_captures is None or count < max_captures):
+            time.sleep(0.5)
             for device, port in self.device_ports.items():
-                send_command(port, "capturing_on")
-            time.sleep(1)
+                self.status_vars[device].set("Capturing (off)")
+                send_command(port, "capture_frame")
 
             for device, port in self.device_ports.items():
-                send_command(port, "capturing_off")
-
-            for device, port in self.device_ports.items():
+                self.status_vars[device].set("Projector ON")
                 send_command(port, "projector_on")
-                time.sleep(3)
-                send_command(port, "capturing_on")
                 time.sleep(1)
-                send_command(port, "capturing_off")
+                self.status_vars[device].set("Capturing (on)")
+                send_command(port, "capture_frame")
+                self.status_vars[device].set("Projector OFF")
                 send_command(port, "projector_off")
-            time.sleep(3)
+                self.status_vars[device].set("Done")
 
-            for device, port in self.device_ports.items():
-                counts[port] = self.get_count(port)
-            print(counts)
-            if max_captures is not None and all(count >= max_captures for count in counts.values()):
-                self.running = False
-                break
+            count += 1
 
         self.running = False
-
-        for device, port in self.device_ports.items(): # turn of explicitly just to be sure
-            send_command(port, "capturing_off")
-
-        self.set_message("Capture ended, devices are still running.")
+        threading.Thread(target=self._finalize_exit, daemon=True).start()
 
     def start_simple_sequence(self):
         if not self.all_ready:
@@ -302,29 +234,16 @@ class MultiDeviceControlApp:
         except Exception:
             max_captures = None
 
-        for device, port in self.device_ports.items():
-            self.send_capture_name(port, self.get_current_capture_name())
-            time.sleep(0.5)
-            send_command(port, "inicialize")
-            time.sleep(0.5)
-
-        for device, port in self.device_ports.items():
-            send_command(port, "capturing_on")
-
-        counts = {port:0 for device, port in self.device_ports.items()}
-        while self.running:
+        count = 0
+        while self.running and (max_captures is None or count < max_captures):
+            time.sleep(0.05)
             for device, port in self.device_ports.items():
-                counts[port] = self.get_count(port)
-            if max_captures is not None and all(count >= max_captures for count in counts.values()):
-                self.running = False
-                break
-            time.sleep(0.5)
+                self.status_vars[device].set(f"Capturing: {count}")
+                send_command(port, "capture_frame")
+            count += 1
 
         self.running = False
-
-        for device, port in self.device_ports.items():  # turn of explicitly just to be sure
-            send_command(port, "capturing_off")
-
+        threading.Thread(target=self._finalize_exit, daemon=True).start()
 
     def toggle_projectors(self):
         cmd = "projector_on" if not self.projectors_on else "projector_off"
@@ -344,22 +263,13 @@ class MultiDeviceControlApp:
 
         self.set_message(f"{'ON' if self.projectors_on else 'OFF'}")
 
-    def exit_devices(self):
-        self.running = False
+    def end_capture(self):
         if not self.running:
             threading.Thread(target=self._finalize_exit, daemon=True).start()
-
-        self.set_message("Exiting")
-
-    def end_capture(self):
         self.running = False
         self.set_message("Capture ending..")
 
-        for device, port in self.device_ports.items():
-            send_command(port, 'cleanup')
-
     def _finalize_exit(self):
-        self.end_capture()
         time.sleep(0.5)
         for device, port in self.device_ports.items():
             response = send_command(port, "exit")
@@ -390,25 +300,21 @@ class MultiDeviceControlApp:
         kill_process_on_port(int(port))
         subprocess.Popen(args)
 
-    def get_current_capture_name(self):
-        capture_name = self.capture_name_var.get()
-        if " " in capture_name:
-            print("Capture name must not contain spaces.")
-            self.set_message("Capture name must not contain spaces.")
-            return
-        return capture_name
-
     def launch_all_devices(self):
         self.set_message("Launching devices...")
-
+        capture_name = self.capture_name_var.get()
 
         self.projector_toggle_button.config(text="Projector OFF")
         self.projector_toggle_button.config(style="Off.TButton")
 
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        capture_name = self.get_current_capture_name()
-        root_path = os.path.join(os.path.dirname(script_dir), 'DATA')
+        root_path = os.path.join(os.path.dirname(script_dir), 'DATA', capture_name)
+        os.makedirs(root_path, exist_ok=True)
 
+        if " " in capture_name:
+            print("Capture name must not contain spaces.")
+            self.set_message("Capture name must not contain spaces.")
+            return
         for port, config in devices_config.items():
             args = [
                 "conda", "run", "-n", env, "python", capture_script,

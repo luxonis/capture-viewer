@@ -181,51 +181,6 @@ def main(args):
                             socket.send_json({"status": "ok"})
                             status = "projector off"
 
-
-                        # elif cmd == "capture_frame":
-                        #     status = "capturing"
-                        #     captured = 0
-                        #     timeout_ms = 500  # max wait for frame availability
-                        #     if settings["output_settings"]["sync"]:
-                        #         start_wait = time.time()
-                        #         while not q['sync'].has():
-                        #             if (time.time() - start_wait) > (timeout_ms / 1000):
-                        #                 break
-                        #         if q['sync'].has():
-                        #             msgGrp = q['sync'].get()
-                        #             for name, msg in msgGrp:
-                        #                 if 'raw' in name:
-                        #                     dataRaw = msg.getData()
-                        #                     cvFrame = unpackRaw10(dataRaw, msg.getWidth(), msg.getHeight(), msg.getStride())
-                        #                 else:
-                        #                     cvFrame = msg.getCvFrame()
-                        #                 timestamp = int(msg.getTimestamp().total_seconds() * 1000)
-                        #                 save_frame(name, cvFrame, output_folders, mxid, timestamp, projector_on)
-                        #                 captured += 1
-                        #         else:
-                        #             print("Timeout waiting for sync queue.")
-                        #     else:
-                        #         for name, queue in q.items():
-                        #             start_wait = time.time()
-                        #             while not queue.has():
-                        #                 if (time.time() - start_wait) > (timeout_ms / 1000):
-                        #                     print(f"Timeout waiting for frame: {name}")
-                        #                     break
-                        #             if queue.has():
-                        #                 frame = queue.get()
-                        #                 if 'raw' in name:
-                        #                     dataRaw = frame.getData()
-                        #                     cvFrame = unpackRaw10(dataRaw, frame.getWidth(), frame.getHeight(),
-                        #                                           frame.getStride())
-                        #                 else:
-                        #                     cvFrame = frame.getCvFrame()
-                        #                 timestamp = int(frame.getTimestamp().total_seconds() * 1000)
-                        #                 save_frame(name, cvFrame, output_folders, mxid, timestamp, projector_on)
-                        #                 captured += 1
-                        #     num_captures[mxid] += captured
-                        #     print(f"Captured {captured} frames")
-                        #     socket.send_json({"status": "ok", "frames": captured})
-
                         elif cmd == "capturing_on":
                             saving = True
                             socket.send_json({"status": "ok"})
