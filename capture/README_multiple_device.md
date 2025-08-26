@@ -23,7 +23,7 @@ python capture/capture_control.py
 🧪 This will open a graphical interface showing all devices, their status, and control buttons.
 
 ## 📁 Where to Specify Devices
-Edit this file: `capture/devices_config.json`
+Edit this file: `capture/capture_control_config.json`
 
 This JSON defines the list of devices, IPs, ports, and their settings.
 
