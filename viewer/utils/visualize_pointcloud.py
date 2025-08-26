@@ -4,7 +4,7 @@ import json
 import os
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from utils.popup_info import show_popup
+from viewer.utils.popup_info import show_popup
 
 # Global variable to store the JSON information
 custom_information_json = None

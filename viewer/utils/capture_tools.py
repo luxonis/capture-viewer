@@ -3,9 +3,9 @@ import depthai as dai
 import cv2
 import matplotlib.pyplot as plt
 import open3d as o3d
-from utils.pointcloud import rotate_pointcloud
+from viewer.utils.pointcloud import rotate_pointcloud
 from tkinter import *
-import tkinter as tk
+
 
 def extract_calibration_values_old(json_data, width=None, height=None):
     depthSize = (1280, 800)

@@ -1,5 +1,5 @@
 import json
-from .dictionary_tools import *
+from viewer.utils.convert.dictionary_tools import *
 
 def config2settings(config, capture_data):
     if type(config) == str:

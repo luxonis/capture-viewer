@@ -1,9 +1,7 @@
-import time
 import tkinter as tk
-from tkinter import ttk, Tk, filedialog
-import os
+from tkinter import ttk, filedialog
 
-from utils.convert import *
+from viewer.utils.convert import *
 
 # Define a dictionary of default settings
 default_config = {

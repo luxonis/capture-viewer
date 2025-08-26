@@ -31,21 +31,21 @@ def run_capture_script(session, selected_streams, ip):
     session_path = session['session_path']
 
     script_directory = os.path.dirname(os.path.abspath(__file__))
-    # print("Script directory:", script_directory)
-    capture_show_path = os.path.join(script_directory, 'oak_capture_show.py')
-
-    # The command to run the script with the session path and selected streams
+    # Move to parent directory to run as module
+    parent_directory = os.path.dirname(script_directory)
+    
+    # The command to run the script as a module with the session path and selected streams
     command = [
         'python',
-        capture_show_path,
+        '-m', 'viewer.oak_capture_show',
         session_path,
     ] + selected_streams
 
     if ip is not None: command += ['--ip', ip]
 
-    # Run the command as a subprocess
+    # Run the command as a subprocess from the parent directory
     try:
-        subprocess.Popen(command)
+        subprocess.Popen(command, cwd=parent_directory)
         time.sleep(4)
         print(f"Opened capture script for session: {session_path} with streams: {selected_streams}")
     except subprocess.CalledProcessError as e:

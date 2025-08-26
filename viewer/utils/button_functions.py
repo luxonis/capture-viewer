@@ -11,10 +11,10 @@ import subprocess
 import json
 
 
-from utils.alignment import getAlignedDepth, rgbd_to_projection
-from utils.stereo import stereo_rectify, undistort
-from utils.capture_tools import get_calibration_between_sockets, colorize_depth, device_connected
-from utils.ReplayVisualizer import ReplayVisualizer
+from viewer.utils.alignment import getAlignedDepth, rgbd_to_projection
+from viewer.utils.stereo import stereo_rectify, undistort
+from viewer.utils.capture_tools import get_calibration_between_sockets, colorize_depth, device_connected
+from viewer.utils.ReplayVisualizer import ReplayVisualizer
 
 def resize_image(image, square_size):
     if image.dtype != np.uint8:

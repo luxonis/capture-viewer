@@ -2,7 +2,7 @@ import cv2
 import screeninfo
 import numpy as np
 
-from utils.capture_universal import colorize_depth, downscale_to_fit
+from utils import colorize_depth, downscale_to_fit
 
 def visualize_frame(name, frame, timestamp, mxid):
     if name in ["left", "right", "rgb", "left_raw", "right_raw", "rgb_raw"]:

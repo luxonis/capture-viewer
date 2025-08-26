@@ -1,5 +1,5 @@
 import json
-from .dictionary_tools import *
+from viewer.utils.convert.dictionary_tools import *
 
 def settings2config(settings_json):
     config = {}

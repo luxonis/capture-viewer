@@ -1,26 +1,25 @@
+import os
 import numpy as np
 import cv2
 import open3d as o3d
-import tkinter as tk
 import glob
 from datetime import datetime
 from PIL import Image, ImageTk
 import subprocess
-import time
 import platform
 import threading
 from queue import Queue
 
-from utils.capture_tools import (colorize_depth, calculate_scaled_dimensions, get_min_max_depths,
-                                 format_json_for_replay, create_placeholder_frame, process_pointcloud)
-from utils.ReplaySettings import *
-from utils.capture_tools import create_depth_range_frame, get_current_monitor_size
-from utils.convert import *
+from viewer.utils.capture_tools import (colorize_depth, calculate_scaled_dimensions, get_min_max_depths,
+                                        format_json_for_replay, create_placeholder_frame)
+from viewer.utils.ReplaySettings import *
+from viewer.utils.capture_tools import create_depth_range_frame, get_current_monitor_size
+from viewer.utils.convert import *
 
 if __name__ == '__main__':
     from ReplayThread import ReplayThread, ReplayRequest
 else:
-    from .ReplayThread import ReplayThread, ReplayRequest
+    from viewer.utils.ReplayThread import ReplayThread, ReplayRequest
 
 
 class ReplayVisualizer:
@@ -102,7 +101,8 @@ class ReplayVisualizer:
         print("[REPLAY]: Replay threads started.")
 
     def close(self):
-        del self.replay_thread.replayer
+        if hasattr(self, 'replay_thread') and hasattr(self.replay_thread, 'replayer'):
+            del self.replay_thread.replayer
         print("[REPLAY]: Replayer closed")
         self.toplLevel.destroy()
 
@@ -573,7 +573,7 @@ class ReplayVisualizer:
 
 if __name__ == '__main__':
     import depthai as dai
-    from oak_capture_show import load_data, extract_timestamps
+    from viewer.oak_capture_show import load_data, extract_timestamps
 
     root = tk.Tk()
     root.title("Main Application")

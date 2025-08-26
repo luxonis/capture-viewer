@@ -1,5 +1,5 @@
-from .dictionary_tools import *
-from ..popup_info import show_popup
+from viewer.utils.convert.dictionary_tools import *
+from viewer.utils.popup_info import show_popup
 
 def convert_current_button_values_to_config(button_values, frame):
     config = {}

@@ -5,10 +5,10 @@ import tempfile
 import open3d as o3d
 import cv2
 
-from utils.capture_tools import process_pointcloud
+from viewer.utils.capture_tools import process_pointcloud
 
-from depth.replay_depth import Replay
-from depth.stereo_config import StereoConfig
+from viewer.depth.replay_depth import Replay
+from viewer.depth.stereo_config import StereoConfig
 
 class ReplayRequest:
     def __init__(self, left: np.ndarray, right: np.ndarray, calibration, config: dict, section: int, parent_frame = None, color: np.ndarray = None):
