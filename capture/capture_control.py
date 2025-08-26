@@ -19,10 +19,15 @@ with open(CONFIG_FILE) as f:
     devices_config = json.load(f)
 
 import os
-env = os.environ.get("CONDA_DEFAULT_ENV") or (
-    os.path.basename(os.environ.get("VIRTUAL_ENV")) if os.environ.get("VIRTUAL_ENV") else "base"
-)
-print("Environment:", env)
+python_path = os.environ.get("PYTHON_BIN", None)
+if python_path is None:
+    env = os.environ.get("CONDA_DEFAULT_ENV") or (
+        os.path.basename(os.environ.get("VIRTUAL_ENV")) if os.environ.get("VIRTUAL_ENV") else "base"
+    )
+    python_path = ["conda", "run", "-n", env, "python"]
+else:
+    python_path = [python_path,]
+print("Python path:", python_path)
 
 capture_script = os.path.join(os.path.dirname(__file__), "dai3_stereo_capture_port_continuos.py")
 
@@ -381,7 +386,7 @@ class MultiDeviceControlApp:
             return
 
         args = [
-            "conda", "run", "-n", env, "python", capture_script,
+            *python_path, capture_script,
             config["settings"], capture_name,
             "--ip", config["ip"],
             "--port", str(port)
@@ -411,7 +416,7 @@ class MultiDeviceControlApp:
 
         for port, config in devices_config.items():
             args = [
-                "conda", "run", "-n", env, "python", capture_script,
+                *python_path, capture_script,
                 config["settings"], capture_name,
                 "--ip", config["ip"],
                 "--port", str(port),
