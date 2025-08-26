@@ -73,6 +73,7 @@ class MultiDeviceControlApp:
         self.status_labels = {}
         self.restart_buttons = {}
         self.running = False
+        self.save_one_inicialized = False
         self.max_captures_var = tk.StringVar(value="Unlimited")
 
         self.build_ui()
@@ -153,6 +154,8 @@ class MultiDeviceControlApp:
 
         ttk.Button(start_controls_frame, text="End Capture", command=self.end_capture).grid(row=1, column=3, padx=5,
                                                                                             pady=5)
+        self.save_one_button = ttk.Button(start_controls_frame, text="Save One (all devices)", command=self.start_save_one, state="disabled", style="Start.TButton")
+        self.save_one_button.grid(row=2, column=0, padx=5, pady=5)
 
         row += 1
 
@@ -186,6 +189,7 @@ class MultiDeviceControlApp:
         if self.all_ready:
             self.start_sequence_button.config(state="enabled")
             self.simple_sequence_button.config(state="enabled")
+            self.save_one_button.config(state="enabled")
             self.set_message("Devices Ready!")
 
     def update_status(self, device, port):
@@ -349,6 +353,50 @@ class MultiDeviceControlApp:
 
         self.set_message(f"{'ON' if self.projectors_on else 'OFF'}")
 
+    def start_save_one(self):
+        if not self.all_ready:
+            self.set_message("Devices not ready")
+            return
+
+        # Mirror your other flows
+        self.start_sequence_button.config(state="disabled")
+        self.simple_sequence_button.config(state="disabled")
+        self.save_one_button.config(state="disabled")
+        self.set_message("Saving one frame per stream...")
+        self.running = True
+
+        threading.Thread(target=self._run_save_one, daemon=True).start()
+
+    def _run_save_one(self):
+        try:
+            if not self.save_one_inicialized:
+                self.set_message("Inicializing...")
+                for device, port in self.device_ports.items():
+                    self.send_capture_name(port, self.get_current_capture_name())
+                    send_command(port, "inicialize")
+                self.save_one_inicialized = True
+
+            self.set_message("Saving projector OFF...")
+            for device, port in self.device_ports.items():
+                send_command(port, "save_one")
+            time.sleep(1)
+
+            self.set_message("Saving projector ON...")
+            for device, port in self.device_ports.items():
+                send_command(port, "projector_on")
+                time.sleep(3)
+                send_command(port, "save_one")
+                time.sleep(1)
+                send_command(port, "projector_off")
+
+            self.set_message("Saved! Click again to continue")
+
+        except Exception as e:
+            self.set_message(f"Save-one error: {e}")
+
+        finally:
+            self.save_one_button.config(state="enabled")
+
     def exit_devices(self):
         self.running = False
         if not self.running:
@@ -358,6 +406,7 @@ class MultiDeviceControlApp:
 
     def end_capture(self):
         self.running = False
+        self.save_one_inicialized = False
         self.set_message("Capture ending..")
 
         for device, port in self.device_ports.items():

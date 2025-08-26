@@ -85,11 +85,13 @@ def main(args):
     projector_on = False
 
     saving = False
-
+    save_one = False
 
     streams = count_output_streams(settings['output_settings'])
     print(f"Streams: {streams}")
     print(f"Number of streams: {len(streams)}")
+
+    stream_check = {stream: 0 for stream in streams}
 
     with dai.Pipeline(device) as pipeline:
         pipeline, q, input_queues = initialize_pipeline(pipeline, settings)
@@ -137,6 +139,18 @@ def main(args):
                                 save_frame(name, cvFrame, output_folders, mxid, timestamp, projector_on)
                                 num_captures[mxid] += 1
                                 status = f"captured: {num_captures[mxid]}"
+
+                            if save_one:
+                                if name not in stream_check:
+                                    raise ValueError("Something is invalid")
+                                elif stream_check[name] == 0:
+                                    timestamp = int(msg.getTimestamp().total_seconds() * 1000)
+                                    save_frame(name, cvFrame, output_folders, mxid, timestamp, projector_on)
+                                    num_captures[mxid] += 1
+                                    stream_check[name] = 1
+                                else:
+                                    print(f"Frame {name} with timestamp {timestamp} skipped (already saved)")
+
                     else:
                         print("Timeout waiting for sync queue.")
                 else:
@@ -159,6 +173,21 @@ def main(args):
                                 save_frame(name, cvFrame, output_folders, mxid, timestamp, projector_on)
                                 num_captures[mxid] += 1
                                 status = f"captured: {num_captures[mxid]}"
+
+                            if save_one:
+                                if name not in stream_check:
+                                    raise ValueError("Something is invalid")
+                                elif stream_check[name] == 0:
+                                    timestamp = int(msg.getTimestamp().total_seconds() * 1000)
+                                    save_frame(name, cvFrame, output_folders, mxid, timestamp, projector_on)
+                                    num_captures[mxid] += 1
+                                    stream_check[name] = 1
+                                else:
+                                    print(f"Frame {name} with timestamp {timestamp} skipped (already saved)")
+
+                if save_one and all(val == 1 for val in stream_check.values()):
+                    save_one = False
+                    status = f"saved for projector {projector_on}"
 
                 # --- Command handling ---
                 socks = dict(poller.poll(timeout=500))
@@ -189,6 +218,12 @@ def main(args):
                             saving = False
                             socket.send_json({"status": "ok"})
                             status = 'ready'
+
+                        elif cmd == "save_one":
+                            num_captures = {mxid: 0}
+                            stream_check = {stream : 0 for stream in streams}
+                            save_one = True
+                            socket.send_json({"status": "ok"})
 
                         elif cmd == "status":
                             socket.send_json({"status": status})
