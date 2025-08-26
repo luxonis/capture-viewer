@@ -3,8 +3,17 @@ import sys
 import json
 import os
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from viewer.utils.popup_info import show_popup
+try:
+    from .popup_info import show_popup
+except ImportError:
+    # Fallback for when running as standalone script
+    import sys
+    import os
+    # Add the project root to the path
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(os.path.dirname(current_dir))
+    sys.path.insert(0, project_root)
+    from viewer.utils.popup_info import show_popup
 
 # Global variable to store the JSON information
 custom_information_json = None
