@@ -22,7 +22,7 @@ The viewer module provides the interface for viewing and analyzing data captured
 Ensure the required dependencies are installed by running:
 
 ```bash
-pip install -r requirements.txt
+pip install -r viewer/requirements.txt
 ```
 
 ## How to Run
