@@ -36,7 +36,7 @@ python capture/capture_control.py
 
 ## Requirements
 ```bash
-pip install capture/requirements_capture.txt
+pip install -r capture/requirements.txt
 ```
 
 ---
