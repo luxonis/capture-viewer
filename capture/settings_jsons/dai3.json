@@ -26,14 +26,14 @@
         "rgb": false,
         "depth": false,
         "disparity": false,
-        "hw_sync": true,
-        "sync": false
+        "hw_sync": false,
+        "sync": true
     },
 
     "profilePreset": "FAST_DENSITY",
     "LRcheck": true,
     "extendedDisparity": true,
 
-    "FPS": 15,
+    "FPS": 5,
     "num_captures": 20
 }

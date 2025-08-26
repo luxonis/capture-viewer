@@ -23,16 +23,16 @@
         "left_raw": true,
         "right": true,
         "right_raw": true,
-        "rgb": true,
+        "rgb": false,
         "depth": false,
         "disparity": false,
-        "sync": false
+        "sync": true
     },
 
     "profilePreset": "FAST_DENSITY",
     "LRcheck": true,
     "extendedDisparity": true,
 
-    "FPS": 15,
+    "FPS": 5,
     "num_captures": 20
 }
