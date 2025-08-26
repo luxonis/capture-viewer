@@ -1,28 +1,11 @@
 # Multi-Device Capture GUI
 
-## 🧠 What is it?
+##  What is it?
 
 This update introduces a **Python GUI controller** to manage multiple Luxonis DepthAI devices for synchronized capture with dot projector control.
 
-It replaces manual script launching with a graphical interface and supports:
 
-- 🔌 Viewing live connection status for each device
-- 🖥️ Launching capture scripts (`dai3_port_capture.py`) via `conda run`
-- 📷 Starting & stopping synchronized capture loops
-- 🔄 Restarting individual devices if they disconnect
-- 📣 Displaying real-time status messages
-
-
-## ▶️ How to Run
-
-From the `capture/` folder (or wherever the GUI script is located), run:
-
-```bash
-python capture/capture_control.py
-```
-🧪 This will open a graphical interface showing all devices, their status, and control buttons.
-
-## 📁 Where to Specify Devices
+## Where to Specify Devices
 Edit this file: `capture/capture_control_config.json`
 
 This JSON defines the list of devices, IPs, ports, and their settings.
@@ -36,9 +19,25 @@ This JSON defines the list of devices, IPs, ports, and their settings.
 }
 ```
 
-## ✅ Requirements
-- Python packages: tkinter, zmq, subprocess
+Use settings with raw streams enabled for RVC4 devices and without raw streams for RVC2 devices.
 
+For running 4 devices with 2x2+2x4=12 output streams (enabling left and right on all devices plus 
+raw left and right on RVC4) runs best on `5 FPS`.
+
+## How to Run
+
+From the `capture/` folder (or wherever the GUI script is located), run:
+
+```bash
+python capture/capture_control.py
+```
+ This will open a graphical interface showing all devices, their status, and control buttons.
+
+
+## Requirements
+```bash
+pip install capture/requirements_capture.txt
+```
 
 ---
 

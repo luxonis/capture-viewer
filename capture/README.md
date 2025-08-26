@@ -3,6 +3,13 @@
 This is a guide on how to run capture with one device either using Depthai v2 or Depthai v3. For guide on how to capture using multiple devices 
 refer to `README_multiple_devices.md`. For RVC2 capture. you can use both Depthai v2 and v3 capture scripts.
 
+## Additional Capture Information
+
+For detailed instructions on working with **multiple device capture**, please refer to the [Multiple Device Capture README](README_multiple_device.md).
+
+For information about capture using **ZED** and **Realsense** cameras, see the [ZED & Realsense Capture README](README_zed_realsense.md).
+
+
 ## Depthai 2 Capture (for RVC2 Stereo and TOF)
 
 ```bash
