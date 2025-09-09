@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.widgets import Button, Slider
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 import glob
 from pathlib import Path
 import argparse
@@ -147,10 +147,14 @@ class MultiDeviceVisualizer:
         # Connect keyboard events
         self.fig.canvas.mpl_connect('key_press_event', self.on_key_press)
         
+        # Connect mouse click events for delete buttons
+        self.fig.canvas.mpl_connect('pick_event', self.on_pick)
+        
     def reconnect_keyboard_events(self):
         """Reconnect keyboard events after figure recreation"""
         if self.fig:
             self.fig.canvas.mpl_connect('key_press_event', self.on_key_press)
+            self.fig.canvas.mpl_connect('pick_event', self.on_pick)
         
     def display_data(self, data_type='left'):
         """Display data for all devices at their current timestamps"""
@@ -161,8 +165,9 @@ class MultiDeviceVisualizer:
             self.fig.clear()
             # Recreate subplots
             self.axs = self.fig.subplots(2, 4)
-            # Reconnect keyboard events
+            # Reconnect events
             self.fig.canvas.mpl_connect('key_press_event', self.on_key_press)
+            self.fig.canvas.mpl_connect('pick_event', self.on_pick)
         
         # Calculate global frame index (average of all device indices)
         total_frames = 0
@@ -185,7 +190,15 @@ class MultiDeviceVisualizer:
                 print(f"Warning: Too many devices ({len(self.subfolders)}), only showing first 8")
                 break
             
-            if current_idx < len(timestamps):
+            # Check if device has any timestamps left
+            if len(timestamps) == 0:
+                # Device has no timestamps left (all deleted)
+                self.axs[row, col].text(0.5, 0.5, 'All frames\ndeleted', 
+                                      ha='center', va='center', transform=self.axs[row, col].transAxes,
+                                      fontsize=10, color='red')
+                short_name = folder_name.split('_')[0] + '_' + folder_name.split('_')[-1]
+                self.axs[row, col].set_title(f"{short_name}\n{data_type.upper()} - Empty", fontsize=8)
+            elif current_idx < len(timestamps):
                 current_timestamp = timestamps[current_idx]
                 data = self.load_data(folder_name, current_timestamp, data_type)
                 
@@ -205,6 +218,18 @@ class MultiDeviceVisualizer:
                     # Add colorbar for depth and disparity
                     if data_type in ['depth', 'disparity']:
                         plt.colorbar(im, ax=self.axs[row, col], fraction=0.046, pad=0.04)
+                    
+                    # Add delete button (small X) in the top-right corner
+                    self.add_delete_button(row, col, folder_name, current_timestamp, data_type)
+                    
+                    # Add move button (small M) in the top-left corner
+                    self.add_move_button(row, col, folder_name, current_timestamp, data_type)
+                    
+                    # Add single delete button (small x) in the bottom-right corner
+                    self.add_single_delete_button(row, col, folder_name, current_timestamp, data_type)
+                    
+                    # Add single move button (small m) in the bottom-left corner
+                    self.add_single_move_button(row, col, folder_name, current_timestamp, data_type)
                     
                     # Shorten folder name for display
                     short_name = folder_name.split('_')[0] + '_' + folder_name.split('_')[-1]
@@ -237,12 +262,12 @@ class MultiDeviceVisualizer:
                 self.axs[row, col].axis('off')
         
         # Update main title with current data type, progress info, and global frame counter
-        active_devices = sum(1 for idx in self.device_current_idx.values() if idx < len(self.device_timestamps[list(self.device_current_idx.keys())[0]]))
+        active_devices = sum(1 for timestamps in self.device_timestamps.values() if len(timestamps) > 0)
         total_devices = len(self.subfolders)
         
         # Calculate global progress
-        avg_frame_idx = current_frames // total_devices if total_devices > 0 else 0
-        avg_total_frames = total_frames // total_devices if total_devices > 0 else 0
+        avg_frame_idx = current_frames // active_devices if active_devices > 0 else 0
+        avg_total_frames = total_frames // active_devices if active_devices > 0 else 0
         
         self.fig.suptitle(f'Multi-Device Visualization | Data Type: {data_type.upper()} | '
                          f'Active Devices: {active_devices}/{total_devices} | '
@@ -251,6 +276,667 @@ class MultiDeviceVisualizer:
         
         plt.tight_layout()
         plt.draw()
+    
+    def add_delete_button(self, row, col, folder_name, timestamp, data_type):
+        """Add a small X button in the top-right corner of the subplot"""
+        if row >= 2 or col >= 4:
+            return
+            
+        # Get the subplot position
+        ax = self.axs[row, col]
+        
+        # Add a small X button in the top-right corner
+        # Position: (0.9, 0.9) in axes coordinates (top-right)
+        delete_text = ax.text(0.9, 0.9, '✕', fontsize=12, color='red', 
+                             ha='center', va='center', transform=ax.transAxes,
+                             bbox=dict(boxstyle='circle', facecolor='white', 
+                                     edgecolor='red', linewidth=1),
+                             picker=5)  # Set picker to 5 pixels tolerance
+        
+        # Store metadata for the delete button
+        delete_text._delete_info = {
+            'folder_name': folder_name,
+            'timestamp': timestamp,
+            'data_type': data_type,
+            'row': row,
+            'col': col
+        }
+    
+    def add_move_button(self, row, col, folder_name, timestamp, data_type):
+        """Add a small M button in the top-left corner of the subplot"""
+        if row >= 2 or col >= 4:
+            return
+            
+        # Get the subplot position
+        ax = self.axs[row, col]
+        
+        # Add a small M button in the top-left corner
+        # Position: (0.1, 0.9) in axes coordinates (top-left)
+        move_text = ax.text(0.1, 0.9, 'M', fontsize=12, color='blue', 
+                           ha='center', va='center', transform=ax.transAxes,
+                           bbox=dict(boxstyle='circle', facecolor='white', 
+                                   edgecolor='blue', linewidth=1),
+                           picker=5)  # Set picker to 5 pixels tolerance
+        
+        # Store metadata for the move button
+        move_text._move_info = {
+            'folder_name': folder_name,
+            'timestamp': timestamp,
+            'data_type': data_type,
+            'row': row,
+            'col': col
+        }
+    
+    def add_single_delete_button(self, row, col, folder_name, timestamp, data_type):
+        """Add a small x button in the bottom-right corner of the subplot for single file deletion"""
+        if row >= 2 or col >= 4:
+            return
+            
+        # Get the subplot position
+        ax = self.axs[row, col]
+        
+        # Add a small x button in the bottom-right corner
+        # Position: (0.9, 0.1) in axes coordinates (bottom-right)
+        single_delete_text = ax.text(0.9, 0.1, 'x', fontsize=10, color='darkred', 
+                                   ha='center', va='center', transform=ax.transAxes,
+                                   bbox=dict(boxstyle='circle', facecolor='lightgray', 
+                                           edgecolor='darkred', linewidth=1),
+                                   picker=5)  # Set picker to 5 pixels tolerance
+        
+        # Store metadata for the single delete button
+        single_delete_text._single_delete_info = {
+            'folder_name': folder_name,
+            'timestamp': timestamp,
+            'data_type': data_type,
+            'row': row,
+            'col': col
+        }
+    
+    def add_single_move_button(self, row, col, folder_name, timestamp, data_type):
+        """Add a small m button in the bottom-left corner of the subplot for single file moving"""
+        if row >= 2 or col >= 4:
+            return
+            
+        # Get the subplot position
+        ax = self.axs[row, col]
+        
+        # Add a small m button in the bottom-left corner
+        # Position: (0.1, 0.1) in axes coordinates (bottom-left)
+        single_move_text = ax.text(0.1, 0.1, 'm', fontsize=10, color='darkblue', 
+                                 ha='center', va='center', transform=ax.transAxes,
+                                 bbox=dict(boxstyle='circle', facecolor='lightblue', 
+                                         edgecolor='darkblue', linewidth=1),
+                                 picker=5)  # Set picker to 5 pixels tolerance
+        
+        # Store metadata for the single move button
+        single_move_text._single_move_info = {
+            'folder_name': folder_name,
+            'timestamp': timestamp,
+            'data_type': data_type,
+            'row': row,
+            'col': col
+        }
+    
+    def on_pick(self, event):
+        """Handle pick events for delete and move buttons"""
+        # Check if we picked a delete button
+        if hasattr(event.artist, '_delete_info'):
+            delete_info = event.artist._delete_info
+            self.confirm_and_delete(delete_info)
+        # Check if we picked a move button
+        elif hasattr(event.artist, '_move_info'):
+            move_info = event.artist._move_info
+            self.confirm_and_move(move_info)
+        # Check if we picked a single delete button
+        elif hasattr(event.artist, '_single_delete_info'):
+            single_delete_info = event.artist._single_delete_info
+            self.confirm_and_single_delete(single_delete_info)
+        # Check if we picked a single move button
+        elif hasattr(event.artist, '_single_move_info'):
+            single_move_info = event.artist._single_move_info
+            self.confirm_and_single_move(single_move_info)
+    
+    def confirm_and_delete(self, delete_info):
+        """Show confirmation dialog and delete the file if confirmed"""
+        folder_name = delete_info['folder_name']
+        timestamp = delete_info['timestamp']
+        data_type = delete_info['data_type']
+        
+        # Get the file path
+        if folder_name not in self.files_by_folder:
+            return
+            
+        timestamp_data = self.files_by_folder[folder_name].get(timestamp, {})
+        if data_type not in timestamp_data:
+            return
+            
+        file_path = timestamp_data[data_type]
+        
+        # Determine related files to delete
+        related_types = self.get_related_data_types(data_type)
+        related_files = []
+        
+        for related_type in related_types:
+            if related_type in timestamp_data:
+                related_files.append((related_type, timestamp_data[related_type]))
+        
+        # Show confirmation dialog with information about related files
+        message = f"Are you sure you want to delete this file?\n\n"
+        message += f"File: {file_path.name}\n"
+        message += f"Device: {folder_name}\n"
+        message += f"Timestamp: {timestamp}\n"
+        message += f"Data Type: {data_type}\n\n"
+        
+        if related_files:
+            message += f"This will also delete {len(related_files)} related files:\n"
+            for related_type, related_path in related_files:
+                message += f"  - {related_path.name}\n"
+        
+        root = tk.Tk()
+        root.withdraw()  # Hide the main window
+        
+        result = messagebox.askyesno(
+            "Confirm Delete",
+            message,
+            icon='warning'
+        )
+        
+        root.destroy()
+        
+        if result:
+            try:
+                # Delete the main file
+                file_path.unlink()
+                print(f"Deleted: {file_path}")
+                
+                # Delete related files
+                for related_type, related_path in related_files:
+                    try:
+                        related_path.unlink()
+                        print(f"Deleted related: {related_path}")
+                    except Exception as e:
+                        print(f"Error deleting related file {related_path}: {e}")
+                
+                # Remove from data structure
+                if timestamp in self.files_by_folder[folder_name]:
+                    # Remove the main data type
+                    del self.files_by_folder[folder_name][timestamp][data_type]
+                    
+                    # Remove related data types
+                    for related_type, _ in related_files:
+                        if related_type in self.files_by_folder[folder_name][timestamp]:
+                            del self.files_by_folder[folder_name][timestamp][related_type]
+                    
+                    # If no more data types for this timestamp, remove the timestamp
+                    if not self.files_by_folder[folder_name][timestamp]:
+                        del self.files_by_folder[folder_name][timestamp]
+                        
+                        # Update device timestamps
+                        if timestamp in self.device_timestamps[folder_name]:
+                            self.device_timestamps[folder_name].remove(timestamp)
+                            
+                            # Adjust current index if necessary
+                            if self.device_current_idx[folder_name] >= len(self.device_timestamps[folder_name]):
+                                self.device_current_idx[folder_name] = max(0, len(self.device_timestamps[folder_name]) - 1)
+                
+                # Clear cache for this file and related files
+                cache_key = f"{folder_name}_{timestamp}_{data_type}"
+                if cache_key in self.data_cache:
+                    del self.data_cache[cache_key]
+                
+                for related_type, _ in related_files:
+                    related_cache_key = f"{folder_name}_{timestamp}_{related_type}"
+                    if related_cache_key in self.data_cache:
+                        del self.data_cache[related_cache_key]
+                
+                # Refresh the display
+                self.display_data(self.current_data_type)
+                
+            except Exception as e:
+                print(f"Error deleting file {file_path}: {e}")
+                # Show error dialog
+                root = tk.Tk()
+                root.withdraw()
+                messagebox.showerror("Delete Error", f"Failed to delete file:\n{file_path}\n\nError: {e}")
+                root.destroy()
+    
+    def get_related_data_types(self, data_type):
+        """Get related data types that should be deleted together"""
+        if data_type == 'left':
+            return ['right', 'left_raw', 'right_raw']
+        elif data_type == 'right':
+            return ['left', 'left_raw', 'right_raw']
+        elif data_type == 'left_raw':
+            return ['left', 'right', 'right_raw']
+        elif data_type == 'right_raw':
+            return ['left', 'right', 'left_raw']
+        elif data_type == 'depth':
+            return ['disparity']  # Depth and disparity are related
+        elif data_type == 'disparity':
+            return ['depth']  # Depth and disparity are related
+        else:
+            return []  # No related types for other data types
+    
+    def confirm_and_single_delete(self, delete_info):
+        """Show confirmation dialog and delete only the single file if confirmed"""
+        folder_name = delete_info['folder_name']
+        timestamp = delete_info['timestamp']
+        data_type = delete_info['data_type']
+        
+        # Get the file path
+        if folder_name not in self.files_by_folder:
+            return
+            
+        timestamp_data = self.files_by_folder[folder_name].get(timestamp, {})
+        if data_type not in timestamp_data:
+            return
+            
+        file_path = timestamp_data[data_type]
+        
+        # Show confirmation dialog for single file deletion
+        message = f"Are you sure you want to delete ONLY this file?\n\n"
+        message += f"File: {file_path.name}\n"
+        message += f"Device: {folder_name}\n"
+        message += f"Timestamp: {timestamp}\n"
+        message += f"Data Type: {data_type}\n\n"
+        message += f"Note: This will NOT delete related files (left/right/raw files)"
+        
+        root = tk.Tk()
+        root.withdraw()  # Hide the main window
+        
+        result = messagebox.askyesno(
+            "Confirm Single Delete",
+            message,
+            icon='warning'
+        )
+        
+        root.destroy()
+        
+        if result:
+            try:
+                # Delete only the main file
+                file_path.unlink()
+                print(f"Deleted single file: {file_path}")
+                
+                # Remove from data structure
+                if timestamp in self.files_by_folder[folder_name]:
+                    # Remove only the specific data type
+                    del self.files_by_folder[folder_name][timestamp][data_type]
+                    
+                    # If no more data types for this timestamp, remove the timestamp
+                    if not self.files_by_folder[folder_name][timestamp]:
+                        del self.files_by_folder[folder_name][timestamp]
+                        
+                        # Update device timestamps
+                        if timestamp in self.device_timestamps[folder_name]:
+                            self.device_timestamps[folder_name].remove(timestamp)
+                            
+                            # Adjust current index if necessary
+                            if self.device_current_idx[folder_name] >= len(self.device_timestamps[folder_name]):
+                                self.device_current_idx[folder_name] = max(0, len(self.device_timestamps[folder_name]) - 1)
+                
+                # Clear cache for this file only
+                cache_key = f"{folder_name}_{timestamp}_{data_type}"
+                if cache_key in self.data_cache:
+                    del self.data_cache[cache_key]
+                
+                # Refresh the display
+                self.display_data(self.current_data_type)
+                
+            except Exception as e:
+                print(f"Error deleting file {file_path}: {e}")
+                # Show error dialog
+                root = tk.Tk()
+                root.withdraw()
+                messagebox.showerror("Delete Error", f"Failed to delete file:\n{file_path}\n\nError: {e}")
+                root.destroy()
+    
+    def confirm_and_single_move(self, move_info):
+        """Show confirmation dialog and move only the single file if confirmed"""
+        folder_name = move_info['folder_name']
+        timestamp = move_info['timestamp']
+        data_type = move_info['data_type']
+        
+        # Get the file path
+        if folder_name not in self.files_by_folder:
+            return
+            
+        timestamp_data = self.files_by_folder[folder_name].get(timestamp, {})
+        if data_type not in timestamp_data:
+            return
+            
+        file_path = timestamp_data[data_type]
+        
+        # Find compatible folders (same model)
+        compatible_folders = self.get_compatible_folders(folder_name)
+        
+        if not compatible_folders:
+            root = tk.Tk()
+            root.withdraw()
+            messagebox.showinfo("No Compatible Folders", 
+                              f"No compatible folders found for {folder_name}")
+            root.destroy()
+            return
+        
+        # Show folder selection dialog
+        root = tk.Tk()
+        root.withdraw()
+        
+        # Create a simple dialog for folder selection
+        from tkinter import simpledialog
+        
+        folder_list = "\n".join([f"{i+1}. {folder}" for i, folder in enumerate(compatible_folders)])
+        message = f"Select destination folder for moving SINGLE file:\n\n{folder_list}\n\nEnter folder number (1-{len(compatible_folders)}):"
+        
+        try:
+            choice = simpledialog.askinteger("Move Single File", message, minvalue=1, maxvalue=len(compatible_folders))
+            root.destroy()
+            
+            if choice is None:  # User cancelled
+                return
+                
+            dest_folder = compatible_folders[choice - 1]
+            
+            # Confirm the move operation
+            result = messagebox.askyesno(
+                "Confirm Single Move",
+                f"Are you sure you want to move ONLY this file?\n\n"
+                f"File: {file_path.name}\n"
+                f"From: {folder_name}\n"
+                f"To: {dest_folder}\n"
+                f"Timestamp: {timestamp}\n"
+                f"Data Type: {data_type}\n\n"
+                f"Note: This will NOT move related files (left/right/raw files)",
+                icon='question'
+            )
+            
+            if result:
+                self.move_single_file(folder_name, dest_folder, timestamp, data_type)
+                
+        except Exception as e:
+            root.destroy()
+            messagebox.showerror("Error", f"Error in folder selection: {e}")
+    
+    def move_single_file(self, source_folder, dest_folder, timestamp, data_type):
+        """Move only a single file from source to destination folder"""
+        try:
+            # Get the specific file for this timestamp and data type
+            source_timestamp_data = self.files_by_folder[source_folder].get(timestamp, {})
+            
+            if data_type not in source_timestamp_data:
+                return
+            
+            source_path = source_timestamp_data[data_type]
+            dest_path = self.data_path / dest_folder / source_path.name
+            
+            # Create destination directory if it doesn't exist
+            dest_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Move the file
+            source_path.rename(dest_path)
+            print(f"Moved single file: {source_path} -> {dest_path}")
+            
+            # Update data structures
+            self.update_data_structures_after_single_move(source_folder, dest_folder, timestamp, data_type)
+            
+            # Show success message
+            root = tk.Tk()
+            root.withdraw()
+            messagebox.showinfo("Move Successful", 
+                              f"Successfully moved single file:\n{data_type}: {source_path.name}")
+            root.destroy()
+            
+            # Refresh the display
+            self.display_data(self.current_data_type)
+            
+        except Exception as e:
+            print(f"Error moving single file: {e}")
+            root = tk.Tk()
+            root.withdraw()
+            messagebox.showerror("Move Error", f"Failed to move single file:\n{str(e)}")
+            root.destroy()
+    
+    def update_data_structures_after_single_move(self, source_folder, dest_folder, timestamp, data_type):
+        """Update internal data structures after moving a single file"""
+        # Remove from source folder
+        if timestamp in self.files_by_folder[source_folder]:
+            if data_type in self.files_by_folder[source_folder][timestamp]:
+                del self.files_by_folder[source_folder][timestamp][data_type]
+            
+            # If no more data types for this timestamp, remove the timestamp
+            if not self.files_by_folder[source_folder][timestamp]:
+                del self.files_by_folder[source_folder][timestamp]
+                
+                # Update device timestamps
+                if timestamp in self.device_timestamps[source_folder]:
+                    self.device_timestamps[source_folder].remove(timestamp)
+                    
+                    # Adjust current index if necessary
+                    if self.device_current_idx[source_folder] >= len(self.device_timestamps[source_folder]):
+                        self.device_current_idx[source_folder] = max(0, len(self.device_timestamps[source_folder]) - 1)
+        
+        # Add to destination folder
+        if dest_folder not in self.files_by_folder:
+            self.files_by_folder[dest_folder] = {}
+        
+        if timestamp not in self.files_by_folder[dest_folder]:
+            self.files_by_folder[dest_folder][timestamp] = {}
+        
+        # Add moved file to destination data structure
+        dest_path = self.data_path / dest_folder / f"{data_type}_{timestamp}.npy"
+        if dest_path.exists():
+            self.files_by_folder[dest_folder][timestamp][data_type] = dest_path
+        
+        # Update device timestamps for destination
+        if dest_folder not in self.device_timestamps:
+            self.device_timestamps[dest_folder] = []
+        
+        if timestamp not in self.device_timestamps[dest_folder]:
+            self.device_timestamps[dest_folder].append(timestamp)
+            self.device_timestamps[dest_folder].sort()
+        
+        # Clear cache for moved file
+        source_cache_key = f"{source_folder}_{timestamp}_{data_type}"
+        dest_cache_key = f"{dest_folder}_{timestamp}_{data_type}"
+        
+        if source_cache_key in self.data_cache:
+            del self.data_cache[source_cache_key]
+        if dest_cache_key in self.data_cache:
+            del self.data_cache[dest_cache_key]
+    
+    def confirm_and_move(self, move_info):
+        """Show confirmation dialog and move the files if confirmed"""
+        folder_name = move_info['folder_name']
+        timestamp = move_info['timestamp']
+        data_type = move_info['data_type']
+        
+        # Get the file path
+        if folder_name not in self.files_by_folder:
+            return
+            
+        timestamp_data = self.files_by_folder[folder_name].get(timestamp, {})
+        if data_type not in timestamp_data:
+            return
+            
+        file_path = timestamp_data[data_type]
+        
+        # Find compatible folders (same model)
+        compatible_folders = self.get_compatible_folders(folder_name)
+        
+        if not compatible_folders:
+            root = tk.Tk()
+            root.withdraw()
+            messagebox.showinfo("No Compatible Folders", 
+                              f"No compatible folders found for {folder_name}")
+            root.destroy()
+            return
+        
+        # Show folder selection dialog
+        root = tk.Tk()
+        root.withdraw()
+        
+        # Create a simple dialog for folder selection
+        from tkinter import simpledialog
+        
+        folder_list = "\n".join([f"{i+1}. {folder}" for i, folder in enumerate(compatible_folders)])
+        message = f"Select destination folder for moving:\n\n{folder_list}\n\nEnter folder number (1-{len(compatible_folders)}):"
+        
+        try:
+            choice = simpledialog.askinteger("Move Files", message, minvalue=1, maxvalue=len(compatible_folders))
+            root.destroy()
+            
+            if choice is None:  # User cancelled
+                return
+                
+            dest_folder = compatible_folders[choice - 1]
+            
+            # Confirm the move operation
+            result = messagebox.askyesno(
+                "Confirm Move",
+                f"Are you sure you want to move this file?\n\n"
+                f"File: {file_path.name}\n"
+                f"From: {folder_name}\n"
+                f"To: {dest_folder}\n"
+                f"Timestamp: {timestamp}\n"
+                f"Data Type: {data_type}",
+                icon='question'
+            )
+            
+            if result:
+                self.move_files(folder_name, dest_folder, timestamp, data_type)
+                
+        except Exception as e:
+            root.destroy()
+            messagebox.showerror("Error", f"Error in folder selection: {e}")
+    
+    def get_compatible_folders(self, source_folder):
+        """Get folders that are compatible for moving (same model)"""
+        # Extract model name by removing the timestamp and True/False suffix
+        # Format: MODEL_SERIAL_TIMESTAMP_True/False
+        parts = source_folder.split('_')
+        
+        # Find the model name by looking for patterns
+        if len(parts) >= 4:
+            # For OAK4-D-PRO_2460444260_20250710164544_True format
+            # Take everything except the last two parts (timestamp and True/False)
+            model_name = '_'.join(parts[:-2])
+        elif len(parts) >= 3:
+            # For OAK-D-PRO-POE_18443010111E970F00_20250710164551_True format
+            # Take everything except the last two parts (timestamp and True/False)
+            model_name = '_'.join(parts[:-2])
+        else:
+            # Fallback: remove only the last part
+            model_name = '_'.join(parts[:-1])
+        
+        compatible_folders = []
+        for folder in self.subfolders:
+            folder_name = folder.name
+            # Check if it's the same model but different folder
+            if folder_name.startswith(model_name) and folder_name != source_folder:
+                compatible_folders.append(folder_name)
+        
+        return compatible_folders
+    
+    def move_files(self, source_folder, dest_folder, timestamp, data_type):
+        """Move files from source to destination folder"""
+        try:
+            # Get all files for this timestamp and data type
+            source_timestamp_data = self.files_by_folder[source_folder].get(timestamp, {})
+            
+            if data_type not in source_timestamp_data:
+                return
+            
+            # Get related data types
+            related_types = self.get_related_data_types(data_type)
+            all_types = [data_type] + related_types
+            
+            moved_files = []
+            
+            # Move each file type
+            for file_type in all_types:
+                if file_type in source_timestamp_data:
+                    source_path = source_timestamp_data[file_type]
+                    dest_path = self.data_path / dest_folder / source_path.name
+                    
+                    # Create destination directory if it doesn't exist
+                    dest_path.parent.mkdir(parents=True, exist_ok=True)
+                    
+                    # Move the file
+                    source_path.rename(dest_path)
+                    moved_files.append((file_type, source_path.name))
+                    print(f"Moved: {source_path} -> {dest_path}")
+            
+            # Update data structures
+            self.update_data_structures_after_move(source_folder, dest_folder, timestamp, all_types)
+            
+            # Show success message
+            root = tk.Tk()
+            root.withdraw()
+            messagebox.showinfo("Move Successful", 
+                              f"Successfully moved {len(moved_files)} files:\n" + 
+                              "\n".join([f"  - {file_type}: {filename}" for file_type, filename in moved_files]))
+            root.destroy()
+            
+            # Refresh the display
+            self.display_data(self.current_data_type)
+            
+        except Exception as e:
+            print(f"Error moving files: {e}")
+            root = tk.Tk()
+            root.withdraw()
+            messagebox.showerror("Move Error", f"Failed to move files:\n{str(e)}")
+            root.destroy()
+    
+    def update_data_structures_after_move(self, source_folder, dest_folder, timestamp, data_types):
+        """Update internal data structures after moving files"""
+        # Remove from source folder
+        if timestamp in self.files_by_folder[source_folder]:
+            for data_type in data_types:
+                if data_type in self.files_by_folder[source_folder][timestamp]:
+                    del self.files_by_folder[source_folder][timestamp][data_type]
+            
+            # If no more data types for this timestamp, remove the timestamp
+            if not self.files_by_folder[source_folder][timestamp]:
+                del self.files_by_folder[source_folder][timestamp]
+                
+                # Update device timestamps
+                if timestamp in self.device_timestamps[source_folder]:
+                    self.device_timestamps[source_folder].remove(timestamp)
+                    
+                    # Adjust current index if necessary
+                    if self.device_current_idx[source_folder] >= len(self.device_timestamps[source_folder]):
+                        self.device_current_idx[source_folder] = max(0, len(self.device_timestamps[source_folder]) - 1)
+        
+        # Add to destination folder
+        if dest_folder not in self.files_by_folder:
+            self.files_by_folder[dest_folder] = {}
+        
+        if timestamp not in self.files_by_folder[dest_folder]:
+            self.files_by_folder[dest_folder][timestamp] = {}
+        
+        # Add moved files to destination data structure
+        for data_type in data_types:
+            dest_path = self.data_path / dest_folder / f"{data_type}_{timestamp}.npy"
+            if dest_path.exists():
+                self.files_by_folder[dest_folder][timestamp][data_type] = dest_path
+        
+        # Update device timestamps for destination
+        if dest_folder not in self.device_timestamps:
+            self.device_timestamps[dest_folder] = []
+        
+        if timestamp not in self.device_timestamps[dest_folder]:
+            self.device_timestamps[dest_folder].append(timestamp)
+            self.device_timestamps[dest_folder].sort()
+        
+        # Clear cache for moved files
+        for data_type in data_types:
+            source_cache_key = f"{source_folder}_{timestamp}_{data_type}"
+            dest_cache_key = f"{dest_folder}_{timestamp}_{data_type}"
+            
+            if source_cache_key in self.data_cache:
+                del self.data_cache[source_cache_key]
+            if dest_cache_key in self.data_cache:
+                del self.data_cache[dest_cache_key]
         
     def on_key_press(self, event):
         """Handle keyboard navigation"""
@@ -265,7 +951,8 @@ class MultiDeviceVisualizer:
             # Next timestamp for all devices
             for folder_name in self.device_current_idx:
                 timestamps = self.device_timestamps[folder_name]
-                self.device_current_idx[folder_name] = min(len(timestamps) - 1, self.device_current_idx[folder_name] + 1)
+                if len(timestamps) > 0:  # Only navigate if there are timestamps
+                    self.device_current_idx[folder_name] = min(len(timestamps) - 1, self.device_current_idx[folder_name] + 1)
             update_display = True
         elif event.key == 'home':
             # First timestamp for all devices
@@ -276,7 +963,8 @@ class MultiDeviceVisualizer:
             # Last timestamp for all devices
             for folder_name in self.device_current_idx:
                 timestamps = self.device_timestamps[folder_name]
-                self.device_current_idx[folder_name] = len(timestamps) - 1
+                if len(timestamps) > 0:  # Only navigate if there are timestamps
+                    self.device_current_idx[folder_name] = len(timestamps) - 1
             update_display = True
         elif event.key == '1':
             # Switch to left camera
@@ -319,8 +1007,9 @@ class MultiDeviceVisualizer:
                 percentage = int(input("Enter percentage (0-100): "))
                 if 0 <= percentage <= 100:
                     for folder_name, timestamps in self.device_timestamps.items():
-                        target_frame = int(len(timestamps) * percentage / 100)
-                        self.device_current_idx[folder_name] = min(len(timestamps) - 1, target_frame)
+                        if len(timestamps) > 0:  # Only navigate if there are timestamps
+                            target_frame = int(len(timestamps) * percentage / 100)
+                            self.device_current_idx[folder_name] = min(len(timestamps) - 1, target_frame)
                     update_display = True
             except (ValueError, KeyboardInterrupt):
                 print("Invalid input or cancelled")
@@ -336,18 +1025,20 @@ class MultiDeviceVisualizer:
             
         # Print navigation info (only if not in fast mode or every 10 frames)
         if not self.fast_mode or self.last_console_update % 10 == 0:
-            active_devices = sum(1 for idx in self.device_current_idx.values() if idx < len(self.device_timestamps[list(self.device_current_idx.keys())[0]]))
+            # Count active devices (devices with timestamps)
+            active_devices = sum(1 for timestamps in self.device_timestamps.values() if len(timestamps) > 0)
             total_devices = len(self.subfolders)
             
             # Calculate global frame progress
             total_frames = 0
             current_frames = 0
             for folder_name, timestamps in self.device_timestamps.items():
-                total_frames += len(timestamps)
-                current_frames += self.device_current_idx[folder_name]
+                if len(timestamps) > 0:  # Only count devices with timestamps
+                    total_frames += len(timestamps)
+                    current_frames += self.device_current_idx[folder_name]
             
-            avg_frame_idx = current_frames // total_devices if total_devices > 0 else 0
-            avg_total_frames = total_frames // total_devices if total_devices > 0 else 0
+            avg_frame_idx = current_frames // active_devices if active_devices > 0 else 0
+            avg_total_frames = total_frames // active_devices if active_devices > 0 else 0
             
             if not self.fast_mode:
                 print(f"\n=== FRAME PROGRESS ===")
@@ -356,18 +1047,22 @@ class MultiDeviceVisualizer:
                 print("\nCurrent timestamps per device:")
                 for folder_name, current_idx in self.device_current_idx.items():
                     timestamps = self.device_timestamps[folder_name]
-                    if current_idx < len(timestamps):
-                        short_name = folder_name.split('_')[0] + '_' + folder_name.split('_')[-1]
+                    short_name = folder_name.split('_')[0] + '_' + folder_name.split('_')[-1]
+                    
+                    if len(timestamps) == 0:
+                        print(f"  {short_name}: EMPTY (all frames deleted)")
+                    elif current_idx < len(timestamps):
                         progress_pct = (current_idx + 1) * 100 // len(timestamps)
                         print(f"  {short_name}: Frame {current_idx + 1}/{len(timestamps)} ({progress_pct}%) - {timestamps[current_idx]}")
                     else:
-                        short_name = folder_name.split('_')[0] + '_' + folder_name.split('_')[-1]
                         print(f"  {short_name}: COMPLETED ({len(timestamps)} frames)")
             else:
                 print(f"Frame: ~{avg_frame_idx + 1}/{avg_total_frames} ({(avg_frame_idx + 1) * 100 // avg_total_frames}%) - {self.current_data_type.upper()}")
             
             print("\nControls: A/D to navigate timestamps, 1-6 to switch data types, F for fast mode, P for percentage jump, Q to quit")
             print("Data types: 1=Left, 2=Right, 3=Left_Raw, 4=Right_Raw, 5=Depth, 6=Disparity")
+            print("Batch operations: X (red) to delete all related files, M (blue) to move all related files")
+            print("Single operations: x (dark red) to delete only this file, m (dark blue) to move only this file")
         
         self.last_console_update += 1
         
@@ -386,6 +1081,8 @@ class MultiDeviceVisualizer:
         print("Note: Each device shows its own timestamp progression")
         print("Controls: A/D to navigate timestamps, 1-6 to switch data types, Q to quit")
         print("Data types: 1=Left, 2=Right, 3=Left_Raw, 4=Right_Raw, 5=Depth, 6=Disparity")
+        print("Batch operations: X (red) to delete all related files, M (blue) to move all related files")
+        print("Single operations: x (dark red) to delete only this file, m (dark blue) to move only this file")
         plt.show()
 
 def select_data_directory():
