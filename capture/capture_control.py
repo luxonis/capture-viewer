@@ -79,6 +79,7 @@ class MultiDeviceControlApp:
         self.running = False
         self.save_one_inicialized = False
         self.max_captures_var = tk.StringVar(value="Unlimited")
+        self.max_cycles_var = tk.StringVar(value="Unlimited")
         
         # Configuration editor variables
         self.config_entries = {}
@@ -131,40 +132,60 @@ class MultiDeviceControlApp:
                                    width=12)
         max_caps_entry.grid(row=0, column=3, sticky="w")
 
-        # Placeholder text behavior
-        def on_focus_in(event):
+        # --- Max Cycles ---
+        ttk.Label(start_controls_frame, text="Max Cycles:").grid(row=1, column=2, sticky="e")
+        max_cycles_entry = ttk.Entry(start_controls_frame, textvariable=self.max_cycles_var, foreground='gray',
+                                     width=12)
+        max_cycles_entry.grid(row=1, column=3, sticky="w")
+
+        # Placeholder text behavior for Max Captures
+        def on_focus_in_caps(event):
             if self.max_captures_var.get() == "Unlimited":
                 self.max_captures_var.set("")
                 max_caps_entry.config(foreground='black')
 
-        def on_focus_out(event):
+        def on_focus_out_caps(event):
             if self.max_captures_var.get() == "":
                 self.max_captures_var.set("Unlimited")
                 max_caps_entry.config(foreground='gray')
 
-        max_caps_entry.bind("<FocusIn>", on_focus_in)
-        max_caps_entry.bind("<FocusOut>", on_focus_out)
+        max_caps_entry.bind("<FocusIn>", on_focus_in_caps)
+        max_caps_entry.bind("<FocusOut>", on_focus_out_caps)
+
+        # Placeholder text behavior for Max Cycles
+        def on_focus_in_cycles(event):
+            if self.max_cycles_var.get() == "Unlimited":
+                self.max_cycles_var.set("")
+                max_cycles_entry.config(foreground='black')
+
+        def on_focus_out_cycles(event):
+            if self.max_cycles_var.get() == "":
+                self.max_cycles_var.set("Unlimited")
+                max_cycles_entry.config(foreground='gray')
+
+        max_cycles_entry.bind("<FocusIn>", on_focus_in_cycles)
+        max_cycles_entry.bind("<FocusOut>", on_focus_out_cycles)
 
         # --- Start/Stop Controls ---
         self.start_sequence_button = ttk.Button(start_controls_frame, text="Start Alternating Capture",
                                                 command=self.start_sequence, state="disabled", style="Start.TButton")
-        self.start_sequence_button.grid(row=1, column=0, padx=5, pady=5)
+        self.start_sequence_button.grid(row=2, column=0, padx=5, pady=5)
 
         self.simple_sequence_button = ttk.Button(start_controls_frame, text="Start Simple Capture",
                                                  command=self.start_simple_sequence, state="disabled",
                                                  style="Start.TButton")
-        self.simple_sequence_button.grid(row=1, column=1, padx=5, pady=5)
+        self.simple_sequence_button.grid(row=2, column=1, padx=5, pady=5)
 
         self.projector_toggle_button = ttk.Button(start_controls_frame, text="Projector OFF",
                                                   command=self.toggle_projectors)
         self.projector_toggle_button.config(style="Off.TButton")
-        self.projector_toggle_button.grid(row=1, column=2, padx=5, pady=5)
+        self.projector_toggle_button.grid(row=2, column=2, padx=5, pady=5)
         self.projectors_on = False
 
-        ttk.Button(start_controls_frame, text="End Capture", command=self.end_capture).grid(row=1, column=3, padx=5,
+        ttk.Button(start_controls_frame, text="End Capture", command=self.end_capture).grid(row=2, column=3, padx=5,
                                                                                             pady=5)
         self.save_one_button = ttk.Button(start_controls_frame, text="Save One (all devices)", command=self.start_save_one, state="disabled", style="Start.TButton")
-        self.save_one_button.grid(row=2, column=0, padx=5, pady=5)
+        self.save_one_button.grid(row=3, column=0, padx=5, pady=5)
 
         row += 1
 
@@ -220,18 +241,25 @@ class MultiDeviceControlApp:
     def check_launch_ready(self):
         self.all_ready = all(self.status_vars[device].get().lower() in ["ready", "projector on", "projector off"] for device in self.device_ports)
 
-        if self.all_ready:
+        if self.all_ready and not self.running:
             self.start_sequence_button.config(state="enabled")
             self.simple_sequence_button.config(state="enabled")
             self.save_one_button.config(state="enabled")
             self.set_message("Devices Ready!")
+        elif not self.all_ready:
+            self.start_sequence_button.config(state="disabled")
+            self.simple_sequence_button.config(state="disabled")
+            self.save_one_button.config(state="disabled")
+        elif self.running:
+            self.start_sequence_button.config(state="disabled")
+            self.simple_sequence_button.config(state="disabled")
+            self.save_one_button.config(state="disabled")
 
     def update_status(self, device, port):
         response = send_command(port, "status")
         status = response.get("status", "unknown")
         self.status_vars[device].set(status)
 
-        # ➕ Log status history
         self.status_history[device].append(status)
         # print(f"[{device}] Status update: {status}")  # Optional logging to console
 
@@ -281,6 +309,7 @@ class MultiDeviceControlApp:
 
         self.start_sequence_button.config(state="disabled")
         self.simple_sequence_button.config(state="disabled")
+        self.save_one_button.config(state="disabled")
         self.set_message("Capturing...")
         self.running = True
         threading.Thread(target=self._run_loop_sequence, daemon=True).start()
@@ -292,12 +321,23 @@ class MultiDeviceControlApp:
         except Exception:
             max_captures = None
 
+        try:
+            max_cycles = self.max_cycles_var.get()
+            max_cycles = int(max_cycles) if max_cycles.strip().isdigit() else None
+        except Exception:
+            max_cycles = None
+
         for device, port in self.device_ports.items():
             self.send_capture_name(port, self.get_current_capture_name())
             send_command(port, "inicialize")
 
         counts = {port:0 for device, port in self.device_ports.items()}
+        cycle_count = 0
+        
         while self.running:
+            cycle_count += 1
+            self.set_message(f"Cycle {cycle_count} - Capturing...")
+            
             for device, port in self.device_ports.items():
                 send_command(port, "capturing_on")
             time.sleep(1)
@@ -316,8 +356,16 @@ class MultiDeviceControlApp:
 
             for device, port in self.device_ports.items():
                 counts[port] = self.get_count(port)
-            print(counts)
+            print(f"Cycle {cycle_count} - Counts: {counts}")
+            
+            # Check if max captures reached
             if max_captures is not None and all(count >= max_captures for count in counts.values()):
+                self.set_message(f"Max captures ({max_captures}) reached after {cycle_count} cycles")
+                self.running = False
+                break
+
+            if max_cycles is not None and cycle_count >= max_cycles:
+                self.set_message(f"Max cycles ({max_cycles}) completed")
                 self.running = False
                 break
 
@@ -328,12 +376,15 @@ class MultiDeviceControlApp:
 
         self.set_message("Capture ended, devices are still running.")
 
+        self.check_launch_ready()
+
     def start_simple_sequence(self):
         if not self.all_ready:
             print("not all ready")
             return
         self.start_sequence_button.config(state="disabled")
         self.simple_sequence_button.config(state="disabled")
+        self.save_one_button.config(state="disabled")
         self.set_message("Starting simple capture...")
         self.running = True
         threading.Thread(target=self._run_simple_sequence, daemon=True).start()
@@ -368,6 +419,8 @@ class MultiDeviceControlApp:
         for device, port in self.device_ports.items():  # turn of explicitly just to be sure
             send_command(port, "capturing_off")
 
+        self.check_launch_ready()
+
 
     def toggle_projectors(self):
         cmd = "projector_on" if not self.projectors_on else "projector_off"
@@ -390,6 +443,10 @@ class MultiDeviceControlApp:
     def start_save_one(self):
         if not self.all_ready:
             self.set_message("Devices not ready")
+            return
+
+        if self.running:
+            self.set_message("Another capture is already running")
             return
 
         # Mirror your other flows
@@ -429,7 +486,8 @@ class MultiDeviceControlApp:
             self.set_message(f"Save-one error: {e}")
 
         finally:
-            self.save_one_button.config(state="enabled")
+            self.running = False
+            self.check_launch_ready()
 
     def exit_devices(self):
         self.running = False
@@ -445,6 +503,7 @@ class MultiDeviceControlApp:
 
         for device, port in self.device_ports.items():
             send_command(port, 'cleanup')
+        self.check_launch_ready()
 
     def _finalize_exit(self):
         self.end_capture()
