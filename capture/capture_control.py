@@ -81,6 +81,9 @@ class MultiDeviceControlApp:
         self.max_captures_var = tk.StringVar(value="Unlimited")
         self.max_cycles_var = tk.StringVar(value="Unlimited")
         self.current_cycle = 0
+        self.projector_sleep_var = tk.StringVar(value="5")
+        self.capture_sleep_var = tk.StringVar(value="2")
+        self.cycle_wait_var = tk.StringVar(value="3")
         
         # Configuration editor variables
         self.config_entries = {}
@@ -139,6 +142,22 @@ class MultiDeviceControlApp:
                                      width=12)
         max_cycles_entry.grid(row=1, column=3, sticky="w")
 
+        # --- Timing Configuration ---
+        timing_frame = ttk.LabelFrame(start_controls_frame, text="Timing (seconds)", padding=(5, 2))
+        timing_frame.grid(row=2, column=0, columnspan=4, sticky="ew", pady=(10, 5))
+
+        ttk.Label(timing_frame, text="Projector Wait:").grid(row=0, column=0, sticky="e", padx=(0, 5))
+        self.projector_sleep_entry = ttk.Entry(timing_frame, textvariable=self.projector_sleep_var, width=8)
+        self.projector_sleep_entry.grid(row=0, column=1, sticky="w", padx=(0, 15))
+
+        ttk.Label(timing_frame, text="Capture Duration:").grid(row=0, column=2, sticky="e", padx=(0, 5))
+        self.capture_sleep_entry = ttk.Entry(timing_frame, textvariable=self.capture_sleep_var, width=8)
+        self.capture_sleep_entry.grid(row=0, column=3, sticky="w", padx=(0, 15))
+
+        ttk.Label(timing_frame, text="Cycle Wait:").grid(row=0, column=4, sticky="e", padx=(0, 5))
+        self.cycle_wait_entry = ttk.Entry(timing_frame, textvariable=self.cycle_wait_var, width=8)
+        self.cycle_wait_entry.grid(row=0, column=5, sticky="w")
+
         # Placeholder text behavior for Max Captures
         def on_focus_in_caps(event):
             if self.max_captures_var.get() == "Unlimited":
@@ -170,23 +189,23 @@ class MultiDeviceControlApp:
         # --- Start/Stop Controls ---
         self.start_sequence_button = ttk.Button(start_controls_frame, text="Start Alternating Capture",
                                                 command=self.start_sequence, state="disabled", style="Start.TButton")
-        self.start_sequence_button.grid(row=2, column=0, padx=5, pady=5)
+        self.start_sequence_button.grid(row=3, column=0, padx=5, pady=5)
 
         self.simple_sequence_button = ttk.Button(start_controls_frame, text="Start Simple Capture",
                                                  command=self.start_simple_sequence, state="disabled",
                                                  style="Start.TButton")
-        self.simple_sequence_button.grid(row=2, column=1, padx=5, pady=5)
+        self.simple_sequence_button.grid(row=3, column=1, padx=5, pady=5)
 
         self.projector_toggle_button = ttk.Button(start_controls_frame, text="Projector OFF",
                                                   command=self.toggle_projectors)
         self.projector_toggle_button.config(style="Off.TButton")
-        self.projector_toggle_button.grid(row=2, column=2, padx=5, pady=5)
+        self.projector_toggle_button.grid(row=3, column=2, padx=5, pady=5)
         self.projectors_on = False
 
-        ttk.Button(start_controls_frame, text="End Capture", command=self.end_capture).grid(row=2, column=3, padx=5,
+        ttk.Button(start_controls_frame, text="End Capture", command=self.end_capture).grid(row=3, column=3, padx=5,
                                                                                             pady=5)
         self.save_one_button = ttk.Button(start_controls_frame, text="Save One (all devices)", command=self.start_save_one, state="disabled", style="Start.TButton")
-        self.save_one_button.grid(row=3, column=0, padx=5, pady=5)
+        self.save_one_button.grid(row=4, column=0, padx=5, pady=5)
 
         row += 1
 
@@ -237,13 +256,14 @@ class MultiDeviceControlApp:
     def poll_statuses(self):
         for device, port in self.device_ports.items():
             threading.Thread(target=self.update_status, args=(device, port), daemon=True).start()
-        if not self.running: self.check_launch_ready()
+        self.check_launch_ready()  # Always call to update button states
         self.root.after(200, self.poll_statuses)
 
     def check_launch_ready(self):
         self.all_ready = all(self.status_vars[device].get().lower() in ["ready", "projector on", "projector off"] for device in self.device_ports)
         devices_launched = any(self.status_vars[device].get().lower() in ["ready", "projector on", "projector off", "capturing", "interrupted"] for device in self.device_ports)
 
+        # Manage capture buttons based on device readiness
         if self.all_ready and not self.running:
             self.start_sequence_button.config(state="enabled")
             self.simple_sequence_button.config(state="enabled")
@@ -259,6 +279,16 @@ class MultiDeviceControlApp:
             self.simple_sequence_button.config(state="disabled")
             self.save_one_button.config(state="disabled")
             # Don't change message when capture is running - let it show current cycle
+        
+        # Manage timing fields - only disable when capture is running
+        if self.running:
+            self.projector_sleep_entry.config(state="disabled")
+            self.capture_sleep_entry.config(state="disabled")
+            self.cycle_wait_entry.config(state="disabled")
+        else:
+            self.projector_sleep_entry.config(state="normal")
+            self.capture_sleep_entry.config(state="normal")
+            self.cycle_wait_entry.config(state="normal")
         
         # Edit config button: enabled unless devices are launched
         if devices_launched:
@@ -339,6 +369,11 @@ class MultiDeviceControlApp:
         except Exception:
             max_cycles = None
 
+        # Get timing configuration
+        projector_sleep = float(self.projector_sleep_var.get() or "5")
+        capture_sleep = float(self.capture_sleep_var.get() or "2")
+        cycle_wait = float(self.cycle_wait_var.get() or "3")
+
         for device, port in self.device_ports.items():
             self.send_capture_name(port, self.get_current_capture_name())
             send_command(port, "inicialize")
@@ -374,7 +409,7 @@ class MultiDeviceControlApp:
 
             for device, port in self.device_ports.items():
                 send_command(port, "projector_on")
-                time.sleep(5)
+                time.sleep(projector_sleep)
                 
                 # Check if we should stop during projector sequence
                 if not self.running:
@@ -382,7 +417,7 @@ class MultiDeviceControlApp:
                     break
                     
                 send_command(port, "capturing_on")
-                time.sleep(2)
+                time.sleep(capture_sleep)
                 send_command(port, "capturing_off")
                 send_command(port, "projector_off")
             
@@ -390,7 +425,7 @@ class MultiDeviceControlApp:
             if not self.running:
                 break
                 
-            time.sleep(3)
+            time.sleep(cycle_wait)
 
             for device, port in self.device_ports.items():
                 counts[port] = self.get_count(port)
@@ -505,6 +540,9 @@ class MultiDeviceControlApp:
 
     def _run_save_one(self):
         try:
+            # Get timing configuration
+            projector_sleep = float(self.projector_sleep_var.get() or "5")
+                
             if not self.save_one_inicialized:
                 self.set_message("Inicializing...")
                 for device, port in self.device_ports.items():
@@ -520,7 +558,7 @@ class MultiDeviceControlApp:
             self.set_message("Saving projector ON...")
             for device, port in self.device_ports.items():
                 send_command(port, "projector_on")
-                time.sleep(3)
+                time.sleep(projector_sleep)
                 send_command(port, "save_one")
                 time.sleep(1)
                 send_command(port, "projector_off")
