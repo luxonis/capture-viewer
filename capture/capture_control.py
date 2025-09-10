@@ -80,6 +80,7 @@ class MultiDeviceControlApp:
         self.save_one_inicialized = False
         self.max_captures_var = tk.StringVar(value="Unlimited")
         self.max_cycles_var = tk.StringVar(value="Unlimited")
+        self.current_cycle = 0
         
         # Configuration editor variables
         self.config_entries = {}
@@ -247,6 +248,7 @@ class MultiDeviceControlApp:
             self.start_sequence_button.config(state="enabled")
             self.simple_sequence_button.config(state="enabled")
             self.save_one_button.config(state="enabled")
+            # Only show "Devices Ready" if no capture is running
             self.set_message("Devices Ready!")
         elif not self.all_ready:
             self.start_sequence_button.config(state="disabled")
@@ -256,6 +258,7 @@ class MultiDeviceControlApp:
             self.start_sequence_button.config(state="disabled")
             self.simple_sequence_button.config(state="disabled")
             self.save_one_button.config(state="disabled")
+            # Don't change message when capture is running - let it show current cycle
         
         # Edit config button: enabled unless devices are launched
         if devices_launched:
@@ -345,22 +348,48 @@ class MultiDeviceControlApp:
         
         while self.running:
             cycle_count += 1
+            self.current_cycle = cycle_count
             self.set_message(f"Cycle {cycle_count} - Capturing...")
             
+            # Check if we should stop before starting this cycle
+            if not self.running:
+                break
+                
             for device, port in self.device_ports.items():
                 send_command(port, "capturing_on")
             time.sleep(1)
 
+            # Check if we should stop after first capture
+            if not self.running:
+                for device, port in self.device_ports.items():
+                    send_command(port, "capturing_off")
+                break
+
             for device, port in self.device_ports.items():
                 send_command(port, "capturing_off")
+
+            # Check if we should stop before projector sequence
+            if not self.running:
+                break
 
             for device, port in self.device_ports.items():
                 send_command(port, "projector_on")
                 time.sleep(5)
+                
+                # Check if we should stop during projector sequence
+                if not self.running:
+                    send_command(port, "projector_off")
+                    break
+                    
                 send_command(port, "capturing_on")
                 time.sleep(2)
                 send_command(port, "capturing_off")
                 send_command(port, "projector_off")
+            
+            # Check if we should stop before final wait
+            if not self.running:
+                break
+                
             time.sleep(3)
 
             for device, port in self.device_ports.items():
@@ -380,9 +409,13 @@ class MultiDeviceControlApp:
                 break
 
         self.running = False
+        self.current_cycle = 0
 
-        for device, port in self.device_ports.items(): # turn of explicitly just to be sure
+        # Ensure all devices are properly stopped
+        for device, port in self.device_ports.items():
             send_command(port, "capturing_off")
+            send_command(port, "projector_off")
+            send_command(port, "cleanup")
 
         self.set_message("Capture ended, devices are still running.")
         
@@ -510,15 +543,16 @@ class MultiDeviceControlApp:
         self.set_message("Exiting")
 
     def end_capture(self):
-        self.running = False
+        if not self.running:
+            self.set_message("No capture running")
+            return
+            
+        self.set_message(f"Stopping capture... (will finish current cycle {self.current_cycle})")
+        self.running = False  # This will cause the capture loop to exit gracefully
         self.save_one_inicialized = False
-        self.set_message("Capture ending..")
-
-        for device, port in self.device_ports.items():
-            send_command(port, 'cleanup')
         
-        # Re-enable buttons if devices are ready
-        self.check_launch_ready()
+        # Don't call cleanup immediately - let the capture loop finish gracefully
+        # The cleanup will be called in the capture loop when it exits
 
     def _finalize_exit(self):
         self.end_capture()
