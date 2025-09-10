@@ -1,10 +1,13 @@
 import sys
 import os
 import json
+import re
+import shutil
+from datetime import datetime
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox, simpledialog
 import zmq
 import threading
 import time
@@ -71,10 +74,16 @@ class MultiDeviceControlApp:
         self.status_vars = {name: tk.StringVar(value="Disconnected") for name in self.device_ports}
         self.status_history = {device: [] for device in self.device_ports}
         self.status_labels = {}
+        self.device_labels = {}  # Store device name labels for updating
         self.restart_buttons = {}
         self.running = False
         self.save_one_inicialized = False
         self.max_captures_var = tk.StringVar(value="Unlimited")
+        
+        # Configuration editor variables
+        self.config_entries = {}
+        self.original_config = devices_config.copy()
+        self.config_modified = False
 
         self.build_ui()
         self.poll_statuses()
@@ -159,9 +168,34 @@ class MultiDeviceControlApp:
 
         row += 1
 
+        # === Configuration Editor ===
+        config_frame = ttk.LabelFrame(main_frame, text="Configuration Editor", padding=(10, 5))
+        config_frame.grid(row=row, column=0, columnspan=3, sticky="ew", pady=(10, 5))
+        
+        # Config editor controls
+        config_controls_frame = ttk.Frame(config_frame)
+        config_controls_frame.grid(row=0, column=0, columnspan=3, sticky="ew", pady=(0, 10))
+        
+        ttk.Button(config_controls_frame, text="Edit Config", command=self.open_config_editor).grid(row=0, column=0, padx=(0, 5))
+        
+        # Config status
+        self.config_status_var = tk.StringVar(value="Config loaded")
+        ttk.Label(config_controls_frame, textvariable=self.config_status_var, foreground="blue").grid(row=0, column=4, padx=(10, 0))
+
+        row += 1
+
         # === Device Statuses ===
         for device, port in self.device_ports.items():
-            ttk.Label(main_frame, text=f"{device} (Port {port})").grid(row=row, column=0, sticky="w")
+            # Get note for this device
+            note = devices_config.get(str(port), {}).get("note", "")
+            device_label_text = f"{device} (Port {port})"
+            if note:
+                device_label_text += f" - {note}"
+            
+            device_label = ttk.Label(main_frame, text=device_label_text)
+            device_label.grid(row=row, column=0, sticky="w")
+            self.device_labels[device] = device_label
+            
             label = ttk.Label(main_frame, textvariable=self.status_vars[device])
             label.grid(row=row, column=1, sticky="w")
             self.status_labels[device] = label
@@ -273,9 +307,9 @@ class MultiDeviceControlApp:
 
             for device, port in self.device_ports.items():
                 send_command(port, "projector_on")
-                time.sleep(3)
+                time.sleep(5)
                 send_command(port, "capturing_on")
-                time.sleep(1)
+                time.sleep(2)
                 send_command(port, "capturing_off")
                 send_command(port, "projector_off")
             time.sleep(3)
@@ -451,6 +485,301 @@ class MultiDeviceControlApp:
             self.set_message("Capture name must not contain spaces.")
             return
         return capture_name
+
+    def update_device_labels(self):
+        """Update device labels to show notes"""
+        for device, port in self.device_ports.items():
+            note = devices_config.get(str(port), {}).get("note", "")
+            device_label_text = f"{device} (Port {port})"
+            if note:
+                device_label_text += f" - {note}"
+            
+            if device in self.device_labels:
+                self.device_labels[device].config(text=device_label_text)
+
+    # Configuration Editor Methods
+    def validate_ip_address(self, ip):
+        """Validate IP address format"""
+        pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
+        if not re.match(pattern, ip):
+            return False
+        parts = ip.split('.')
+        return all(0 <= int(part) <= 255 for part in parts)
+
+    def validate_port(self, port):
+        """Validate port number"""
+        try:
+            port_num = int(port)
+            return 1024 <= port_num <= 65535
+        except ValueError:
+            return False
+
+    def open_config_editor(self):
+        """Open configuration editor window"""
+        editor_window = tk.Toplevel(self.root)
+        editor_window.title("Configuration Editor")
+        editor_window.geometry("600x500")
+        editor_window.transient(self.root)
+        editor_window.grab_set()
+
+        # Create main frame with scrollbar
+        main_frame = ttk.Frame(editor_window)
+        main_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+        # Create canvas and scrollbar for scrolling
+        canvas = tk.Canvas(main_frame)
+        scrollbar = ttk.Scrollbar(main_frame, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Store entries for this editor session
+        session_entries = {}
+
+        # Create entries for each device
+        row = 0
+        for port, config in devices_config.items():
+            device_frame = ttk.LabelFrame(scrollable_frame, text=f"Device on Port {port}", padding=10)
+            device_frame.grid(row=row, column=0, columnspan=2, sticky="ew", pady=5)
+
+            # IP Address
+            ttk.Label(device_frame, text="IP Address:").grid(row=0, column=0, sticky="w", padx=(0, 10))
+            ip_var = tk.StringVar(value=config["ip"])
+            ip_entry = ttk.Entry(device_frame, textvariable=ip_var, width=20)
+            ip_entry.grid(row=0, column=1, sticky="w", padx=(0, 20))
+            session_entries[f"{port}_ip"] = ip_var
+
+            # Settings
+            ttk.Label(device_frame, text="Settings:").grid(row=0, column=2, sticky="w", padx=(0, 10))
+            settings_var = tk.StringVar(value=config["settings"])
+            settings_entry = ttk.Entry(device_frame, textvariable=settings_var, width=15)
+            settings_entry.grid(row=0, column=3, sticky="w")
+
+            # Note
+            ttk.Label(device_frame, text="Note:").grid(row=1, column=0, sticky="w", padx=(0, 10))
+            note_var = tk.StringVar(value=config.get("note", ""))
+            note_entry = ttk.Entry(device_frame, textvariable=note_var, width=30)
+            note_entry.grid(row=1, column=1, columnspan=2, sticky="w", padx=(0, 20))
+            session_entries[f"{port}_note"] = note_var
+
+            # Port (read-only, for reference)
+            ttk.Label(device_frame, text="Port:").grid(row=2, column=0, sticky="w", padx=(0, 10))
+            ttk.Label(device_frame, text=port, foreground="gray").grid(row=2, column=1, sticky="w", padx=(0, 20))
+
+            # Remove device button
+            ttk.Button(device_frame, text="Remove Device", 
+                      command=lambda p=port: self.remove_device_confirm(p, editor_window, session_entries)).grid(row=2, column=2, columnspan=2, sticky="e", padx=(10, 0))
+
+            session_entries[f"{port}_settings"] = settings_var
+            row += 1
+
+        # Buttons frame
+        buttons_frame = ttk.Frame(scrollable_frame)
+        buttons_frame.grid(row=row, column=0, columnspan=2, pady=20)
+
+        ttk.Button(buttons_frame, text="Apply Changes", 
+                  command=lambda: self.apply_config_changes(session_entries, editor_window)).grid(row=0, column=0, padx=5)
+        ttk.Button(buttons_frame, text="Cancel", 
+                  command=editor_window.destroy).grid(row=0, column=1, padx=5)
+        ttk.Button(buttons_frame, text="Add New Device", 
+                  command=lambda: self.add_new_device_editor(editor_window, session_entries)).grid(row=0, column=2, padx=5)
+
+        # Pack canvas and scrollbar
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        # Bind mousewheel to canvas
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        
+        def _on_mousewheel_linux(event):
+            if event.num == 4:
+                canvas.yview_scroll(-1, "units")
+            elif event.num == 5:
+                canvas.yview_scroll(1, "units")
+        
+        # Bind for Windows/Mac
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        # Bind for Linux
+        canvas.bind_all("<Button-4>", _on_mousewheel_linux)
+        canvas.bind_all("<Button-5>", _on_mousewheel_linux)
+
+        def _unbind_mousewheel(event):
+            canvas.unbind_all("<MouseWheel>")
+            canvas.unbind_all("<Button-4>")
+            canvas.unbind_all("<Button-5>")
+        editor_window.bind("<Destroy>", _unbind_mousewheel)
+
+    def add_new_device_editor(self, parent_window, session_entries):
+        """Add a new device to the configuration"""
+        dialog = tk.Toplevel(parent_window)
+        dialog.title("Add New Device")
+        dialog.geometry("400x200")
+        dialog.transient(parent_window)
+        dialog.grab_set()
+
+        ttk.Label(dialog, text="Port:").grid(row=0, column=0, sticky="w", padx=10, pady=5)
+        port_var = tk.StringVar()
+        ttk.Entry(dialog, textvariable=port_var, width=15).grid(row=0, column=1, sticky="w", padx=10, pady=5)
+
+        ttk.Label(dialog, text="IP Address:").grid(row=1, column=0, sticky="w", padx=10, pady=5)
+        ip_var = tk.StringVar()
+        ttk.Entry(dialog, textvariable=ip_var, width=20).grid(row=1, column=1, sticky="w", padx=10, pady=5)
+
+        ttk.Label(dialog, text="Settings:").grid(row=2, column=0, sticky="w", padx=10, pady=5)
+        settings_var = tk.StringVar(value="dai3")
+        ttk.Entry(dialog, textvariable=settings_var, width=15).grid(row=2, column=1, sticky="w", padx=10, pady=5)
+
+        ttk.Label(dialog, text="Note:").grid(row=3, column=0, sticky="w", padx=10, pady=5)
+        note_var = tk.StringVar()
+        ttk.Entry(dialog, textvariable=note_var, width=20).grid(row=3, column=1, sticky="w", padx=10, pady=5)
+
+        def add_device():
+            port = port_var.get().strip()
+            ip = ip_var.get().strip()
+            settings = settings_var.get().strip()
+            note = note_var.get().strip()
+
+            if not port or not ip or not settings:
+                messagebox.showerror("Error", "Port, IP, and Settings are required")
+                return
+
+            if not self.validate_port(port):
+                messagebox.showerror("Error", "Invalid port number (1024-65535)")
+                return
+
+            if not self.validate_ip_address(ip):
+                messagebox.showerror("Error", "Invalid IP address format")
+                return
+
+            if port in devices_config:
+                messagebox.showerror("Error", f"Port {port} already exists")
+                return
+
+            # Add to current session
+            session_entries[f"{port}_ip"] = tk.StringVar(value=ip)
+            session_entries[f"{port}_settings"] = tk.StringVar(value=settings)
+            session_entries[f"{port}_note"] = tk.StringVar(value=note)
+            
+            # Add to devices_config
+            devices_config[port] = {"ip": ip, "settings": settings, "note": note}
+            
+            dialog.destroy()
+            parent_window.destroy()
+            self.open_config_editor()  # Refresh editor
+
+        ttk.Button(dialog, text="Add Device", command=add_device).grid(row=4, column=0, padx=10, pady=20)
+        ttk.Button(dialog, text="Cancel", command=dialog.destroy).grid(row=4, column=1, padx=10, pady=20)
+
+    def remove_device_confirm(self, port, editor_window, session_entries):
+        """Confirm and remove a device from the configuration"""
+        device_info = devices_config.get(port, {})
+        ip = device_info.get("ip", "Unknown")
+        note = device_info.get("note", "")
+        
+        # Create confirmation message
+        confirm_msg = f"Are you sure you want to remove this device?\n\nPort: {port}\nIP: {ip}"
+        if note:
+            confirm_msg += f"\nNote: {note}"
+        
+        if messagebox.askyesno("Confirm Device Removal", confirm_msg):
+            self.remove_device(port, editor_window, session_entries)
+
+    def remove_device(self, port, editor_window, session_entries):
+        """Remove a device from the configuration"""
+        try:
+            # Remove from devices_config
+            if port in devices_config:
+                del devices_config[port]
+            
+            # Remove from session_entries
+            keys_to_remove = [key for key in session_entries.keys() if key.startswith(f"{port}_")]
+            for key in keys_to_remove:
+                del session_entries[key]
+            
+            # Close and reopen the editor to refresh the display
+            editor_window.destroy()
+            self.open_config_editor()
+            
+            messagebox.showinfo("Success", f"Device on port {port} has been removed successfully!")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to remove device: {str(e)}")
+
+    def apply_config_changes(self, session_entries, editor_window):
+        """Apply configuration changes from the editor and save to file"""
+        try:
+            # Validate all entries
+            for key, var in session_entries.items():
+                if key.endswith("_ip"):
+                    if not self.validate_ip_address(var.get()):
+                        messagebox.showerror("Error", f"Invalid IP address: {var.get()}")
+                        return
+                elif key.endswith("_settings"):
+                    if not var.get().strip():
+                        messagebox.showerror("Error", "Settings cannot be empty")
+                        return
+
+            # Apply changes
+            for key, var in session_entries.items():
+                if key.endswith("_ip"):
+                    port = key.replace("_ip", "")
+                    devices_config[port]["ip"] = var.get().strip()
+                elif key.endswith("_settings"):
+                    port = key.replace("_settings", "")
+                    devices_config[port]["settings"] = var.get().strip()
+                elif key.endswith("_note"):
+                    port = key.replace("_note", "")
+                    devices_config[port]["note"] = var.get().strip()
+
+            # Save to file automatically
+            self.save_config_to_file()
+            
+            # Update device ports mapping
+            self.device_ports = {f"Device {i+1}": int(port) for i, port in enumerate(devices_config.keys())}
+            
+            # Update device labels to show notes
+            self.update_device_labels()
+            
+            editor_window.destroy()
+            messagebox.showinfo("Success", "Configuration changes applied and saved successfully!")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to apply changes: {str(e)}")
+
+    def save_config_to_file(self):
+        """Save current configuration to file (internal method)"""
+        try:
+            # Create backup
+            backup_file = CONFIG_FILE + f".backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            shutil.copy2(CONFIG_FILE, backup_file)
+            
+            # Save current config
+            with open(CONFIG_FILE, 'w') as f:
+                json.dump(devices_config, f, indent=2)
+            
+            self.original_config = devices_config.copy()
+            self.config_modified = False
+            self.config_status_var.set("Config saved")
+            self.set_message("Configuration saved successfully")
+            
+        except Exception as e:
+            raise Exception(f"Failed to save configuration: {str(e)}")
+
+    def save_config(self):
+        """Save current configuration to file (public method)"""
+        try:
+            self.save_config_to_file()
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+
 
     def launch_all_devices(self):
         self.set_message("Launching devices...")
