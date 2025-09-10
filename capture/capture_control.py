@@ -197,7 +197,8 @@ class MultiDeviceControlApp:
         config_controls_frame = ttk.Frame(config_frame)
         config_controls_frame.grid(row=0, column=0, columnspan=3, sticky="ew", pady=(0, 10))
         
-        ttk.Button(config_controls_frame, text="Edit Config", command=self.open_config_editor).grid(row=0, column=0, padx=(0, 5))
+        self.edit_config_button = ttk.Button(config_controls_frame, text="Edit Config", command=self.open_config_editor)
+        self.edit_config_button.grid(row=0, column=0, padx=(0, 5))
         
         # Config status
         self.config_status_var = tk.StringVar(value="Config loaded")
@@ -240,6 +241,7 @@ class MultiDeviceControlApp:
 
     def check_launch_ready(self):
         self.all_ready = all(self.status_vars[device].get().lower() in ["ready", "projector on", "projector off"] for device in self.device_ports)
+        devices_launched = any(self.status_vars[device].get().lower() in ["ready", "projector on", "projector off", "capturing", "interrupted"] for device in self.device_ports)
 
         if self.all_ready and not self.running:
             self.start_sequence_button.config(state="enabled")
@@ -254,12 +256,19 @@ class MultiDeviceControlApp:
             self.start_sequence_button.config(state="disabled")
             self.simple_sequence_button.config(state="disabled")
             self.save_one_button.config(state="disabled")
+        
+        # Edit config button: enabled unless devices are launched
+        if devices_launched:
+            self.edit_config_button.config(state="disabled")
+        else:
+            self.edit_config_button.config(state="enabled")
 
     def update_status(self, device, port):
         response = send_command(port, "status")
         status = response.get("status", "unknown")
         self.status_vars[device].set(status)
 
+        # ➕ Log status history
         self.status_history[device].append(status)
         # print(f"[{device}] Status update: {status}")  # Optional logging to console
 
@@ -363,7 +372,8 @@ class MultiDeviceControlApp:
                 self.set_message(f"Max captures ({max_captures}) reached after {cycle_count} cycles")
                 self.running = False
                 break
-
+            
+            # Check if max cycles reached
             if max_cycles is not None and cycle_count >= max_cycles:
                 self.set_message(f"Max cycles ({max_cycles}) completed")
                 self.running = False
@@ -375,7 +385,8 @@ class MultiDeviceControlApp:
             send_command(port, "capturing_off")
 
         self.set_message("Capture ended, devices are still running.")
-
+        
+        # Re-enable buttons if devices are ready
         self.check_launch_ready()
 
     def start_simple_sequence(self):
@@ -418,7 +429,8 @@ class MultiDeviceControlApp:
 
         for device, port in self.device_ports.items():  # turn of explicitly just to be sure
             send_command(port, "capturing_off")
-
+        
+        # Re-enable buttons if devices are ready
         self.check_launch_ready()
 
 
@@ -487,6 +499,7 @@ class MultiDeviceControlApp:
 
         finally:
             self.running = False
+            # Re-enable buttons if devices are ready
             self.check_launch_ready()
 
     def exit_devices(self):
@@ -503,6 +516,8 @@ class MultiDeviceControlApp:
 
         for device, port in self.device_ports.items():
             send_command(port, 'cleanup')
+        
+        # Re-enable buttons if devices are ready
         self.check_launch_ready()
 
     def _finalize_exit(self):
@@ -556,6 +571,80 @@ class MultiDeviceControlApp:
             if device in self.device_labels:
                 self.device_labels[device].config(text=device_label_text)
 
+    def refresh_device_display(self):
+        """Refresh the device display to match current configuration"""
+        # Reload configuration from file
+        global devices_config
+        try:
+            with open(CONFIG_FILE) as f:
+                devices_config = json.load(f)
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to reload configuration: {str(e)}")
+            return
+        
+        # Update device ports mapping
+        self.device_ports = {f"Device {i+1}": int(port) for i, port in enumerate(devices_config.keys())}
+        
+        # Recreate device status variables
+        self.status_vars = {name: tk.StringVar(value="Disconnected") for name in self.device_ports}
+        self.status_history = {device: [] for device in self.device_ports}
+        
+        # Clear old device widgets
+        for widget in list(self.device_labels.values()) + list(self.status_labels.values()) + list(self.restart_buttons.values()):
+            if widget.winfo_exists():
+                widget.destroy()
+        
+        # Clear dictionaries
+        self.device_labels.clear()
+        self.status_labels.clear()
+        self.restart_buttons.clear()
+        
+        # Find main frame and rebuild device section
+        main_frame = None
+        for child in self.root.winfo_children():
+            if isinstance(child, ttk.Frame):
+                main_frame = child
+                break
+        
+        if main_frame:
+            # Find the row after configuration editor
+            config_row = None
+            for child in main_frame.grid_slaves():
+                if hasattr(child, 'grid_info'):
+                    grid_info = child.grid_info()
+                    if hasattr(child, 'cget') and child.cget('text') == 'Configuration Editor':
+                        config_row = grid_info.get('row', 0)
+                        break
+            
+            if config_row is not None:
+                device_row = config_row + 1
+                
+                # Rebuild device status display
+                for device, port in self.device_ports.items():
+                    # Get note for this device
+                    note = devices_config.get(str(port), {}).get("note", "")
+                    device_label_text = f"{device} (Port {port})"
+                    if note:
+                        device_label_text += f" - {note}"
+                    
+                    device_label = ttk.Label(main_frame, text=device_label_text)
+                    device_label.grid(row=device_row, column=0, sticky="w")
+                    self.device_labels[device] = device_label
+                    
+                    label = ttk.Label(main_frame, textvariable=self.status_vars[device])
+                    label.grid(row=device_row, column=1, sticky="w")
+                    self.status_labels[device] = label
+
+                    restart_btn = ttk.Button(main_frame, text="Restart", command=lambda p=port: self.restart_device(p))
+                    restart_btn.grid(row=device_row, column=2, padx=5)
+                    restart_btn.grid_remove()
+                    self.restart_buttons[device] = restart_btn
+
+                    device_row += 1
+        
+        self.set_message("Device display refreshed")
+        self.config_status_var.set("Display refreshed")
+
     # Configuration Editor Methods
     def validate_ip_address(self, ip):
         """Validate IP address format"""
@@ -575,6 +664,15 @@ class MultiDeviceControlApp:
 
     def open_config_editor(self):
         """Open configuration editor window"""
+        # Check if devices are launched
+        devices_launched = any(self.status_vars[device].get().lower() in ["ready", "projector on", "projector off", "capturing", "interrupted"] for device in self.device_ports)
+        
+        if devices_launched:
+            messagebox.showwarning("Configuration Locked", 
+                                 "Cannot edit configuration while devices are launched.\n"
+                                 "Please exit devices before editing configuration.")
+            return
+        
         editor_window = tk.Toplevel(self.root)
         editor_window.title("Configuration Editor")
         editor_window.geometry("600x500")
@@ -803,8 +901,8 @@ class MultiDeviceControlApp:
             # Update device ports mapping
             self.device_ports = {f"Device {i+1}": int(port) for i, port in enumerate(devices_config.keys())}
             
-            # Update device labels to show notes
-            self.update_device_labels()
+            # Refresh the device display to reflect config changes
+            self.refresh_device_display()
             
             editor_window.destroy()
             messagebox.showinfo("Success", "Configuration changes applied and saved successfully!")
