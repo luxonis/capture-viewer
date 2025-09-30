@@ -3,6 +3,12 @@
 This is a guide on how to run capture with one device either using Depthai v2 or Depthai v3. For guide on how to capture using multiple devices 
 refer to `README_multiple_devices.md`. For RVC2 capture. you can use both Depthai v2 and v3 capture scripts.
 
+## ⚠️ Capture Initialization
+
+**Important**: Before starting a capture, **wait for auto-exposure and autofocus (if supported) to stabilize**.
+This ensures the recorded data is accurate and reliable.
+Starting the capture too early may result in invalid or inconsistent results.
+
 ## Additional Capture Information
 
 For detailed instructions on working with **multiple device capture**, please refer to the [Multiple Device Capture README](README_multiple_device.md).
