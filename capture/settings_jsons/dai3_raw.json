@@ -7,9 +7,9 @@
     "rgbResolution": {"x": 2560, "y": 1600},
     "sync_on_host": true,
     "monoSettings": {
-        "luma_denoise": 0,
+        "luma_denoise": 2,
         "chroma_denoise": 0,
-        "sharpness": 0,
+        "sharpness": 1,
         "contrast": 0
     },
     "exposureSettings": {
