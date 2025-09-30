@@ -2,6 +2,7 @@
 """
 Multi-Device Data Visualizer for 4-device sync node data
 Shows all 8 folders simultaneously, displaying the same timestamp across all devices
+Supports both .npy files and RGB images (.png, .jpg, .jpeg)
 """
 
 import os
@@ -15,6 +16,7 @@ import glob
 from pathlib import Path
 import argparse
 from collections import defaultdict
+from PIL import Image
 
 class MultiDeviceVisualizer:
     def __init__(self, data_path):
@@ -30,6 +32,7 @@ class MultiDeviceVisualizer:
         self.current_data_type = 'left'  # Current data type being displayed
         self.fast_mode = False  # Fast navigation mode (less console output)
         self.last_console_update = 0  # Track when we last updated console
+        self.convert_bgr_to_rgb = True  # Convert BGR images to RGB
         
         self.load_data_structure()
         self.setup_device_timestamps()
@@ -48,7 +51,10 @@ class MultiDeviceVisualizer:
         
         # Load file structure for each subfolder
         for folder in self.subfolders:
-            files = list(folder.glob("*.npy"))
+            # Support both .npy files and image files
+            npy_files = list(folder.glob("*.npy"))
+            image_files = list(folder.glob("*.png")) + list(folder.glob("*.jpg")) + list(folder.glob("*.jpeg"))
+            files = npy_files + image_files
             files.sort()
             
             # Group files by timestamp (extract timestamp from filename)
@@ -112,7 +118,25 @@ class MultiDeviceVisualizer:
         
         # Load data from file
         try:
-            data = np.load(timestamp_data[data_type])
+            file_path = timestamp_data[data_type]
+            
+            # Check if it's an image file or .npy file
+            if file_path.suffix.lower() in ['.png', '.jpg', '.jpeg']:
+                # Load image file
+                image = Image.open(file_path)
+                
+                # Convert to RGB mode to ensure consistent color format
+                if image.mode != 'RGB':
+                    image = image.convert('RGB')
+                
+                data = np.array(image)
+                
+                # Convert BGR to RGB if needed (for OpenCV-saved images)
+                if self.convert_bgr_to_rgb and len(data.shape) == 3 and data.shape[2] == 3:
+                    data = data[:, :, ::-1]  # Reverse the color channels
+            else:
+                # Load .npy file
+                data = np.load(file_path)
             
             # Add to cache
             self.data_cache[cache_key] = data
@@ -203,21 +227,28 @@ class MultiDeviceVisualizer:
                 data = self.load_data(folder_name, current_timestamp, data_type)
                 
                 if data is not None:
-                    # Choose colormap based on data type
-                    if data_type in ['left', 'left_raw', 'right', 'right_raw']:
-                        cmap = 'gray'
-                    elif data_type == 'depth':
-                        cmap = 'viridis'
-                    elif data_type == 'disparity':
-                        cmap = 'plasma'
+                    # Check if data is RGB (3D array with 3 channels)
+                    is_rgb = len(data.shape) == 3 and data.shape[2] == 3
+                    
+                    if is_rgb:
+                        # Display RGB image without colormap
+                        im = self.axs[row, col].imshow(data)
                     else:
-                        cmap = 'gray'
-                    
-                    im = self.axs[row, col].imshow(data, cmap=cmap)
-                    
-                    # Add colorbar for depth and disparity
-                    if data_type in ['depth', 'disparity']:
-                        plt.colorbar(im, ax=self.axs[row, col], fraction=0.046, pad=0.04)
+                        # Choose colormap based on data type for grayscale/depth data
+                        if data_type in ['left', 'left_raw', 'right', 'right_raw']:
+                            cmap = 'gray'
+                        elif data_type == 'depth':
+                            cmap = 'viridis'
+                        elif data_type == 'disparity':
+                            cmap = 'plasma'
+                        else:
+                            cmap = 'gray'
+                        
+                        im = self.axs[row, col].imshow(data, cmap=cmap)
+                        
+                        # Add colorbar for depth and disparity
+                        if data_type in ['depth', 'disparity']:
+                            plt.colorbar(im, ax=self.axs[row, col], fraction=0.046, pad=0.04)
                     
                     # Add delete button (small X) in the top-right corner
                     self.add_delete_button(row, col, folder_name, current_timestamp, data_type)
@@ -514,6 +545,8 @@ class MultiDeviceVisualizer:
             return ['disparity']  # Depth and disparity are related
         elif data_type == 'disparity':
             return ['depth']  # Depth and disparity are related
+        elif data_type == 'rgb':
+            return []  # RGB images are standalone
         else:
             return []  # No related types for other data types
     
@@ -996,10 +1029,24 @@ class MultiDeviceVisualizer:
             self.current_data_type = 'disparity'
             self.display_data('disparity')
             return
+        elif event.key == '7':
+            # Switch to RGB images
+            self.current_data_type = 'rgb'
+            self.display_data('rgb')
+            return
         elif event.key == 'f':
             # Toggle fast mode
             self.fast_mode = not self.fast_mode
             print(f"\nFast mode: {'ON' if self.fast_mode else 'OFF'}")
+            return
+        elif event.key == 'c':
+            # Toggle BGR to RGB conversion
+            self.convert_bgr_to_rgb = not self.convert_bgr_to_rgb
+            print(f"\nBGR to RGB conversion: {'ON' if self.convert_bgr_to_rgb else 'OFF'}")
+            # Clear cache to reload images with new setting
+            self.data_cache.clear()
+            # Refresh display
+            self.display_data(self.current_data_type)
             return
         elif event.key == 'p':
             # Jump to specific percentage
@@ -1059,8 +1106,8 @@ class MultiDeviceVisualizer:
             else:
                 print(f"Frame: ~{avg_frame_idx + 1}/{avg_total_frames} ({(avg_frame_idx + 1) * 100 // avg_total_frames}%) - {self.current_data_type.upper()}")
             
-            print("\nControls: A/D to navigate timestamps, 1-6 to switch data types, F for fast mode, P for percentage jump, Q to quit")
-            print("Data types: 1=Left, 2=Right, 3=Left_Raw, 4=Right_Raw, 5=Depth, 6=Disparity")
+            print("\nControls: A/D to navigate timestamps, 1-7 to switch data types, F for fast mode, C to toggle BGR/RGB, P for percentage jump, Q to quit")
+            print("Data types: 1=Left, 2=Right, 3=Left_Raw, 4=Right_Raw, 5=Depth, 6=Disparity, 7=RGB")
             print("Batch operations: X (red) to delete all related files, M (blue) to move all related files")
             print("Single operations: x (dark red) to delete only this file, m (dark blue) to move only this file")
         
@@ -1079,8 +1126,8 @@ class MultiDeviceVisualizer:
         total_timestamps = sum(len(timestamps) for timestamps in self.device_timestamps.values())
         print(f"Total timestamps across all devices: {total_timestamps}")
         print("Note: Each device shows its own timestamp progression")
-        print("Controls: A/D to navigate timestamps, 1-6 to switch data types, Q to quit")
-        print("Data types: 1=Left, 2=Right, 3=Left_Raw, 4=Right_Raw, 5=Depth, 6=Disparity")
+        print("Controls: A/D to navigate timestamps, 1-7 to switch data types, C to toggle BGR/RGB, Q to quit")
+        print("Data types: 1=Left, 2=Right, 3=Left_Raw, 4=Right_Raw, 5=Depth, 6=Disparity, 7=RGB")
         print("Batch operations: X (red) to delete all related files, M (blue) to move all related files")
         print("Single operations: x (dark red) to delete only this file, m (dark blue) to move only this file")
         plt.show()
@@ -1105,6 +1152,7 @@ def main():
 Examples:
   python show_multiple_npy.py /path/to/your/data
   python show_multiple_npy.py /path/to/your/data --data-type depth
+  python show_multiple_npy.py /path/to/your/data --data-type rgb
   python show_multiple_npy.py --select
   python show_multiple_npy.py  # uses default path
         '''
@@ -1114,7 +1162,7 @@ Examples:
                        help='Path to the data directory (optional, defaults to capture-viewer path)')
     parser.add_argument('--select', action='store_true',
                        help='Open file dialog to select data directory')
-    parser.add_argument('--data-type', type=str, choices=['left', 'left_raw', 'right', 'right_raw', 'depth', 'disparity'],
+    parser.add_argument('--data-type', type=str, choices=['left', 'left_raw', 'right', 'right_raw', 'depth', 'disparity', 'rgb'],
                        default='left', help='Initial data type to display (default: left)')
     
     args = parser.parse_args()
