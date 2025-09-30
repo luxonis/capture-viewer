@@ -143,6 +143,7 @@ def main(args):
                     print(mxid, end=' ')
                     finalise_capture(start_time, end_time, num_captures[mxid], streams)
                     capture_ended, save = True, False
+                    pipeline.getDefaultDevice().setIrLaserDotProjectorIntensity(0)
                     pipeline.stop()
 
             now = time.time()
@@ -151,6 +152,7 @@ def main(args):
                 print(mxid, end=' ')
                 finalise_capture(start_time, end_time, num_captures[mxid], streams)
                 capture_ended, save = True, False
+                pipeline.getDefaultDevice().setIrLaserDotProjectorIntensity(0)
                 pipeline.stop()
 
 if __name__ == "__main__":
