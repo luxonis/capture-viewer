@@ -260,7 +260,7 @@ class MultiDeviceControlApp:
         self.root.after(200, self.poll_statuses)
 
     def check_launch_ready(self):
-        self.all_ready = all(self.status_vars[device].get().lower() in ["ready", "projector on", "projector off"] for device in self.device_ports)
+        self.all_ready = all(self.status_vars[device].get().lower() in ["ready", "projector on", "projector off", "saved for projector False", "saved for projector True"] for device in self.device_ports)
         devices_launched = any(self.status_vars[device].get().lower() in ["ready", "projector on", "projector off", "capturing", "interrupted"] for device in self.device_ports)
 
         # Manage capture buttons based on device readiness
@@ -277,8 +277,8 @@ class MultiDeviceControlApp:
         elif self.running:
             self.start_sequence_button.config(state="disabled")
             self.simple_sequence_button.config(state="disabled")
-            self.save_one_button.config(state="disabled")
-            # Don't change message when capture is running - let it show current cycle
+            if not self.save_one_inicialized:  # todo ?
+                self.save_one_button.config(state="disabled")
         
         # Manage timing fields - only disable when capture is running
         if self.running:
@@ -290,8 +290,8 @@ class MultiDeviceControlApp:
             self.capture_sleep_entry.config(state="normal")
             self.cycle_wait_entry.config(state="normal")
         
-        # Edit config button: enabled unless devices are launched
-        if devices_launched:
+        # Edit config button: disabled when devices are launched OR capture is running
+        if devices_launched or self.running:
             self.edit_config_button.config(state="disabled")
         else:
             self.edit_config_button.config(state="enabled")
@@ -392,39 +392,20 @@ class MultiDeviceControlApp:
                 
             for device, port in self.device_ports.items():
                 send_command(port, "capturing_on")
-            time.sleep(1)
-
-            # Check if we should stop after first capture
-            if not self.running:
-                for device, port in self.device_ports.items():
-                    send_command(port, "capturing_off")
-                break
+            time.sleep(capture_sleep)
 
             for device, port in self.device_ports.items():
                 send_command(port, "capturing_off")
 
-            # Check if we should stop before projector sequence
-            if not self.running:
-                break
-
             for device, port in self.device_ports.items():
                 send_command(port, "projector_on")
                 time.sleep(projector_sleep)
-                
-                # Check if we should stop during projector sequence
-                if not self.running:
-                    send_command(port, "projector_off")
-                    break
                     
                 send_command(port, "capturing_on")
                 time.sleep(capture_sleep)
                 send_command(port, "capturing_off")
                 send_command(port, "projector_off")
-            
-            # Check if we should stop before final wait
-            if not self.running:
-                break
-                
+
             time.sleep(cycle_wait)
 
             for device, port in self.device_ports.items():
@@ -535,6 +516,7 @@ class MultiDeviceControlApp:
         self.save_one_button.config(state="disabled")
         self.set_message("Saving one frame per stream...")
         self.running = True
+        self.in_snapshot_mode = True  # Enter snapshot mode
 
         threading.Thread(target=self._run_save_one, daemon=True).start()
 
@@ -544,7 +526,7 @@ class MultiDeviceControlApp:
             projector_sleep = float(self.projector_sleep_var.get() or "5")
                 
             if not self.save_one_inicialized:
-                self.set_message("Inicializing...")
+                self.set_message("Initializing new capture session...")
                 for device, port in self.device_ports.items():
                     self.send_capture_name(port, self.get_current_capture_name())
                     send_command(port, "inicialize")
@@ -563,12 +545,13 @@ class MultiDeviceControlApp:
                 time.sleep(1)
                 send_command(port, "projector_off")
 
-            self.set_message("Saved! Click again to continue")
+            self.set_message("Snapshot saved! Ready for next snapshot or click 'End Capture' to finish")
+            # Re-enable Save One button for next snapshot
+            self.save_one_button.config(state="enabled")
+            print(f"DEBUG: Save One button enabled, in_snapshot_mode={self.in_snapshot_mode}, running={self.running}")
 
         except Exception as e:
             self.set_message(f"Save-one error: {e}")
-
-        finally:
             self.running = False
             # Re-enable buttons if devices are ready
             self.check_launch_ready()
@@ -585,12 +568,19 @@ class MultiDeviceControlApp:
             self.set_message("No capture running")
             return
             
-        self.set_message(f"Stopping capture... (will finish current cycle {self.current_cycle})")
+        self.set_message("Ending capture...")
         self.running = False  # This will cause the capture loop to exit gracefully
         self.save_one_inicialized = False
+        self.in_snapshot_mode = False  # Exit snapshot mode
         
-        # Don't call cleanup immediately - let the capture loop finish gracefully
-        # The cleanup will be called in the capture loop when it exits
+        # Call cleanup to finalize current capture
+        for device, port in self.device_ports.items():
+            send_command(port, 'cleanup')
+        
+        self.set_message("Capture ended. Ready for next capture.")
+        
+        # Re-enable buttons if devices are ready
+        self.check_launch_ready()
 
     def _finalize_exit(self):
         self.end_capture()
