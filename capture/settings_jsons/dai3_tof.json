@@ -5,11 +5,7 @@
     "flood_light_intensity": 1,
     "stereoResolution": {
         "x": 1280,
-        "y": 720
-    },
-    "rgbResolution": {
-        "x": 1920,
-        "y": 1080
+        "y": 800
     },
     "alignSocket": "REC_RIGHT",
     "LRcheck": true,
@@ -21,12 +17,8 @@
     "sync_on_host": true,
 
     "output_settings": {
-        "left": true,
-        "right": true,
-        "left_raw": false,
-        "right_raw": false,
-        "rgb": false,
-        "rgb_raw": false,
+        "left": false,
+        "right": false,
         "tof": true,
         "tof_depth": true,
         "tof_intensity": true,

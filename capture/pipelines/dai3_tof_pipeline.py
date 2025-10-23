@@ -35,7 +35,7 @@ def initialize_pipeline(pipeline, settings):
         monoRight = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_C)
         monoRightOut = configure_cam(monoRight, settings["stereoResolution"]["x"], settings["stereoResolution"]["y"], settings["FPS"])
 
-    if output_settings["rgb"]:
+    if output_settings.get("rgb", False):
         color = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_A)
         colorOut = configure_cam(color, settings["rgbResolution"]["x"], settings["rgbResolution"]["y"], settings["FPS"])
 
@@ -44,15 +44,15 @@ def initialize_pipeline(pipeline, settings):
         tof = set_tof_node(pipeline, settings)
 
     # Create input control queues
-    if output_settings["left"] or output_settings["left_raw"]: 
+    if output_settings["left"]: 
         input_queues["left_input_control"] = monoLeft.inputControl.createInputQueue()
-    if output_settings["right"] or output_settings["right_raw"]: 
+    if output_settings["right"]: 
         input_queues["right_input_control"] = monoRight.inputControl.createInputQueue()
-    if output_settings["rgb"] or output_settings.get("rgb_raw", False): 
+    if output_settings.get("rgb", False): 
         input_queues["rgb_input_control"] = color.inputControl.createInputQueue()
 
     # Create stereo depth if needed
-    if output_settings.get('hw_sync', False) or output_settings["depth"] or output_settings["disparity"]:
+    if (output_settings.get('hw_sync', False) or output_settings["depth"] or output_settings["disparity"]) and (output_settings["left"] and output_settings["right"]):
         stereo = pipeline.create(dai.node.StereoDepth)
         stereo.setRectification(True)
         stereo.setDefaultProfilePreset(eval(f"dai.node.StereoDepth.PresetMode.{settings['profilePreset']}"))
@@ -71,7 +71,7 @@ def initialize_pipeline(pipeline, settings):
         sync.setRunOnHost(settings.get('sync_on_host', True))
 
         # Link stereo outputs to sync
-        if output_settings.get('hw_sync', False) or output_settings["depth"] or output_settings["disparity"]:
+        if (output_settings.get('hw_sync', False) or output_settings["depth"] or output_settings["disparity"]) and (output_settings["left"] and output_settings["right"]):
             stereo.syncedLeft.link(sync.inputs["left"])
             stereo.syncedRight.link(sync.inputs["right"])
             if output_settings["depth"]:
@@ -79,20 +79,15 @@ def initialize_pipeline(pipeline, settings):
             if output_settings["disparity"]:
                 stereo.disparity.link(sync.inputs["disparity"])
         else:
-            monoLeftOut.link(sync.inputs["left"])
-            monoRightOut.link(sync.inputs["right"])
+            if output_settings["left"]:
+                monoLeftOut.link(sync.inputs["left"])
+            if output_settings["right"]:
+                monoRightOut.link(sync.inputs["right"])
 
         # Link RGB to sync
-        if output_settings["rgb"]:
+        if output_settings.get("rgb", False):
             colorOut.link(sync.inputs["rgb"])
 
-        # Link raw outputs to sync
-        if output_settings["left_raw"]: 
-            monoLeft.raw.link(sync.inputs["left_raw"])
-        if output_settings["right_raw"]: 
-            monoRight.raw.link(sync.inputs["right_raw"])
-        if output_settings.get("rgb_raw", False):
-            color.raw.link(sync.inputs["rgb_raw"])
 
         # Link ToF outputs to sync
         if output_settings["tof"] or output_settings.get("tof_depth", False) or output_settings.get("tof_intensity", False) or output_settings.get("tof_amplitude", False):
@@ -107,26 +102,24 @@ def initialize_pipeline(pipeline, settings):
 
     else:
         # Individual queues without sync
-        if output_settings.get('hw_sync', False) or output_settings["depth"] or output_settings["disparity"]:
-            queues['left'] = stereo.syncedLeft.createOutputQueue()
-            queues['right'] = stereo.syncedRight.createOutputQueue()
+        if (output_settings.get('hw_sync', False) or output_settings["depth"] or output_settings["disparity"]) and (output_settings["left"] and output_settings["right"]):
+            if output_settings["left"]:
+                queues['left'] = stereo.syncedLeft.createOutputQueue()
+            if output_settings["right"]:
+                queues['right'] = stereo.syncedRight.createOutputQueue()
             if output_settings["depth"]:
                 queues['depth'] = stereo.depth.createOutputQueue()
             if output_settings["disparity"]:
                 queues['disparity'] = stereo.disparity.createOutputQueue()
         else:
-            queues['left'] = monoLeftOut.createOutputQueue()
-            queues['right'] = monoRightOut.createOutputQueue()
+            if output_settings["left"]:
+                queues['left'] = monoLeftOut.createOutputQueue()
+            if output_settings["right"]:
+                queues['right'] = monoRightOut.createOutputQueue()
 
-        if output_settings["rgb"]:
+        if output_settings.get("rgb", False):
             queues["rgb"] = colorOut.createOutputQueue()
 
-        if output_settings["left_raw"]: 
-            queues['left_raw'] = monoLeft.raw.createOutputQueue()
-        if output_settings["right_raw"]: 
-            queues['right_raw'] = monoRight.raw.createOutputQueue()
-        if output_settings.get("rgb_raw", False):
-            queues['rgb_raw'] = color.raw.createOutputQueue()
 
         # ToF individual queues
         if output_settings["tof"] or output_settings.get("tof_depth", False) or output_settings.get("tof_intensity", False) or output_settings.get("tof_amplitude", False):

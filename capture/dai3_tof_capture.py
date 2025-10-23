@@ -17,7 +17,6 @@ if str(dai.__version__)[0] != "3":
 script_dir = os.path.dirname(os.path.abspath(__file__))
 root_path = os.path.join(os.path.dirname(script_dir), 'DATA')
 
-from utils.raw_data_utils import unpackRaw10
 from utils.show_frames import visualize_frame, visualize_frame_info
 from utils.capture_universal import initialize_capture, finalise_capture, count_output_streams
 from utils.parse_arguments import parseArguments, process_argument_logic
@@ -25,15 +24,44 @@ from utils.isp_control import initialize_mono_control, controlQueueSend
 
 from pipelines.dai3_tof_pipeline import initialize_pipeline
 
-def colorizeToFDepth(frameDepth):
-    """Colorize ToF depth frame for visualization"""
-    invalidMask = frameDepth == 0
-    # Estimate max depth from typical phase unwrapping level (4)
-    maxDepth = (4 + 1) * 1500  # ~7500 mm range for 100MHz
-    # Linear interpolation to 0-255
-    depthFrameColor = np.interp(frameDepth, (0, maxDepth), (0, 255)).astype(np.uint8)
+def colorizeToFDepth(frameDepth, phaseUnwrappingLevel=4):
+    """Colorize ToF depth frame for visualization based on phase unwrapping level"""
+    # Handle invalid/zero depth values
+    invalidMask = (frameDepth == 0) | (frameDepth < 0) | np.isnan(frameDepth)
+    
+    # ToF depth data is in 16-bit format where max value (65535) represents max distance
+    # Calculate actual max distance in mm based on phase unwrapping level
+    # For 100MHz: max_distance_mm = (phaseUnwrappingLevel + 1) * 1498
+    maxDistanceMm = (phaseUnwr0appingLevel + 1) * 1498
+    
+    # Convert 16-bit depth values to actual distances in mm
+    # Scale from [0, 65535] to [0, maxDistanceMm]
+    actualDepthMm = (frameDepth / 65535.0) * maxDistanceMm
+    
+    # Get valid depth values for better range estimation
+    validDepths = actualDepthMm[~invalidMask]
+    if len(validDepths) > 0:
+        # Use 95th percentile for better visualization (avoids outliers)
+        actualMaxDepth = np.percentile(validDepths, 95)
+        # Use the smaller of calculated max or actual data max
+        maxDepth = min(maxDistanceMm, actualMaxDepth)
+    else:
+        maxDepth = maxDistanceMm
+    
+    # Ensure we have a reasonable range
+    if maxDepth <= 0:
+        maxDepth = 1000  # Default fallback
+    
+    # Normalize actual depth to 0-255 range
+    depthNormalized = np.clip(actualDepthMm / maxDepth, 0, 1)
+    depthFrameColor = (depthNormalized * 255).astype(np.uint8)
+    
+    # Apply colormap
     depthFrameColor = cv2.applyColorMap(depthFrameColor, cv2.COLORMAP_JET)
-    depthFrameColor[invalidMask] = 0
+    
+    # Set invalid pixels to black
+    depthFrameColor[invalidMask] = [0, 0, 0]
+    
     return depthFrameColor
 
 def main(args):
@@ -107,11 +135,7 @@ def main(args):
                 for name, msg in msgGrp:
                     timestamp = int(msg.getTimestamp().total_seconds() * 1000)
 
-                    if 'raw' in name:
-                        dataRaw = msg.getData()
-                        cvFrame = unpackRaw10(dataRaw, msg.getWidth(), msg.getHeight(), msg.getStride())
-                    else: 
-                        cvFrame = msg.getCvFrame()
+                    cvFrame = msg.getCvFrame()
 
                     if save:
                         if name in ['left', 'right']:
@@ -122,7 +146,22 @@ def main(args):
                     if show_streams:
                         # Special visualization for ToF depth
                         if name == 'tof_depth':
-                            visualized_depth = colorizeToFDepth(cvFrame)
+                            phaseUnwrappingLevel = settings.get("tofConfig", {}).get("phaseUnwrappingLevel", 4)
+                            # Debug: print depth statistics for each frame
+                            h, w = cvFrame.shape[:2]
+                            center_h, center_w = h // 2, w // 2
+                            center_region = cvFrame[center_h-5:center_h+5, center_w-5:center_w+5]
+                            center_mean = np.mean(center_region) if center_region.size > 0 else 0
+                            
+                            # Convert to actual distances for better understanding
+                            maxDistanceMm = (phaseUnwrappingLevel + 1) * 1498
+                            actualMinMm = (np.min(cvFrame) / 65535.0) * maxDistanceMm
+                            actualMaxMm = (np.max(cvFrame) / 65535.0) * maxDistanceMm
+                            actualMeanMm = (np.mean(cvFrame) / 65535.0) * maxDistanceMm
+                            actualCenterMm = (center_mean / 65535.0) * maxDistanceMm
+                            
+                            print(f"Frame {timestamp}: Raw[Min: {np.min(cvFrame)}, Max: {np.max(cvFrame)}, Mean: {np.mean(cvFrame):.1f}] -> Actual[Min: {actualMinMm:.1f}mm, Max: {actualMaxMm:.1f}mm, Mean: {actualMeanMm:.1f}mm, Center: {actualCenterMm:.1f}mm], Phase Level: {phaseUnwrappingLevel}")
+                            visualized_depth = colorizeToFDepth(cvFrame, phaseUnwrappingLevel)
                             visualize_frame(name, visualized_depth, timestamp, mxid)
                         else:
                             visualize_frame(name, cvFrame, timestamp, mxid)
@@ -131,11 +170,7 @@ def main(args):
             else:
                 for name in q.keys():
                     frame = q[name].get()
-                    if 'raw' in name:
-                        dataRaw = frame.getData()
-                        cvFrame = unpackRaw10(dataRaw, frame.getWidth(), frame.getHeight(), frame.getStride())
-                    else: 
-                        cvFrame = frame.getCvFrame()
+                    cvFrame = frame.getCvFrame()
                     timestamp = int(frame.getTimestamp().total_seconds() * 1000)
                     if save:
                         if name in ['left', 'right']:
@@ -146,7 +181,22 @@ def main(args):
                     if show_streams:
                         # Special visualization for ToF depth
                         if name == 'tof_depth':
-                            visualized_depth = colorizeToFDepth(cvFrame)
+                            phaseUnwrappingLevel = settings.get("tofConfig", {}).get("phaseUnwrappingLevel", 4)
+                            # Debug: print depth statistics for each frame
+                            h, w = cvFrame.shape[:2]
+                            center_h, center_w = h // 2, w // 2
+                            center_region = cvFrame[center_h-5:center_h+5, center_w-5:center_w+5]
+                            center_mean = np.mean(center_region) if center_region.size > 0 else 0
+                            
+                            # Convert to actual distances for better understanding
+                            maxDistanceMm = (phaseUnwrappingLevel + 1) * 1498
+                            actualMinMm = (np.min(cvFrame) / 65535.0) * maxDistanceMm
+                            actualMaxMm = (np.max(cvFrame) / 65535.0) * maxDistanceMm
+                            actualMeanMm = (np.mean(cvFrame) / 65535.0) * maxDistanceMm
+                            actualCenterMm = (center_mean / 65535.0) * maxDistanceMm
+                            
+                            print(f"Frame {timestamp}: Raw[Min: {np.min(cvFrame)}, Max: {np.max(cvFrame)}, Mean: {np.mean(cvFrame):.1f}] -> Actual[Min: {actualMinMm:.1f}mm, Max: {actualMaxMm:.1f}mm, Mean: {actualMeanMm:.1f}mm, Center: {actualCenterMm:.1f}mm], Phase Level: {phaseUnwrappingLevel}")
+                            visualized_depth = colorizeToFDepth(cvFrame, phaseUnwrappingLevel)
                             visualize_frame(name, visualized_depth, timestamp, mxid)
                         else:
                             visualize_frame(name, cvFrame, timestamp, mxid)
